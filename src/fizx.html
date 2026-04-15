@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>FIZX VISUALIZER</title>
+    <style>
+        :root {
+            --bg-body:       #030603;
+            --bg-container:  linear-gradient(145deg, #141a14, #0a0f0a);
+            --bg-screen:     #0a0e0a;
+            --border-screen: #2a4a2a;
+            --color-primary: #1eff00;
+            --color-dim:     #3c9e3c;
+            --color-faint:   #2a8a2a;
+            --color-muted:   #3a7a3a;
+            --shadow-screen: inset 0 0 25px rgba(0,255,0,0.06);
+            --shadow-outer:  0 0 0 2px #1a3a1a, 0 20px 40px rgba(0,0,0,0.5);
+            --bg-stats:      #0a0c0a;
+            --bg-btn:        #1a2a1a;
+            --border-btn:    #3c9e3c;
+            --color-btn:     #aaffaa;
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+
+        body {
+            background: var(--bg-body);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', 'Fira Code', monospace;
+            transition: background 0.5s ease;
+        }
+
+        /* ── STAGE ────────────────────────────────────────────────────────
+           9:16 default. .ar-landscape flips to 16:9.
+           max-width uses min() so the stage never overflows either axis.
+        ── */
+        .stage {
+            aspect-ratio: 9 / 16;
+            max-width: min(100vw, calc(100vh * 9 / 16));
+            width: 100%;
+            position: relative;
+            box-shadow: var(--shadow-outer);
+            transition: box-shadow 0.5s ease, max-width 0.3s ease, aspect-ratio 0.3s ease;
+        }
+        .stage.ar-landscape {
+            aspect-ratio: 16 / 9;
+            max-width: min(100vw, calc(100vh * 16 / 9));
+        }
+
+        .container {
+            width: 100%;
+            height: 100%;
+            background: var(--bg-container);
+            display: flex;
+            flex-direction: column;
+            padding: 10px 10px 14px 10px;
+            transition: background 0.5s ease;
+        }
+
+        /* ── SCREEN ──────────────────────────────────────────────────── */
+        .screen {
+            flex: 1;
+            background: var(--bg-screen);
+            border-radius: 10px;
+            box-shadow: var(--shadow-screen);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border-screen);
+            margin-bottom: 6px;
+            transition: background 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
+        }
+
+        /* CRT scanlines — only when .crt-on present (RAP preset) */
+        .screen.crt-on::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0,255,0,0.04) 0px, rgba(0,255,0,0.04) 2px,
+                transparent 2px, transparent 5px
+            );
+            pointer-events: none;
+            z-index: 5;
+        }
+        .screen.crt-on::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 40%, transparent 50%, rgba(0,0,0,0.5) 100%);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* Screen flash — color injected via JS into a CSS var per preset */
+        @keyframes kScreenFlash {
+            0%   { box-shadow: inset 0 0 60px var(--flash-color), 0 0 20px var(--flash-color); }
+            100% { box-shadow: var(--shadow-screen); }
+        }
+        .screen.screen-flash { animation: kScreenFlash 0.12s ease-out; }
+
+        /* Scan wipe — only active on CRT screens (RAP) */
+        @keyframes kScanWipe {
+            0%   { background-position: 0 -100%; }
+            100% { background-position: 0 200%; }
+        }
+        .screen.crt-on.scan-active::before {
+            background:
+                repeating-linear-gradient(0deg,
+                    rgba(0,255,0,0.04) 0px, rgba(0,255,0,0.04) 2px,
+                    transparent 2px, transparent 5px),
+                linear-gradient(to bottom, transparent 0%, rgba(0,255,0,0.18) 50%, transparent 100%);
+            background-size: 100% 100%, 100% 30%;
+            animation: kScanWipe 0.25s linear;
+        }
+
+        /* ── LYRIC AREA ──────────────────────────────────────────────── */
+        .lyric-area {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 10;
+            padding: 30px 20px 80px 20px;
+        }
+
+        .current-line {
+            font-size: clamp(2.5rem, 5.5vw, 2.3rem);
+            font-weight: bold;
+            color: var(--color-primary);
+            text-shadow: 0 0 5px var(--color-dim), 0 0 8px var(--color-faint);
+            margin-bottom: 16px;
+            line-height: 1.4;
+            transition: color 0.5s ease, text-shadow 0.5s ease;
+        }
+
+        .next-line {
+            font-size: clamp(0.5rem, 3vw, 1rem);
+            color: var(--color-dim);
+            opacity: 0.7;
+            border-top: 1px dashed var(--color-faint);
+            padding-top: 15px;
+            transition: color 0.5s ease, border-color 0.5s ease;
+        }
+
+        /* ── BEAT CIRCLE ─────────────────────────────────────────────── */
+        .beat-circle-wrap {
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 12;
+        }
+        .beat-circle-wrap.circle-off { display: none; }
+
+        /* Dust particles — color set per-particle via JS */
+        .dust-particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 6;
+            filter: blur(1px);
+        }
+        @keyframes kFloatUp {
+            0%   { transform: translateY(0) translateX(0);         opacity: 0; }
+            20%  { opacity: 0.5; }
+            80%  { opacity: 0.2; }
+            100% { transform: translateY(-100px) translateX(30px); opacity: 0; }
+        }
+
+        /* ── STATUS BAR ──────────────────────────────────────────────── */
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--color-faint);
+            font-size: 8px;
+            background: var(--bg-stats);
+            padding: 4px 10px;
+            border-radius: 20px;
+            margin-top: 5px;
+            font-family: monospace;
+            transition: background 0.5s ease, color 0.5s ease;
+        }
+
+        /* ── CONTROLS ────────────────────────────────────────────────── */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        /* Icon-only buttons — label appears on hover via tooltip */
+        button {
+            background: var(--bg-btn);
+            border: 1px solid var(--border-btn);
+            color: var(--color-btn);
+            font-family: monospace;
+            font-weight: bold;
+            /* Square-ish touch targets, compact */
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 0.85rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: filter 0.1s, box-shadow 0.1s, border-color 0.4s, color 0.4s, background 0.4s;
+        }
+
+        button:hover {
+            filter: brightness(1.5);
+            box-shadow: 0 0 8px var(--color-primary);
+        }
+
+        /* Tooltip shown on hover — the data-tip attribute holds the label */
+        button::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #111;
+            color: var(--color-btn);
+            font-size: 7px;
+            white-space: nowrap;
+            padding: 2px 6px;
+            border-radius: 4px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            border: 1px solid var(--border-btn);
+        }
+        button:hover::after { opacity: 1; }
+
+        /* Main row: 5 icon buttons */
+        .controls-row-main {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button.btn-util {
+            width: auto;
+            height: 20px;
+            border-radius: 10px;
+            font-size: 0.6rem;
+            padding: 0 8px;
+            border-radius: 10px;
+            margin-top: 14px;
+        }
+        button.btn-util:hover::after { bottom: calc(100% + 4px); }
+
+        .status-text {
+            font-size: 7px;
+            text-align: center;
+            margin-top: 4px;
+            color: var(--color-muted);
+            font-family: monospace;
+            transition: color 0.5s ease;
+        }
+
+        /* ── RAP ANIMATIONS ─────────────────────────────────────────── */
+        @keyframes kShake {
+            0%   { transform: translate(0,0);       text-shadow: 0 0 3px #0f0; }
+            25%  { transform: translate(-2px,1px);  text-shadow: 2px 0 #ff00aa; }
+            50%  { transform: translate(2px,-1px);  text-shadow: -2px 0 #0effff; }
+            75%  { transform: translate(-1px,1px); }
+            100% { transform: translate(0,0);        text-shadow: 0 0 5px #1eff00; }
+        }
+        @keyframes kGlitch {
+            0%   { text-shadow: -1px 0 #ff00aa,  1px 0 #00ffff; opacity: 1; }
+            50%  { text-shadow:  2px 0 #ff00aa, -2px 0 #00ffff; opacity: 0.9; }
+            100% { text-shadow: 0 0 5px #1eff00; opacity: 1; }
+        }
+        @keyframes kChroma {
+            0%   { filter: none; text-shadow: 0 0 0 transparent; }
+            30%  { text-shadow: -4px 0 #ff0044, 4px 0 #00ffcc; filter: brightness(1.4); }
+            60%  { text-shadow:  3px 0 #ff0044,-3px 0 #00ffcc; }
+            100% { filter: none; text-shadow: 0 0 5px #1eff00; }
+        }
+        @keyframes kFlicker {
+            0%  {opacity:1;} 15%{opacity:0.2;} 30%{opacity:1;}
+            50% {opacity:0.5;} 65%{opacity:1;} 80%{opacity:0.3;} 100%{opacity:1;}
+        }
+        @keyframes kZoom {
+            0%  { transform: scale(1); }
+            40% { transform: scale(1.08); }
+            100%{ transform: scale(1); }
+        }
+
+        /* ── ETHEREAL ANIMATIONS ─────────────────────────────────────── */
+        @keyframes kDrift {
+            0%  { transform: translateY(0);    opacity: 1; }
+            40% { transform: translateY(-4px); opacity: 0.75; }
+            70% { transform: translateY(-2px); opacity: 0.9; }
+            100%{ transform: translateY(0);    opacity: 1; }
+        }
+        @keyframes kBreathe {
+            0%  { letter-spacing: normal; opacity: 1; filter: blur(0); }
+            50% { letter-spacing: 0.06em; opacity: 0.8; filter: blur(0.5px); }
+            100%{ letter-spacing: normal; opacity: 1; filter: none; }
+        }
+        @keyframes kAurora {
+            0%  { text-shadow: 0 0 8px #a855f7, 0 0 20px #7c3aed; }
+            33% { text-shadow: 0 0 12px #c084fc,0 0 28px #a855f7; }
+            66% { text-shadow: 0 0 10px #818cf8,0 0 22px #6366f1; }
+            100%{ text-shadow: 0 0 8px #a855f7, 0 0 20px #7c3aed; }
+        }
+        @keyframes kDissolve {
+            0%  { opacity:1;   filter:blur(0); }
+            30% { opacity:0.5; filter:blur(2px); }
+            60% { opacity:0.85;filter:blur(0.5px); }
+            100%{ opacity:1;   filter:blur(0); }
+        }
+        @keyframes kFloat {
+            0%  { transform: scale(1)    translateY(0); }
+            50% { transform: scale(1.03) translateY(-3px); }
+            100%{ transform: scale(1)    translateY(0); }
+        }
+
+        .fx-shake   { animation: kShake   0.08s ease-in-out; }
+        .fx-glitch  { animation: kGlitch  0.12s 2; }
+        .fx-chroma  { animation: kChroma  0.18s ease-out; }
+        .fx-flicker { animation: kFlicker 0.20s linear; }
+        .fx-zoom    { animation: kZoom    0.15s ease-out; }
+        .fx-drift   { animation: kDrift   0.60s ease-in-out; }
+        .fx-breathe { animation: kBreathe 0.80s ease-in-out; }
+        .fx-aurora  { animation: kAurora  0.70s ease-in-out; }
+        .fx-dissolve{ animation: kDissolve 0.50s ease-in-out; }
+        .fx-float   { animation: kFloat   0.65s ease-in-out; }
+    </style>
+</head>
+<body>
+<div class="stage" id="stage">
+    <div class="container">
+        <div class="screen" id="screen">
+            <div class="lyric-area">
+                <div class="current-line" id="currentLine">⚡ FIZX READY ⚡</div>
+                <div class="next-line"    id="nextLine">▶ select audio file</div>
+            </div>
+            <div class="beat-circle-wrap" id="beatCircleWrap"></div>
+        </div>
+
+        <div class="stats">
+            <!-- <span>💻 4GB | 2 CORE</span> -->
+            <span id="statusMsg">click ▶ to load audio</span>
+            <!-- <span id="presetLabel">RAP</span> -->
+            <!-- <span id="modeLabel">A</span> -->
+            <span id="timeDisplay">0:00</span>
+            <span id="bpmDisplay">-- BPM</span>
+        </div>
+
+        <div class="controls">
+            <div class="controls-row-main">
+                <!-- data-tip = tooltip shown on hover -->
+                <button class="btn-util" id="arBtn"     data-tip="Aspect ratio">⊞ 16:9</button>
+
+                <button id="playBtn"    data-tip="Play / Pause">▶</button>
+                <button id="resetBtn"   data-tip="Reset + new file">⟳</button>
+                <button id="modeBtn"    data-tip="Sync mode A/B">⇄</button>
+                <button id="presetBtn"  data-tip="Switch preset">🎨</button>
+
+
+                <button class="btn-util" id="circleBtn" data-tip="Beat circle">◎ off</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// INJECTED DATA
+// compile.py replaces these three blocks with real content.
+// When editing manually: paste beats array and BPM from ex_beats.py,
+// edit LYRICS and PRESETS / PRESET_ORDER directly below.
+// ═══════════════════════════════════════════════════════════════════
+
+/* @@PRESETS@@ */
+const PRESETS = {
+    rap: {
+        label: 'RAP',
+        cssVars: {
+            '--bg-body':'#030603','--bg-container':'linear-gradient(145deg,#141a14,#0a0f0a)',
+            '--bg-screen':'#0a0e0a','--border-screen':'#2a4a2a','--color-primary':'#1eff00',
+            '--color-dim':'#3c9e3c','--color-faint':'#2a8a2a','--color-muted':'#3a7a3a',
+            '--shadow-screen':'inset 0 0 25px rgba(0,255,0,0.06)',
+            '--shadow-outer':'0 0 0 2px #1a3a1a, 0 20px 40px rgba(0,0,0,0.5)',
+            '--bg-stats':'#0a0c0a','--bg-btn':'#1a2a1a','--border-btn':'#3c9e3c','--color-btn':'#aaffaa',
+            '--crt-on':'1',
+        },
+        dustColor:  'rgba(30,255,0,0.25)',
+        flashColor: 'rgba(0,255,0,0.4)',
+        effects: [
+            { className:'fx-shake',   duration:100, useFlash:true,  useScan:false },
+            { className:'fx-glitch',  duration:260, useFlash:false, useScan:false },
+            { className:'fx-chroma',  duration:200, useFlash:false, useScan:true  },
+            { className:'fx-flicker', duration:220, useFlash:false, useScan:false },
+            { className:'fx-zoom',    duration:160, useFlash:true,  useScan:false },
+        ],
+        circle: { style:'ring', baseSize:60, pulseScale:1.6, pulseDuration:180, ringWidth:3, color:'#1eff00', glowColor:'rgba(30,255,0,0.5)' },
+    },
+    ethereal: {
+        label: 'ETHEREAL',
+        cssVars: {
+            '--bg-body':'#06030f','--bg-container':'linear-gradient(145deg,#0e0819,#070410)',
+            '--bg-screen':'#0b0718','--border-screen':'#2e1650','--color-primary':'#b388ff',
+            '--color-dim':'#7c4daa','--color-faint':'#4a2870','--color-muted':'#2e1650',
+            '--shadow-screen':'inset 0 0 35px rgba(140,70,220,0.06)',
+            '--shadow-outer':'0 0 0 2px #1e0a38, 0 20px 60px rgba(60,0,100,0.55)',
+            '--bg-stats':'#080514','--bg-btn':'#140a28','--border-btn':'#5c3080','--color-btn':'#c4a0f0',
+            '--crt-on':'0',
+        },
+        dustColor:  'rgba(160,100,255,0.15)',
+        flashColor: 'rgba(140,70,255,0.16)',
+        effects: [
+            { className:'fx-drift',    duration:600, useFlash:false, useScan:false },
+            { className:'fx-breathe',  duration:800, useFlash:false, useScan:false },
+            { className:'fx-aurora',   duration:700, useFlash:true,  useScan:false },
+            { className:'fx-dissolve', duration:500, useFlash:true,  useScan:false },
+            { className:'fx-float',    duration:650, useFlash:false, useScan:false },
+        ],
+        circle: { style:'bloom', baseSize:70, pulseScale:1.9, pulseDuration:700, ringWidth:0, color:'rgba(180,100,255,0.0)', glowColor:'rgba(150,80,255,0.5)' },
+    },
+};
+const PRESET_ORDER = ['rap','ethereal'];
+/* @@END_PRESETS@@ */
+
+/* @@LYRICS@@ */
+const LYRICS = [
+    { text:"Yeah...",                        start:1.0,  end:1.48 },
+    { text:"They said I couldn't build it.", start:1.48, end:3.0  },
+];
+/* @@END_LYRICS@@ */
+
+/* @@BEATS@@ */
+const BEAT_DATA = {
+    beats: [1.045,1.509,1.974,3.855,4.319,5.248,6.177,6.641,7.593,8.057,8.522,
+            10.844,11.796,13.677,17.903,19.296,20.689,21.177,23.522,24.451,24.915,
+            26.355,26.796,28.677,34.296,35.689,36.153,38.986,39.451,39.915,41.796,
+            42.26,43.189,44.606,45.534,45.999,46.486,47.903,53.034,54.938,55.844,56.75],
+    bpm: 129,
+};
+/* @@END_BEATS@@ */
+
+// ── DOM refs ──────────────────────────────────────────────────────
+const stageEl       = document.getElementById('stage');
+const screenEl      = document.getElementById('screen');
+const currentLineEl = document.getElementById('currentLine');
+const nextLineEl    = document.getElementById('nextLine');
+const timeDisplay   = document.getElementById('timeDisplay');
+const bpmDisplay    = document.getElementById('bpmDisplay');
+const statusMsg     = document.getElementById('statusMsg');
+// const presetLabel   = document.getElementById('presetLabel');
+// const modeLabel     = document.getElementById('modeLabel');
+const playBtn       = document.getElementById('playBtn');
+const resetBtn      = document.getElementById('resetBtn');
+const modeBtn       = document.getElementById('modeBtn');
+const presetBtn     = document.getElementById('presetBtn');
+const arBtn         = document.getElementById('arBtn');
+const circleBtn     = document.getElementById('circleBtn');
+const circleWrap    = document.getElementById('beatCircleWrap');
+
+// ── State ─────────────────────────────────────────────────────────
+let beatTimestamps = [...BEAT_DATA.beats];
+let bpm            = BEAT_DATA.bpm;
+let currentMode    = 'A';
+let currentPreset  = PRESET_ORDER[0];
+let circleEnabled  = true;
+let isLandscape    = false;
+let isPlaying      = false;
+
+let audio           = null;
+let audioContext    = null;
+let t0              = null;
+let scheduledTimers = [];
+let animFrameId     = null;
+let beatCircle      = null;
+
+// ═══════════════════════════════════════════════════════════════════
+// BEAT CIRCLE
+// Canvas-rendered, rebuilt on preset switch.
+// RAP  : hollow ring, hard snap scale pulse.
+// ETHEREAL: radial gradient bloom, slow fade pulse.
+// ═══════════════════════════════════════════════════════════════════
+class BeatCircle {
+    constructor(wrap, cfg) {
+        this.cfg    = cfg;
+        this._rafId = null;
+        this.scale  = 1;
+        const sz    = cfg.baseSize * 2.6;
+        this.canvas = document.createElement('canvas');
+        this.canvas.width  = sz;
+        this.canvas.height = sz;
+        this.canvas.style.cssText = `width:${sz}px;height:${sz}px;display:block;`;
+        wrap.innerHTML = '';
+        wrap.appendChild(this.canvas);
+        this.ctx = this.canvas.getContext('2d');
+        this._draw();
+    }
+
+    pulse() {
+        const { pulseDuration, pulseScale } = this.cfg;
+        const start = performance.now();
+        const go = now => {
+            const p    = Math.min((now - start) / pulseDuration, 1);
+            // sin curve: fast attack, slow release
+            this.scale = 1 + (pulseScale - 1) * Math.sin(p * Math.PI);
+            this._draw();
+            if (p < 1) this._rafId = requestAnimationFrame(go);
+            else { this.scale = 1; this._draw(); }
+        };
+        if (this._rafId) cancelAnimationFrame(this._rafId);
+        this._rafId = requestAnimationFrame(go);
+    }
+
+    _draw() {
+        const { canvas, ctx, cfg, scale } = this;
+        const cx = canvas.width  / 2;
+        const cy = canvas.height / 2;
+        const r  = (cfg.baseSize / 2) * scale;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (cfg.style === 'ring') {
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.strokeStyle = cfg.color;
+            ctx.lineWidth   = cfg.ringWidth;
+            ctx.shadowColor = cfg.glowColor;
+            ctx.shadowBlur  = 10 + (scale - 1) * 20;
+            ctx.globalAlpha = 0.7 + (scale - 1) * 0.3;
+            ctx.stroke();
+        } else {
+            // Bloom: radial gradient with no hard edge
+            const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.4);
+            const a = 0.12 + (scale - 1) * 0.5;
+            g.addColorStop(0,   `rgba(180,100,255,${a * 1.5})`);
+            g.addColorStop(0.4, `rgba(140,60,240,${a})`);
+            g.addColorStop(0.75,`rgba(100,30,200,${a * 0.4})`);
+            g.addColorStop(1,   'rgba(80,20,180,0)');
+            ctx.fillStyle   = g;
+            ctx.shadowColor = cfg.glowColor;
+            ctx.shadowBlur  = 28 + (scale - 1) * 40;
+            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+
+    destroy() { if (this._rafId) cancelAnimationFrame(this._rafId); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PRESET APPLICATION
+// Injects CSS vars, toggles CRT, rebuilds dust and beat circle.
+// ═══════════════════════════════════════════════════════════════════
+function applyPreset(key) {
+    const p = PRESETS[key];
+    currentPreset = key;
+
+    // Inject CSS custom properties
+    const root = document.documentElement;
+    Object.entries(p.cssVars).forEach(([k, v]) => root.style.setProperty(k, v));
+
+    // --flash-color drives the @keyframes kScreenFlash box-shadow
+    root.style.setProperty('--flash-color', p.flashColor);
+
+    screenEl.classList.toggle('crt-on', p.cssVars['--crt-on'] === '1');
+
+    // Rebuild dust with preset color
+    document.querySelectorAll('.dust-particle').forEach(el => el.remove());
+    createDust(p.dustColor);
+
+    // Rebuild beat circle with preset config
+    if (beatCircle) beatCircle.destroy();
+    beatCircle = new BeatCircle(circleWrap, p.circle);
+
+    // // Update status bar label
+    // presetLabel.textContent = p.label;
+
+    // Update preset button to show the next preset name
+    const nextKey = PRESET_ORDER[(PRESET_ORDER.indexOf(key) + 1) % PRESET_ORDER.length];
+    presetBtn.setAttribute('data-tip', `→ ${PRESETS[nextKey].label}`);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VISUAL TRIGGER
+// Picks a random effect from the active preset pool.
+// Flash uses --flash-color so it's automatically preset-aware.
+// ═══════════════════════════════════════════════════════════════════
+function triggerVisual() {
+    const pool   = PRESETS[currentPreset].effects;
+    const effect = pool[Math.floor(Math.random() * pool.length)];
+
+    // Reflow guard: forces browser to treat re-added class as new animation
+    currentLineEl.classList.remove(effect.className);
+    void currentLineEl.offsetWidth;
+    currentLineEl.classList.add(effect.className);
+    setTimeout(() => currentLineEl.classList.remove(effect.className), effect.duration + 20);
+
+    if (effect.useFlash) {
+        screenEl.classList.add('screen-flash');
+        setTimeout(() => screenEl.classList.remove('screen-flash'), 150);
+    }
+
+    if (effect.useScan && screenEl.classList.contains('crt-on')) {
+        screenEl.classList.add('scan-active');
+        setTimeout(() => screenEl.classList.remove('scan-active'), 280);
+    }
+
+    if (circleEnabled && beatCircle) beatCircle.pulse();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCHEDULER
+// setTimeout anchored to AudioContext clock via t0.
+// t0 = AudioContext.currentTime captured at play().then() resolution,
+// which absorbs browser audio startup latency automatically.
+// ═══════════════════════════════════════════════════════════════════
+function scheduleAll(timestamps) {
+    cancelScheduled();
+    const atx = audioContext.currentTime;
+    timestamps.forEach(ts => {
+        const ms = (t0 + ts - atx) * 1000;
+        if (ms < 0) return;
+        scheduledTimers.push(setTimeout(triggerVisual, ms));
+    });
+}
+
+function cancelScheduled() {
+    scheduledTimers.forEach(id => clearTimeout(id));
+    scheduledTimers = [];
+}
+
+// ── rAF display loop — lyrics text + time counter only ───────────
+function updateLyrics(t) {
+    const idx = LYRICS.findIndex(l => t >= l.start && t <= l.end);
+    if (idx !== -1) {
+        currentLineEl.textContent = LYRICS[idx].text;
+        const next = LYRICS[idx + 1];
+        nextLineEl.textContent = next ? `➡ ${next.text}` : `🏁 FINISH`;
+    } else if (LYRICS.length && t > LYRICS[LYRICS.length - 1].end) {
+        currentLineEl.textContent = `@AmMoPy`;
+        nextLineEl.textContent    = `⭐ SHOW SOME LOVE ⭐`;
+    } else if (LYRICS.length && t < LYRICS[0].start) {
+        currentLineEl.textContent = `⚡ FIZX READY ⚡`;
+        nextLineEl.textContent    = `➡ ${LYRICS[0].text}`;
+    }
+}
+
+function displayLoop() {
+    if (audio && !audio.paused && !audio.ended) {
+        timeDisplay.textContent = fmt(audio.currentTime);
+        updateLyrics(audio.currentTime);
+    }
+    animFrameId = requestAnimationFrame(displayLoop);
+}
+
+// ── Audio ─────────────────────────────────────────────────────────
+async function setupAudio(file) {
+    const url = URL.createObjectURL(file);
+    if (audio) { audio.pause(); URL.revokeObjectURL(audio.src); }
+    audio = new Audio(url);
+    audio.preload = 'auto';
+
+    if (audioContext) await audioContext.close();
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+    return new Promise(resolve => {
+        audio.onloadeddata = () => { bpmDisplay.textContent = `${bpm} BPM`; resolve(); };
+        audio.onerror      = () => { statusMsg.textContent = `❌ load error`; resolve(); };
+        audio.onended      = () => { isPlaying = false; playBtn.textContent = '▶'; };
+    });
+}
+
+function selectAudio() {
+    const input  = document.createElement('input');
+    input.type   = 'file';
+    input.accept = 'audio/mpeg,audio/wav,audio/ogg,audio/mp3';
+    input.onchange = async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        statusMsg.textContent = `⏳ ${file.name.slice(0, 28)}…`;
+        await setupAudio(file);
+        updateLyrics(0);
+        timeDisplay.textContent = fmt(0);
+        statusMsg.textContent   = `✅ ${beatTimestamps.length} beats · ${LYRICS.length} lines`;
+    };
+    input.click();
+}
+
+// ── Play / Pause ──────────────────────────────────────────────────
+async function togglePlay() {
+    if (!audio) { selectAudio(); return; }
+
+    if (isPlaying) {
+        // Pause
+        audio.pause();
+        cancelScheduled();
+        isPlaying = false;
+        playBtn.textContent = '▶';
+        statusMsg.textContent = `⏸ ${fmt(audio.currentTime)}`;
+        return;
+    }
+
+    // Resume or start from beginning if ended
+    if (audio.ended) audio.currentTime = 0;
+    if (audioContext.state === 'suspended') await audioContext.resume();
+
+    audio.play().then(() => {
+        // Capture clock epoch immediately after play() resolves.
+        // The gap between .play() call and this callback is the browser's
+        // audio startup latency; sampling t0 here absorbs it automatically.
+        t0 = audioContext.currentTime;
+
+        // On resume, filter to only future timestamps so we don't reschedule
+        // callbacks that already fired before the pause.
+        const elapsed = audio.currentTime;
+        const source  = (currentMode === 'A' ? beatTimestamps : LYRICS.map(l => l.start))
+                        .filter(ts => ts > elapsed);
+        scheduleAll(source);
+
+        isPlaying = true;
+        playBtn.textContent   = '⏸';
+        statusMsg.textContent = `▶ ${PRESETS[currentPreset].label} · MODE ${currentMode} · ${source.length} triggers`;
+    }).catch(() => {
+        statusMsg.textContent = `⚠️ tap again`;
+    });
+}
+
+// ── Reset ─────────────────────────────────────────────────────────
+function resetAudio() {
+    if (audio) { audio.pause(); URL.revokeObjectURL(audio.src); audio = null; }
+    cancelScheduled();
+    t0 = null; isPlaying = false;
+    timeDisplay.textContent   = fmt(0);
+    bpmDisplay.textContent    = `-- BPM`;
+    playBtn.textContent       = '▶';
+    currentLineEl.textContent = `⚡ FIZX READY ⚡`;
+    nextLineEl.textContent    = `▶ select audio file`;
+    statusMsg.textContent     = `⟳ select new file`;
+    selectAudio();
+}
+
+// ── Mode toggle ───────────────────────────────────────────────────
+function toggleMode() {
+    currentMode = currentMode === 'A' ? 'B' : 'A';
+    // modeLabel.textContent = currentMode;
+
+    if (audio && isPlaying && t0 !== null) {
+        const elapsed = audioContext.currentTime - t0;
+        const source  = (currentMode === 'A' ? beatTimestamps : LYRICS.map(l => l.start))
+                        .filter(ts => ts > elapsed);
+        cancelScheduled();
+        scheduleAll(source);
+    }
+    statusMsg.textContent = `MODE ${currentMode}`;
+}
+
+// ── Preset toggle ─────────────────────────────────────────────────
+function togglePreset() {
+    const next = PRESET_ORDER[(PRESET_ORDER.indexOf(currentPreset) + 1) % PRESET_ORDER.length];
+    applyPreset(next);
+
+    if (audio && isPlaying && t0 !== null) {
+        const elapsed = audioContext.currentTime - t0;
+        const source  = (currentMode === 'A' ? beatTimestamps : LYRICS.map(l => l.start))
+                        .filter(ts => ts > elapsed);
+        cancelScheduled();
+        scheduleAll(source);
+    }
+}
+
+// ── AR toggle ─────────────────────────────────────────────────────
+function toggleAR() {
+    isLandscape = !isLandscape;
+    stageEl.classList.toggle('ar-landscape', isLandscape);
+    arBtn.textContent = isLandscape ? '⊞ 9:16' : '⊞ 16:9';
+}
+
+// ── Circle toggle ─────────────────────────────────────────────────
+function toggleCircle() {
+    circleEnabled = !circleEnabled;
+    circleWrap.classList.toggle('circle-off', !circleEnabled);
+    circleBtn.textContent = circleEnabled ? '◎ off' : '◎ on';
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+function fmt(sec) {
+    if (isNaN(sec) || sec < 0) return '0:00';
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+function createDust(color) {
+    for (let i = 0; i < 20; i++) {
+        const d  = document.createElement('div');
+        const sz = 2 + Math.random() * 4;
+        d.classList.add('dust-particle');
+        d.style.cssText = `
+            width:${sz}px; height:${sz}px;
+            background:${color};
+            left:${Math.random() * 100}%;
+            bottom:${Math.random() * 40}px;
+            animation: kFloatUp ${6 + Math.random() * 12}s infinite linear;
+            animation-delay: ${Math.random() * 10}s;
+        `;
+        screenEl.appendChild(d);
+    }
+}
+
+// ── Event listeners ───────────────────────────────────────────────
+playBtn.onclick   = togglePlay;
+resetBtn.onclick  = resetAudio;
+modeBtn.onclick   = toggleMode;
+presetBtn.onclick = togglePreset;
+arBtn.onclick     = toggleAR;
+circleBtn.onclick = toggleCircle;
+
+// ── Boot ──────────────────────────────────────────────────────────
+applyPreset(PRESET_ORDER[0]);
+bpmDisplay.textContent = `${bpm} BPM`;
+updateLyrics(0);
+displayLoop();
+
+window.addEventListener('beforeunload', () => {
+    cancelScheduled();
+    if (animFrameId)  cancelAnimationFrame(animFrameId);
+    if (audio)        audio.pause();
+    if (audioContext) audioContext.close();
+    if (beatCircle)   beatCircle.destroy();
+});
+</script>
+</body>
+</html>
