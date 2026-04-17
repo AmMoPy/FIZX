@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>FIZX · DOX_BEST</title>
+    <style>
+        /* ── DESIGN TOKENS (defaults overwritten at runtime by applyPreset) ── */
+        :root {
+            --bg-body:       #030603;
+            --bg-container:  linear-gradient(145deg,#141a14,#0a0f0a);
+            --bg-screen:     #0a0e0a;
+            --border-screen: #2a4a2a;
+            --color-primary: #1eff00;
+            --color-dim:     #3c9e3c;
+            --color-faint:   #2a8a2a;
+            --color-muted:   #3a7a3a;
+            --shadow-screen: inset 0 0 25px rgba(0,255,0,0.06);
+            --shadow-outer:  0 0 0 2px #1a3a1a,0 20px 40px rgba(0,0,0,0.5);
+            --bg-stats:      #0a0c0a;
+            --bg-btn:        #1a2a1a;
+            --border-btn:    #3c9e3c;
+            --color-btn:     #aaffaa;
+            --flash-color:   rgba(0,255,0,0.4);
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+
+        body {
+            background: var(--bg-body);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New','Fira Code',monospace;
+            transition: background 0.5s ease;
+        }
+
+        /* ── STAGE ────────────────────────────────────────────────────
+           9:16 default. .ar-landscape flips to 16:9.
+           max-width = min() prevents overflow on both axes.
+        ── */
+        .stage {
+            aspect-ratio: 9 / 16;
+            max-width: min(100vw, calc(100vh * 9 / 16));
+            width: 100%;
+            position: relative;
+            box-shadow: var(--shadow-outer);
+            transition: box-shadow 0.5s ease, max-width 0.3s ease, aspect-ratio 0.3s ease;
+        }
+        .stage.ar-landscape {
+            aspect-ratio: 16 / 9;
+            max-width: min(100vw, calc(100vh * 16 / 9));
+        }
+
+        .container {
+            width: 100%;
+            height: 100%;
+            background: var(--bg-container);
+            display: flex;
+            flex-direction: column;
+            padding: 10px 10px 14px 10px;
+            transition: background 0.5s ease;
+        }
+
+        /* ── SCREEN ──────────────────────────────────────────────────── */
+        .screen {
+            flex: 1;
+            background: var(--bg-screen);
+            border-radius: 10px;
+            box-shadow: var(--shadow-screen);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border-screen);
+            margin-bottom: 6px;
+            transition: background 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
+        }
+
+        /* CRT scanlines — only active when preset sets --crt-on:1
+           toggled via .crt-on class by applyPreset() */
+        .screen.crt-on::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0,255,0,0.04) 0px, rgba(0,255,0,0.04) 2px,
+                transparent 2px, transparent 5px
+            );
+            pointer-events: none;
+            z-index: 5;
+        }
+        .screen.crt-on::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 40%, transparent 50%, rgba(0,0,0,0.5) 100%);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* Screen flash — color driven by --flash-color CSS var.
+           applyPreset() sets this per-preset so the flash is always
+           theme-appropriate without any JS branching. */
+        @keyframes kScreenFlash {
+            0%  { box-shadow: inset 0 0 60px var(--flash-color), 0 0 20px var(--flash-color); }
+            100%{ box-shadow: var(--shadow-screen); }
+        }
+        .screen.screen-flash { animation: kScreenFlash 0.12s ease-out; }
+
+        /* ── LYRIC AREA ──────────────────────────────────────────────── */
+        .lyric-area {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 10;
+            padding: 30px 20px 80px 20px;
+        }
+
+        .current-line {
+            font-size: clamp(3rem, 6vw, 3rem);
+            font-weight: bold;
+            color: var(--color-primary);
+            text-shadow: 0 0 5px var(--color-dim), 0 0 8px var(--color-faint);
+            margin-bottom: 16px;
+            line-height: 1.4;
+            /* GPU hint — this element is animated on every beat */
+            will-change: transform, opacity, filter;
+            transition: color 0.5s ease, text-shadow 0.5s ease;
+        }
+
+        .next-line {
+            font-size: clamp(0.5rem, 3vw, 1rem);
+            color: var(--color-dim);
+            opacity: 0.7;
+            border-top: 1px dashed var(--color-faint);
+            padding-top: 15px;
+            transition: color 0.5s ease, border-color 0.5s ease;
+        }
+
+        /* ── VISUALIZER WRAP ─────────────────────────────────────────── */
+        .visualizer-wrap {
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 12;
+            /* GPU hint — canvas is composited independently */
+            will-change: transform, opacity;
+        }
+        .visualizer-wrap.viz-off { display: none; }
+
+        /* ── DUST ────────────────────────────────────────────────────── */
+        .dust-particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 6;
+            filter: blur(1px);
+            /* GPU hint — dust is always animating */
+            will-change: transform, opacity;
+        }
+        @keyframes kFloatUp {
+            0%  { transform:translateY(0) translateX(0);         opacity:0; }
+            20% { opacity:0.5; }
+            80% { opacity:0.2; }
+            100%{ transform:translateY(-100px) translateX(30px); opacity:0; }
+        }
+
+        /* ── STATUS BAR ──────────────────────────────────────────────── */
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--color-faint);
+            font-size: 8px;
+            background: var(--bg-stats);
+            padding: 4px 10px;
+            border-radius: 20px;
+            margin-top: 5px;
+            font-family: monospace;
+            transition: background 0.5s ease, color 0.5s ease;
+        }
+
+        /* ── CONTROLS ────────────────────────────────────────────────── */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        /* Icon-only circular buttons — tooltip via data-tip + ::after */
+        button {
+            background: var(--bg-btn);
+            border: 1px solid var(--border-btn);
+            color: var(--color-btn);
+            font-family: monospace;
+            font-weight: bold;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 0.85rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: filter 0.1s, box-shadow 0.1s, border-color 0.4s, color 0.4s, background 0.4s;
+        }
+        button:hover {
+            filter: brightness(1.5);
+            box-shadow: 0 0 8px var(--color-primary);
+        }
+        button::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #111;
+            color: var(--color-btn);
+            font-size: 7px;
+            white-space: nowrap;
+            padding: 2px 6px;
+            border-radius: 4px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            border: 1px solid var(--border-btn);
+        }
+        button:hover::after { opacity: 1; }
+
+        .controls-row-main { 
+            display: flex; 
+            gap: 10px; 
+            justify-content: center; 
+        }
+
+        /* Util buttons — pill shape, smaller text */
+        button.btn-util {
+            width: auto;
+            height: 20px;
+            border-radius: 10px;
+            font-size: 0.6rem;
+            padding: 0 8px;
+            margin-top: 14px;
+        }
+        button.btn-util:hover::after { bottom:calc(100% + 4px); }
+
+        .status-text {
+            font-size: 7px;
+            text-align: center;
+            margin-top: 4px;
+            color: var(--color-muted);
+            font-family: monospace;
+            transition: color 0.5s ease;
+        }
+
+        /* ── PRESET STYLES INJECTION POINT ──────────────────────────────
+           compile.py replaces this block with CSS extracted from
+           each preset's `styles` property in presets.js.
+           The template itself contains ZERO theme-specific CSS.
+        ── */
+        /* @@STYLES@@ */
+/* ── RAP ── */
+@keyframes kShake {
+                0%  { transform:translate(0,0);      text-shadow:0 0 3px #0f0; }
+                25% { transform:translate(-2px,1px); text-shadow:2px 0 #ff00aa; }
+                50% { transform:translate(2px,-1px); text-shadow:-2px 0 #0effff; }
+                75% { transform:translate(-1px,1px); }
+                100%{ transform:translate(0,0);      text-shadow:0 0 5px #1eff00; }
+            }
+            @keyframes kGlitch {
+                0%  { text-shadow:-1px 0 #ff00aa,1px 0 #00ffff; opacity:1; }
+                50% { text-shadow:2px 0 #ff00aa,-2px 0 #00ffff; opacity:0.9; }
+                100%{ text-shadow:0 0 5px #1eff00; opacity:1; }
+            }
+            @keyframes kChroma {
+                0%  { filter:none; text-shadow:0 0 0 transparent; }
+                30% { text-shadow:-4px 0 #ff0044,4px 0 #00ffcc; filter:brightness(1.4); }
+                60% { text-shadow:3px 0 #ff0044,-3px 0 #00ffcc; }
+                100%{ filter:none; text-shadow:0 0 5px #1eff00; }
+            }
+            @keyframes kFlicker {
+                0%  { opacity:1; }  15%{ opacity:0.2; } 30%{ opacity:1; }
+                50% { opacity:0.5;} 65%{ opacity:1;  } 80%{ opacity:0.3; } 100%{ opacity:1; }
+            }
+            @keyframes kZoom {
+                0%  { transform:scale(1); }
+                40% { transform:scale(1.08); }
+                100%{ transform:scale(1); }
+            }
+            @keyframes kScanWipe {
+                0%  { background-position:0 -100%; }
+                100%{ background-position:0 200%; }
+            }
+            .screen.crt-on.scan-active::before {
+                background:
+                    repeating-linear-gradient(0deg,
+                        rgba(0,255,0,0.04) 0px,rgba(0,255,0,0.04) 2px,
+                        transparent 2px,transparent 5px),
+                    linear-gradient(to bottom,transparent 0%,rgba(0,255,0,0.18) 50%,transparent 100%);
+                background-size:100% 100%,100% 30%;
+                animation:kScanWipe 0.25s linear;
+            }
+            .fx-shake   { animation:kShake   0.08s ease-in-out; }
+            .fx-glitch  { animation:kGlitch  0.12s 2; }
+            .fx-chroma  { animation:kChroma  0.18s ease-out; }
+            .fx-flicker { animation:kFlicker 0.20s linear; }
+            .fx-zoom    { animation:kZoom    0.15s ease-out; }
+
+/* ── ETHEREAL ── */
+@keyframes kDrift {
+                0%  { transform:translateY(0);    opacity:1; }
+                40% { transform:translateY(-4px); opacity:0.75; }
+                70% { transform:translateY(-2px); opacity:0.9; }
+                100%{ transform:translateY(0);    opacity:1; }
+            }
+            @keyframes kBreathe {
+                0%  { letter-spacing:normal; opacity:1; filter:blur(0); }
+                50% { letter-spacing:0.06em; opacity:0.8; filter:blur(0.5px); }
+                100%{ letter-spacing:normal; opacity:1; filter:none; }
+            }
+            @keyframes kEtherealAurora {
+                0%  { text-shadow:0 0 8px #a855f7,0 0 20px #7c3aed; }
+                33% { text-shadow:0 0 12px #c084fc,0 0 28px #a855f7; }
+                66% { text-shadow:0 0 10px #818cf8,0 0 22px #6366f1; }
+                100%{ text-shadow:0 0 8px #a855f7,0 0 20px #7c3aed; }
+            }
+            @keyframes kDissolve {
+                0%  { opacity:1;    filter:blur(0); }
+                30% { opacity:0.5;  filter:blur(2px); }
+                60% { opacity:0.85; filter:blur(0.5px); }
+                100%{ opacity:1;    filter:blur(0); }
+            }
+            @keyframes kFloat {
+                0%  { transform:scale(1)    translateY(0); }
+                50% { transform:scale(1.03) translateY(-3px); }
+                100%{ transform:scale(1)    translateY(0); }
+            }
+            .fx-drift    { animation:kDrift         0.60s ease-in-out; }
+            .fx-breathe  { animation:kBreathe        0.80s ease-in-out; }
+            .fx-aurora   { animation:kEtherealAurora 0.70s ease-in-out; }
+            .fx-dissolve { animation:kDissolve       0.50s ease-in-out; }
+            .fx-float    { animation:kFloat          0.65s ease-in-out; }
+/* @@END_STYLES@@ */
+    </style>
+</head>
+<body>
+<div class="stage" id="stage">
+    <div class="container">
+        <div class="screen" id="screen">
+            <div class="lyric-area">
+                <div class="current-line" id="currentLine">⚡ FIZX READY ⚡</div>
+                <div class="next-line"    id="nextLine">▶ select audio file</div>
+            </div>
+            <div class="visualizer-wrap" id="visualizerWrap"></div>
+        </div>
+
+        <div class="stats">
+            <span id="statusMsg">click ▶ to load audio</span>
+            <span id="timeDisplay">0:00</span>
+            <span id="bpmDisplay">-- BPM</span>
+        </div>
+
+        <div class="controls">
+            <div class="controls-row-main">
+                <!-- data-tip = tooltip shown on hover -->
+                <button class="btn-util" id="arBtn"    data-tip="Aspect ratio">⊞ 16:9</button>
+                <button id="playBtn"   data-tip="Play / Pause">▶</button>
+                <button id="resetBtn"  data-tip="Reset + new file">⟳</button>
+                <button id="modeBtn"   data-tip="Sync mode A/B">⇄</button>
+                <button id="presetBtn" data-tip="Switch preset">🎨</button>
+                <button class="btn-util" id="vizBtn"   data-tip="Visualizer">◎ particles</button>
+            </div>
+        </div>
+        <div class="status-text" id="statusText"></div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// INJECTED BLOCKS
+// compile.py replaces each /* @@TAG@@ */ ... /* @@END_TAG@@ */ block.
+// ═══════════════════════════════════════════════════════════════════
+
+/* @@VISUALIZERS@@ */
+const CANVAS_SCALE = 2.6; 
+
+
+
+
+
+function easeOutSine(t) { return Math.sin((t * Math.PI) / 2); }
+
+class BaseVisualizer {
+    constructor(wrap, cfg) {
+        this.wrap   = wrap;
+        this.cfg    = cfg;
+        this.canvas = null;
+        this.ctx    = null;
+        this._rafId = null;
+        this._init();
+    }
+
+    
+    _init() { throw new Error('BaseVisualizer._init() must be implemented'); }
+
+    
+    pulse() { throw new Error('BaseVisualizer.pulse() must be implemented'); }
+
+    
+    
+    _cleanup() {}
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    destroy() {
+        this._cleanup();
+
+        if (this._rafId) {
+            cancelAnimationFrame(this._rafId);
+            this._rafId = null;
+        }
+
+        if (this.canvas) {
+            if (this.ctx) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            this.canvas.width  = 0;
+            this.canvas.height = 0;
+            if (this.canvas.parentNode) this.canvas.parentNode.removeChild(this.canvas);
+            this.canvas = null;
+            this.ctx    = null;
+        }
+
+        this.wrap = null;
+        this.cfg  = null;
+    }
+
+    
+    _makeCanvas(w, h) {
+        
+        this.wrap.innerHTML = '';
+        const canvas = document.createElement('canvas');
+        canvas.width  = w;
+        canvas.height = h;
+        
+        canvas.style.cssText = `width:${w}px;height:${h}px;display:block;`;
+        
+        canvas.style.willChange = 'transform, opacity';
+        this.wrap.appendChild(canvas);
+        this.canvas = canvas;
+        this.ctx    = canvas.getContext('2d');
+        return canvas;
+    }
+}
+
+class ParticlesVisualizer extends BaseVisualizer {
+    _init() {
+        this._particles = [];
+        const sz = this.cfg.baseSize * CANVAS_SCALE;
+        this.sz  = sz;
+        this._makeCanvas(sz, sz);
+        this._loop();
+    }
+
+    pulse() {
+        const { cfg, sz } = this;
+        const max   = cfg.maxParticles || 60;
+        const count = cfg.particlesPerBurst || 12;
+        const cx = sz / 2, cy = sz / 2;
+        
+        if (this._particles.length + count > max) {
+            this._particles.splice(0, count);
+        }
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 / count) * i + (Math.random() - 0.5) * 0.4;
+            const speed = cfg.baseSize * 0.012 + Math.random() * cfg.baseSize * 0.014;
+            this._particles.push({
+                x: cx, y: cy,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                r: 1.5 + Math.random() * 2,
+                life: 1.0,
+                decay: 0.018 + Math.random() * 0.012,
+            });
+        }
+    }
+
+    _loop() {
+        if (!this.canvas) return;
+        const { ctx, sz, cfg } = this;
+        ctx.clearRect(0, 0, sz, sz);
+        this._particles = this._particles.filter(p => {
+            p.x   += p.vx;
+            p.y   += p.vy;
+            p.vx  *= 0.96; 
+            p.vy  *= 0.96;
+            p.life -= p.decay;
+            if (p.life <= 0) return false;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+            ctx.fillStyle   = cfg.color;
+            ctx.shadowColor = cfg.glowColor;
+            ctx.shadowBlur  = 4;
+            ctx.globalAlpha = p.life * 0.85;
+            ctx.fill();
+            ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+            return true;
+        });
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+
+    _cleanup() { this._particles = []; }
+}
+
+class WaveformVisualizer extends BaseVisualizer {
+    _init() {
+        this._amplitude = 0;
+        this._phase     = 0;
+        const w = this.cfg.baseSize * 3;
+        const h = this.cfg.baseSize * 1.4;
+        this.w  = w;
+        this.h  = h;
+        this._makeCanvas(w, h);
+        this._loop();
+    }
+
+    pulse() {
+        this._amplitude = this.cfg.waveAmplitude || 14;
+    }
+
+    _loop() {
+        if (!this.canvas) return;
+        const { ctx, w, h, cfg } = this;
+        const freq     = cfg.waveFrequency || 3;
+        const maxAmp   = cfg.waveAmplitude || 14;
+        const decayRate = this._amplitude > 0.05
+            ? (this._amplitude / (cfg.pulseDuration / 16.67)) * 1.2
+            : 0;
+        this._amplitude = Math.max(0, this._amplitude - decayRate);
+        this._phase    += 0.04;
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.beginPath();
+        const cy = h / 2;
+        for (let px = 0; px <= w; px++) {
+            const x   = px / w;
+            const env = Math.sin(x * Math.PI); 
+            const y   = cy - Math.sin(x * Math.PI * 2 * freq + this._phase) * this._amplitude * env;
+            px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+        }
+        const intensity = this._amplitude / maxAmp;
+        ctx.strokeStyle = cfg.color;
+        ctx.lineWidth   = cfg.lineWidth || 2;
+        ctx.shadowColor = cfg.glowColor;
+        ctx.shadowBlur  = 4 + intensity * 12;
+        ctx.globalAlpha = 0.45 + intensity * 0.55;
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+}
+
+class DNAVisualizer extends BaseVisualizer {
+    _init() {
+        this._restAmp = this.cfg.baseSize * 0.12;
+        this._maxAmp  = this.cfg.baseSize * 0.42;
+        this._amp     = this._restAmp;
+        this._phase   = 0;
+        const w = this.cfg.baseSize * 3;
+        const h = this.cfg.baseSize * 1.4;
+        this.w  = w;
+        this.h  = h;
+        this._makeCanvas(w, h);
+        this._loop();
+    }
+
+    pulse() { this._amp = this._maxAmp; }
+
+    _loop() {
+        if (!this.canvas) return;
+        const { ctx, w, h, cfg } = this;
+        
+        this._amp  = this._restAmp + (this._amp - this._restAmp) * 0.945;
+        this._phase += 0.03;
+        ctx.clearRect(0, 0, w, h);
+        const cy      = h / 2;
+        const freq    = 2.5;
+        const rungs   = 8;
+        const glow    = ((this._amp - this._restAmp) / (this._maxAmp - this._restAmp)) * 14;
+        const alpha   = 0.45 + ((this._amp - this._restAmp) / (this._maxAmp - this._restAmp)) * 0.4;
+        this._strand(ctx, w, cy, this._amp, freq, 0,         cfg, glow, alpha);
+        this._strand(ctx, w, cy, this._amp, freq, Math.PI,   cfg, glow, alpha * 0.7);
+        
+        ctx.strokeStyle = cfg.color;
+        ctx.lineWidth   = (cfg.lineWidth || 1.5) * 0.6;
+        ctx.globalAlpha = alpha * 0.35;
+        ctx.shadowColor = cfg.glowColor;
+        ctx.shadowBlur  = glow * 0.5;
+        for (let i = 0; i <= rungs; i++) {
+            const xN = i / rungs;
+            const y1 = cy - Math.sin(xN * Math.PI * 2 * freq + this._phase) * this._amp;
+            const y2 = cy - Math.sin(xN * Math.PI * 2 * freq + this._phase + Math.PI) * this._amp;
+            ctx.beginPath(); ctx.moveTo(xN * w, y1); ctx.lineTo(xN * w, y2); ctx.stroke();
+        }
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+
+    _strand(ctx, w, cy, amp, freq, offset, cfg, glow, alpha) {
+        ctx.beginPath();
+        for (let px = 0; px <= w; px++) {
+            const y = cy - Math.sin((px / w) * Math.PI * 2 * freq + this._phase + offset) * amp;
+            px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+        }
+        ctx.strokeStyle = cfg.color;
+        ctx.lineWidth   = cfg.lineWidth || 1.5;
+        ctx.shadowColor = cfg.glowColor;
+        ctx.shadowBlur  = glow;
+        ctx.globalAlpha = alpha;
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+}
+
+class HeartbeatVisualizer extends BaseVisualizer {
+    _init() {
+        this._lock = false;
+        const w    = this.cfg.baseSize * 3;
+        const h    = this.cfg.baseSize * 1.2;
+        this.w     = w;
+        this.h     = h;
+        this._makeCanvas(w, h);
+        this._draw(0);
+    }
+
+    pulse() {
+        
+        
+        if (this._lock) return;
+        this._lock  = true;
+        const dur   = this.cfg.pulseDuration;
+        const start = performance.now();
+        const go = now => {
+            if (!this.canvas) return; 
+            const p = Math.min((now - start) / dur, 1);
+            this._draw(p);
+            if (p < 1) this._rafId = requestAnimationFrame(go);
+            else { this._draw(0); this._lock = false; }
+        };
+        if (this._rafId) cancelAnimationFrame(this._rafId);
+        this._rafId = requestAnimationFrame(go);
+    }
+
+    _draw(p) {
+        if (!this.canvas) return;
+        const { ctx, w, h, cfg } = this;
+        ctx.clearRect(0, 0, w, h);
+        const cy  = h / 2;
+        const amp = (h * 0.38) * Math.sin(p * Math.PI); 
+
+        
+        const profile = x => {
+            if (x < 0.25) return 0;
+            if (x < 0.32) return -(x - 0.25) / 0.07 * 0.15;
+            if (x < 0.38) return  (x - 0.32) / 0.06;
+            if (x < 0.42) return 1 - (x - 0.38) / 0.04 * 1.6;
+            if (x < 0.46) return -0.6 + (x - 0.42) / 0.04 * 0.6;
+            if (x < 0.55) return 0;
+            if (x < 0.65) return Math.sin((x - 0.55) / 0.10 * Math.PI) * 0.18;
+            return 0;
+        };
+
+        ctx.beginPath();
+        for (let px = 0; px < w; px++) {
+            const y = cy - profile(px / w) * amp;
+            px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+        }
+        ctx.strokeStyle = cfg.color;
+        ctx.lineWidth   = cfg.lineWidth || 1.5;
+        ctx.shadowColor = cfg.glowColor;
+        ctx.shadowBlur  = 8 + amp * 0.3;
+        ctx.globalAlpha = 0.5 + p * 0.5;
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+
+    _cleanup() { this._lock = false; }
+}
+
+class RippleVisualizer extends BaseVisualizer {
+    _init() {
+        this._rings = []; 
+        const sz    = this.cfg.baseSize * CANVAS_SCALE;
+        this.sz     = sz;
+        this._makeCanvas(sz, sz);
+        this._loop();
+    }
+
+    pulse() {
+        const max = this.cfg.maxRings || 4;
+        if (this._rings.length >= max) this._rings.shift(); 
+        this._rings.push({ startTime: performance.now(), duration: this.cfg.pulseDuration });
+    }
+
+    _loop() {
+        if (!this.canvas) return;
+        const { ctx, sz, cfg } = this;
+        const cx = sz / 2, cy = sz / 2;
+        const maxR = (cfg.baseSize / 2) * 2.2;
+        ctx.clearRect(0, 0, sz, sz);
+        const now = performance.now();
+        this._rings = this._rings.filter(ring => {
+            const p = (now - ring.startTime) / ring.duration;
+            if (p >= 1) return false;
+            const r = maxR * easeOutSine(p);
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.strokeStyle = cfg.color;
+            ctx.lineWidth   = (cfg.ringWidth || 1.5) * (1 - p * 0.5);
+            ctx.shadowColor = cfg.glowColor;
+            ctx.shadowBlur  = 12 * (1 - p);
+            ctx.globalAlpha = (1 - p) * 0.7;
+            ctx.stroke();
+            ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+            return true;
+        });
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+
+    _cleanup() { this._rings = []; }
+}
+
+class RingVisualizer extends BaseVisualizer {
+    _init() {
+        this.scale = 1;
+        const sz   = this.cfg.baseSize * CANVAS_SCALE;
+        this._makeCanvas(sz, sz);
+        this._draw();
+    }
+
+    pulse() {
+        const { pulseDuration, pulseScale } = this.cfg;
+        const start = performance.now();
+        const go = now => {
+            const p    = Math.min((now - start) / pulseDuration, 1);
+            this.scale = 1 + (pulseScale - 1) * Math.sin(p * Math.PI);
+            this._draw();
+            if (p < 1) this._rafId = requestAnimationFrame(go);
+            else { this.scale = 1; this._draw(); }
+        };
+        if (this._rafId) cancelAnimationFrame(this._rafId);
+        this._rafId = requestAnimationFrame(go);
+    }
+
+    _draw() {
+        if (!this.canvas) return;
+        const { ctx, cfg, scale } = this;
+        const cx = this.canvas.width / 2, cy = this.canvas.height / 2;
+        const r  = (cfg.baseSize / 2) * scale;
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = cfg.color;
+        ctx.lineWidth   = cfg.ringWidth;
+        ctx.shadowColor = cfg.glowColor;
+        ctx.shadowBlur  = 10 + (scale - 1) * 20;
+        ctx.globalAlpha = 0.7 + (scale - 1) * 0.3;
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+}
+
+class BloomVisualizer extends BaseVisualizer {
+    _init() {
+        this.scale     = 1;
+        this._colorIdx = 0;
+        this._curColor = (this.cfg.colorCycle && this.cfg.colorCycle.length)
+                          ? this.cfg.colorCycle[0]
+                          : this.cfg.glowColor;
+        const sz       = this.cfg.baseSize * CANVAS_SCALE;
+        this._makeCanvas(sz, sz);
+        this._draw();
+    }
+
+    pulse() {
+        if (this.cfg.colorCycle && this.cfg.colorCycle.length) {
+            this._colorIdx = (this._colorIdx + 1) % this.cfg.colorCycle.length;
+            this._curColor = this.cfg.colorCycle[this._colorIdx];
+        }
+        const { pulseDuration, pulseScale } = this.cfg;
+        const start = performance.now();
+        const go = now => {
+            const p    = Math.min((now - start) / pulseDuration, 1);
+            this.scale = 1 + (pulseScale - 1) * Math.sin(p * Math.PI);
+            this._draw();
+            if (p < 1) this._rafId = requestAnimationFrame(go);
+            else { this.scale = 1; this._draw(); }
+        };
+        if (this._rafId) cancelAnimationFrame(this._rafId);
+        this._rafId = requestAnimationFrame(go);
+    }
+
+    _draw() {
+        if (!this.canvas) return;
+        const { ctx, cfg, scale } = this;
+        const cx = this.canvas.width / 2, cy = this.canvas.height / 2;
+        const r  = (cfg.baseSize / 2) * scale;
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.4);
+        const a = 0.12 + (scale - 1) * 0.5;
+        g.addColorStop(0,    this._alpha(this._curColor, a * 1.5));
+        g.addColorStop(0.4,  this._alpha(this._curColor, a));
+        g.addColorStop(0.75, this._alpha(this._curColor, a * 0.35));
+        g.addColorStop(1,    'rgba(0,0,0,0)');
+        ctx.fillStyle   = g;
+        ctx.shadowColor = this._curColor;
+        ctx.shadowBlur  = 28 + (scale - 1) * 40;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+
+    
+    
+    
+    _alpha(rgba, a) {
+        return rgba.replace(/[\d.]+\)$/, `${Math.min(a, 1).toFixed(2)})`);
+    }
+}
+
+const VISUALIZERS = {
+    particles: ParticlesVisualizer,
+    waveform: WaveformVisualizer,
+    dna: DNAVisualizer,
+    heartbeat: HeartbeatVisualizer,
+    ripple: RippleVisualizer,
+    ring: RingVisualizer,
+    bloom: BloomVisualizer,
+};
+
+const VISUALIZER_ORDER = ["particles", "waveform", "dna", "heartbeat", "ripple", "ring", "bloom", "off"];
+/* @@END_VISUALIZERS@@ */
+
+/* @@PRESETS@@ */
+const PRESETS = {
+rap: {
+        label: 'RAP',
+
+        cssVars: {
+            '--bg-body':       '#030603',
+            '--bg-container':  'linear-gradient(145deg,#141a14,#0a0f0a)',
+            '--bg-screen':     '#0a0e0a',
+            '--border-screen': '#2a4a2a',
+            '--color-primary': '#1eff00',
+            '--color-dim':     '#3c9e3c',
+            '--color-faint':   '#2a8a2a',
+            '--color-muted':   '#3a7a3a',
+            '--shadow-screen': 'inset 0 0 25px rgba(0,255,0,0.06)',
+            '--shadow-outer':  '0 0 0 2px #1a3a1a,0 20px 40px rgba(0,0,0,0.5)',
+            '--bg-stats':      '#0a0c0a',
+            '--bg-btn':        '#1a2a1a',
+            '--border-btn':    '#3c9e3c',
+            '--color-btn':     '#aaffaa',
+            '--crt-on':        '1'},
+
+        
+        
+        
+
+        dustColor:  'rgba(30,255,0,0.25)',
+        flashColor: 'rgba(0,255,0,0.4)',
+
+        effects: [
+            
+            { className:'fx-shake',   duration:100, useFlash:true,  useScan:false },
+            { className:'fx-glitch',  duration:260, useFlash:false, useScan:false },
+            { className:'fx-chroma',  duration:200, useFlash:false, useScan:true  },
+            { className:'fx-flicker', duration:220, useFlash:false, useScan:false },
+            { className:'fx-zoom',    duration:160, useFlash:true,  useScan:false },
+        ],
+
+        visualizer: {
+            style:         'ring', 
+            baseSize:      60,
+            pulseScale:    1.6,
+            pulseDuration: 180,
+            ringWidth:     3,
+            color:         '#1eff00',
+            glowColor:     'rgba(30,255,0,0.5)'}},
+ethereal: {
+        label: 'ETHEREAL',
+
+        cssVars: {
+            '--bg-body':       '#06030f',
+            '--bg-container':  'linear-gradient(145deg,#0e0819,#070410)',
+            '--bg-screen':     '#0b0718',
+            '--border-screen': '#2e1650',
+            '--color-primary': '#b388ff',
+            '--color-dim':     '#7c4daa',
+            '--color-faint':   '#4a2870',
+            '--color-muted':   '#2e1650',
+            '--shadow-screen': 'inset 0 0 35px rgba(140,70,220,0.06)',
+            '--shadow-outer':  '0 0 0 2px #1e0a38,0 20px 60px rgba(60,0,100,0.55)',
+            '--bg-stats':      '#080514',
+            '--bg-btn':        '#140a28',
+            '--border-btn':    '#5c3080',
+            '--color-btn':     '#c4a0f0',
+            '--crt-on':        '0'},
+
+        
+
+        dustColor:  'rgba(160,100,255,0.15)',
+        flashColor: 'rgba(140,70,255,0.16)',
+
+        effects: [
+            
+            { className:'fx-drift',    duration:600, useFlash:false, useScan:false },
+            { className:'fx-breathe',  duration:800, useFlash:false, useScan:false },
+            { className:'fx-aurora',   duration:700, useFlash:true,  useScan:false },
+            { className:'fx-dissolve', duration:500, useFlash:true,  useScan:false },
+            { className:'fx-float',    duration:650, useFlash:false, useScan:false },
+        ],
+
+        visualizer: {
+            style:         'bloom',
+            baseSize:      70,
+            pulseScale:    1.9,
+            pulseDuration: 700,
+            ringWidth:     0,
+            color:         'rgba(180,100,255,0.3)',
+            glowColor:     'rgba(150,80,255,0.5)'}}
+};
+const PRESET_ORDER = ['rap', 'ethereal'];
+/* @@END_PRESETS@@ */
+
+/* @@LYRICS@@ */
+const LYRICS = [
+    { text: "Yeah...",                       start: 1.0,  end: 1.48 },
+    { text: "They said I couldn't build it.", start: 1.48, end: 3.0  },
+    
+];
+/* @@END_LYRICS@@ */
+
+/* @@BEATS@@ */
+const BEAT_DATA = {
+    beats: [1.022, 1.486, 1.718, 1.95, 2.101, 2.415, 2.635, 2.763, 2.984, 3.216, 3.344, 3.587, 3.82, 4.052, 4.272, 4.516, 4.748, 4.981, 5.213, 5.457, 5.677, 5.921, 6.142, 6.385, 6.618, 6.85, 7.082, 7.326, 7.558, 7.79, 8.022, 8.266, 8.487, 8.742, 8.963, 9.195, 9.358, 9.671, 9.834, 10.379, 10.588, 10.809, 11.285, 11.54, 11.773, 12.005, 12.237, 12.62, 12.957, 13.177, 13.421, 13.642, 13.886, 14.118, 14.362, 14.594, 14.826, 15.07, 15.302, 15.534, 15.766, 15.999, 16.231, 16.463, 17.194, 17.403, 17.636, 17.868, 17.995, 18.321, 18.46, 18.797, 18.971, 19.145, 19.737, 19.981, 20.201, 20.329, 20.666, 20.91, 21.142, 21.362, 21.606, 21.838, 22.013, 22.314, 22.523, 22.779, 22.988, 23.487, 23.638, 23.951, 24.079, 24.416, 24.66, 24.88, 25.124, 25.252, 25.577, 25.704, 26.064, 26.32, 26.494, 26.761, 26.9, 27.214, 27.469, 27.701, 27.829, 28.061, 28.294, 28.642, 28.874, 29.118, 29.362, 29.582, 29.803, 29.931, 30.256, 30.511, 30.743, 30.987, 31.951, 32.403, 32.636, 33.042, 33.321, 33.448, 33.785, 34.029, 34.157, 34.4, 34.737, 34.969, 35.201, 35.434, 35.666, 35.91, 36.13, 36.374, 36.618, 36.862, 37.071, 37.245, 37.547, 37.767, 38.011, 38.243, 38.464, 38.719, 38.951, 39.184, 39.416, 39.648, 39.88, 40.124, 40.356, 40.6, 40.948, 41.285, 41.529, 41.703, 42.005, 42.225, 42.469, 42.701, 42.829, 43.166, 43.537, 43.665, 44.571, 44.815, 45.035, 45.279, 45.5, 45.743, 45.976, 46.208, 46.452, 46.684, 46.916, 47.148, 47.392, 47.624, 47.856, 48.042, 48.205, 49.261, 49.482, 49.726, 49.853, 50.202, 50.352, 50.538, 50.666, 50.898, 51.037, 51.363, 51.49, 51.827, 52.059, 52.222, 52.512, 52.698, 52.907, 53.359, 53.568, 53.917, 54.648, 54.915, 55.414, 55.809, 55.937, 56.297, 56.506, 56.726, 57.005, 57.226, 57.702, 57.922, 58.166, 58.398, 58.63, 58.863],
+    bpm:   129,
+};
+/* @@END_BEATS@@ */
+
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE
+// ═══════════════════════════════════════════════════════════════════
+
+// ── DOM ───────────────────────────────────────────────────────────
+const stageEl       = document.getElementById('stage');
+const screenEl      = document.getElementById('screen');
+const currentLineEl = document.getElementById('currentLine');
+const nextLineEl    = document.getElementById('nextLine');
+const timeDisplay   = document.getElementById('timeDisplay');
+const bpmDisplay    = document.getElementById('bpmDisplay');
+const statusMsg     = document.getElementById('statusMsg');
+const playBtn       = document.getElementById('playBtn');
+const resetBtn      = document.getElementById('resetBtn');
+const modeBtn       = document.getElementById('modeBtn');
+const presetBtn     = document.getElementById('presetBtn');
+const arBtn         = document.getElementById('arBtn');
+const vizBtn        = document.getElementById('vizBtn');
+const visWrap       = document.getElementById('visualizerWrap');
+
+// ── State ─────────────────────────────────────────────────────────
+let beatTimestamps = [...BEAT_DATA.beats]; // Copy to allow modification
+let bpm            = BEAT_DATA.bpm;
+let currentMode    = 'A'; // 'A' = beat triggers, 'B' = lyric start triggers
+let currentPreset  = PRESET_ORDER[0];
+let isLandscape    = false;
+let isPlaying      = false;
+
+// Visualizer cycling: VISUALIZER_ORDER is injected by compile.py from
+// visualizers.js. In the default template it is defined inline below.
+// The 'off' sentinel maps to null (no visualizer rendered).
+// If VISUALIZER_ORDER is not injected (non-technical user), default to particles/waveform/off.
+const VIZ_ORDER = (typeof VISUALIZER_ORDER !== 'undefined')
+    ? VISUALIZER_ORDER
+    : ['particles', 'waveform', 'off'];
+let vizIndex    = 0;   // current position in VIZ_ORDER
+let vizs        = null; // active BaseVisualizer instance or null
+
+// ── Audio ─────────────────────────────────────────────────────────
+let audio        = null;
+let audioContext = null;
+let t0           = null; // AudioContext.currentTime at play() resolution
+
+// ── Timer Registry ────────────────────────────────────────────────
+// Every setTimeout created by triggerVisual() is tracked here.
+// resetAudio() and song changes clear this registry before any new
+// allocations — prevents timers from firing against stale state.
+// This prevents memory leak if setTimeouts are never cancelled on reset.
+const activeVisualTimers = [];
+
+// Beat scheduler timers (AudioContext-anchored setTimeouts for each beat)
+const scheduledTimers = [];
+
+// Display loop rAF handle
+let animFrameId = null;
+
+// Flash cycle index for aurora-style presets
+let flashCycleIdx = 0;
+
+// Per-effect debounce: tracks the pending removal timer for each CSS class.
+// Key: className string → Value: setTimeout id.
+// When triggerVisual() fires the same class again before the previous
+// duration elapsed, this clears the old removal timer first.
+// This prevents the "stutter" where an animation class gets removed
+// mid-flight by a previous setTimeout that is now stale.
+const effectRemovalTimers = {};
+
+
+// ═══════════════════════════════════════════════════════════════════
+// VISUALIZER MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════
+
+function buildVisualizer(key) {
+    // Destroy existing instance with full GPU cleanup before creating new one.
+    // destroy() in BaseVisualizer zeros canvas dimensions → immediate GPU release.
+    if (vizs) {
+        vizs.destroy();
+        vizs = null;
+    }
+
+    if (key === 'off' || !key) {
+        visWrap.classList.add('viz-off');
+        vizBtn.textContent = '◎ off';
+        return;
+    }
+
+    // VISUALIZERS map is injected by compile.py. If not present (raw template),
+    // fall back gracefully — just hide the wrap.
+    if (typeof VISUALIZERS === 'undefined' || !VISUALIZERS[key]) {
+        visWrap.classList.add('viz-off');
+        return;
+    }
+
+    visWrap.classList.remove('viz-off');
+    const cfg = PRESETS[currentPreset].visualizer;
+    // Override style key to match the chosen visualizer
+    vizs = new VISUALIZERS[key](visWrap, { ...cfg, style: key });
+    vizBtn.textContent = `◎ ${key}`;
+}
+
+function cycleVisualizer() {
+    vizIndex = (vizIndex + 1) % VIZ_ORDER.length;
+    buildVisualizer(VIZ_ORDER[vizIndex]);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// PRESET APPLICATION
+// Injects CSS vars, sets flash color var, toggles CRT class,
+// rebuilds dust, rebuilds visualizer with new preset's visualizer config.
+// ═══════════════════════════════════════════════════════════════════
+function applyPreset(key) {
+    const p = PRESETS[key];
+    if (!p) return;
+
+    currentPreset = key;
+    flashCycleIdx = 0;
+
+    // CSS custom properties are injected via
+    // root.style.setProperty() which overrides any existing inline styles.
+    // This is intentional — presets fully own the visual theme.    
+    const root = document.documentElement;
+    Object.entries(p.cssVars).forEach(([k, v]) => root.style.setProperty(k, v));
+
+    // --flash-color drives @keyframes kScreenFlash — set here so the
+    // flash is always theme-correct with no JS branching in triggerVisual.
+    root.style.setProperty('--flash-color', p.flashColor);
+    // The '--crt-on' property is read as a string, not a boolean.
+    screenEl.classList.toggle('crt-on', p.cssVars['--crt-on'] === '1');
+
+    // Rebuild dust with preset color
+    document.querySelectorAll('.dust-particle').forEach(el => el.remove());
+    createDust(p.dustColor);
+
+    // Rebuild visualizer with new preset's visualizer config, keeping
+    // the currently selected visualizer type (vizIndex).
+    buildVisualizer(VIZ_ORDER[vizIndex]);
+
+    const nextKey = PRESET_ORDER[(PRESET_ORDER.indexOf(key) + 1) % PRESET_ORDER.length];
+    presetBtn.setAttribute('data-tip', `→ ${PRESETS[nextKey].label}`);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// VISUAL TRIGGER
+// Called once per scheduled beat. Picks a random effect from the
+// active preset pool, applies it to .current-line, and pulses the
+// active visualizer.
+//
+// DEBOUNCE:
+//   effectRemovalTimers tracks the pending "remove class" timer per
+//   className. If the same effect fires again before expiry, the
+//   stale removal timer is cancelled first. Without this, fast beats
+//   cause the class to be removed mid-animation by the old timer,
+//   creating a stutter where the animation starts then abruptly stops.
+//
+// TIMER TRACKING:
+//   All setTimeouts pushed to activeVisualTimers so resetAudio() can
+//   clear them. This closes the leak in the previous implementation.
+// ═══════════════════════════════════════════════════════════════════
+function triggerVisual() {
+    const p      = PRESETS[currentPreset];
+    const effect = p.effects[Math.floor(Math.random() * p.effects.length)];
+
+    // Debounce: clear stale removal timer for this class before restarting
+    if (effectRemovalTimers[effect.className]) {
+        clearTimeout(effectRemovalTimers[effect.className]);
+        delete effectRemovalTimers[effect.className];
+    }
+
+    // void offsetWidth: forces browser to reflow, ensuring the class
+    // removal + re-add is treated as a fresh animation start.
+    // Without this, if the same class is re-added before the browser
+    // commits the removal, the animation does not restart.
+    currentLineEl.classList.remove(effect.className);
+    void currentLineEl.offsetWidth; // Force reflow — critical for animation restart
+    currentLineEl.classList.add(effect.className);
+
+    // Schedule class removal; track the timer ID for cleanup on reset
+    const removeId = setTimeout(() => {
+        currentLineEl.classList.remove(effect.className);
+        delete effectRemovalTimers[effect.className];
+        const idx = activeVisualTimers.indexOf(removeId);
+        if (idx !== -1) activeVisualTimers.splice(idx, 1);
+    }, effect.duration + 20);
+    activeVisualTimers.push(removeId);
+    effectRemovalTimers[effect.className] = removeId;
+
+    if (effect.useFlash) {
+        // Rotate flash color if preset uses flashCycle
+        if (p.flashCycle && p.flashCycleColors && p.flashCycleColors.length) {
+            flashCycleIdx = (flashCycleIdx + 1) % p.flashCycleColors.length;
+            document.documentElement.style.setProperty('--flash-color', p.flashCycleColors[flashCycleIdx]);
+        }
+        screenEl.classList.remove('screen-flash');
+        void screenEl.offsetWidth; // reflow guard — same reason as above
+        screenEl.classList.add('screen-flash');
+        const flashId = setTimeout(() => {
+            screenEl.classList.remove('screen-flash');
+            const idx = activeVisualTimers.indexOf(flashId);
+            if (idx !== -1) activeVisualTimers.splice(idx, 1);
+        }, 150);
+        activeVisualTimers.push(flashId);
+    }
+
+    if (effect.useScan && screenEl.classList.contains('crt-on')) {
+        screenEl.classList.add('scan-active');
+        const scanId = setTimeout(() => {
+            screenEl.classList.remove('scan-active');
+            const idx = activeVisualTimers.indexOf(scanId);
+            if (idx !== -1) activeVisualTimers.splice(idx, 1);
+        }, 280);
+        activeVisualTimers.push(scanId);
+    }
+
+    if (vizs) vizs.pulse();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// BEAT SCHEDULER
+// AudioContext-anchored setTimeout per beat.
+// t0 = AudioContext.currentTime sampled at play().then() resolution.
+// This absorbs browser audio startup latency automatically — the gap
+// between .play() call and the then() callback is the hardware latency,
+// and by sampling t0 there rather than before .play(), it is baked in.
+//
+// Timer IDs stored in scheduledTimers for full cleanup on reset.
+// ═══════════════════════════════════════════════════════════════════
+function scheduleAll(timestamps) {
+    clearScheduled();
+    const atx = audioContext.currentTime;
+    timestamps.forEach(ts => {
+        const ms = (t0 + ts - atx) * 1000;
+        if (ms < 0) return; // already past (e.g. resume after seek)
+        const id = setTimeout(triggerVisual, ms);
+        scheduledTimers.push(id);
+    });
+}
+
+function clearScheduled() {
+    scheduledTimers.forEach(id => clearTimeout(id));
+    scheduledTimers.length = 0; // in-place clear — avoids reallocation
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// DISPLAY LOOP
+// rAF loop for lyrics text updates and time counter only.
+// Beat triggering is NOT done here — it is handled by scheduled
+// setTimeouts in scheduleAll(). Separation of concerns:
+//   - Display loop: ~60fps polling, latency-insensitive
+//   - Beat scheduler: AudioContext-precise, fires independently
+// ═══════════════════════════════════════════════════════════════════
+function updateLyrics(t) {
+    const idx = LYRICS.findIndex(l => t >= l.start && t <= l.end);
+    if (idx !== -1) {
+        currentLineEl.textContent = LYRICS[idx].text;
+        const next = LYRICS[idx + 1];
+        nextLineEl.textContent = next ? `➡ ${next.text}` : `🏁 FINISH`;
+    } else if (LYRICS.length && t > LYRICS[LYRICS.length - 1].end) {
+        currentLineEl.textContent = `@AmMoPy`;
+        nextLineEl.textContent    = `⭐ SHOW SOME LOVE ⭐`;
+    } else if (LYRICS.length && t < LYRICS[0].start) {
+        currentLineEl.textContent = `⚡ FIZX READY ⚡`;
+        nextLineEl.textContent    = `➡ ${LYRICS[0].text}`;
+    }
+}
+
+function displayLoop() {
+    if (audio && !audio.paused && !audio.ended) {
+        timeDisplay.textContent = fmt(audio.currentTime);
+        updateLyrics(audio.currentTime);
+    }
+    animFrameId = requestAnimationFrame(displayLoop);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// AUDIO LIFECYCLE
+// ═══════════════════════════════════════════════════════════════════
+async function setupAudio(file) {
+    const url = URL.createObjectURL(file);
+    if (audio) { audio.pause(); URL.revokeObjectURL(audio.src); audio = null; }
+
+    // Close existing AudioContext before creating a new one.
+    // Browsers accumulate "ghost" suspended contexts if not explicitly
+    // closed — each holds DSP resources and event handlers.
+    // await ensures closure completes before new context is created.
+    if (audioContext) {
+        await audioContext.close();
+        audioContext = null;
+    }
+
+    audio = new Audio(url);
+    audio.preload = 'auto';
+    audioContext  = new (window.AudioContext || window.webkitAudioContext)();
+
+    return new Promise(resolve => {
+        audio.onloadeddata = () => { bpmDisplay.textContent = `${bpm} BPM`; resolve(); };
+        audio.onerror      = () => { statusMsg.textContent = `❌ load error`; resolve(); };
+        audio.onended      = () => { isPlaying = false; playBtn.textContent = '▶'; };
+    });
+}
+
+function selectAudio() {
+    const input  = document.createElement('input');
+    input.type   = 'file';
+    input.accept = 'audio/mpeg,audio/wav,audio/ogg,audio/mp3';
+    input.onchange = async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        statusMsg.textContent = `⏳ ${file.name.slice(0, 28)}…`;
+        await setupAudio(file);
+        updateLyrics(0);
+        timeDisplay.textContent = fmt(0);
+        statusMsg.textContent   = `✅ ${beatTimestamps.length} beats · ${LYRICS.length} lines`;
+    };
+    input.click();
+}
+
+// ── Play / Pause ──────────────────────────────────────────────────
+async function togglePlay() {
+    if (!audio) { selectAudio(); return; }
+
+    if (isPlaying) {
+        audio.pause();
+        clearScheduled();
+        isPlaying = false;
+        playBtn.textContent   = '▶';
+        statusMsg.textContent = `⏸ ${fmt(audio.currentTime)}`;
+        return;
+    }
+
+    if (audio.ended) audio.currentTime = 0;
+    if (audioContext.state === 'suspended') await audioContext.resume();
+
+    audio.play().then(() => {
+        // t0 sampled here — inside then() — so it includes startup latency.
+        // making setTimeout alignment accurate even on slow devices
+        // All beat delays computed as (t0 + beatTs - audioContext.currentTime).
+        t0 = audioContext.currentTime;
+
+        // On resume, filter to only future timestamps so we don't reschedule
+        // callbacks that already fired before the pause.
+        const elapsed = audio.currentTime;
+        const source  = (currentMode === 'A' ? beatTimestamps : LYRICS.map(l => l.start))
+                        .filter(ts => ts > elapsed);
+        scheduleAll(source);
+
+        isPlaying = true;
+        playBtn.textContent   = '⏸';
+        statusMsg.textContent = `▶ ${PRESETS[currentPreset].label} · ${currentMode} · ${source.length}`;
+    }).catch(() => { statusMsg.textContent = `⚠️ tap again`; });
+}
+
+// ── Reset ─────────────────────────────────────────────────────────
+// Full teardown sequence — the order matters:
+//   1. Stop audio + revoke blob URL
+//   2. Clear ALL timers (scheduled beats + visual effect timers)
+//   3. Cancel display rAF — stops canvas loops immediately
+//   4. Close AudioContext — prevents ghost context accumulation
+//   5. Destroy visualizer — releases GPU buffers
+//   6. Reset UI state
+//   7. Re-trigger file picker
+async function resetAudio() {
+    // 1. Audio
+    if (audio) { audio.pause(); URL.revokeObjectURL(audio.src); audio = null; }
+
+    // 2. All timers — beats + visual effects + effect debounce registry
+    clearScheduled();
+    activeVisualTimers.forEach(id => clearTimeout(id));
+    activeVisualTimers.length = 0;
+    Object.keys(effectRemovalTimers).forEach(k => {
+        clearTimeout(effectRemovalTimers[k]);
+        delete effectRemovalTimers[k];
+    });
+
+    // 3. Display loop
+    if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+
+    // 4. AudioContext — await ensures DSP resources are released before
+    //    a new context might be created by setupAudio()
+    if (audioContext) { await audioContext.close(); audioContext = null; }
+
+    // 5. Visualizer GPU cleanup
+    if (vizs) { vizs.destroy(); vizs = null; }
+
+    // 6. UI state
+    t0 = null; isPlaying = false;
+    timeDisplay.textContent   = fmt(0);
+    bpmDisplay.textContent    = `-- BPM`;
+    playBtn.textContent       = '▶';
+    currentLineEl.textContent = `⚡ FIZX READY ⚡`;
+    nextLineEl.textContent    = `▶ select audio file`;
+    statusMsg.textContent     = `⟳ select new file`;
+
+    // Restart display loop — it is display-only so safe to run without audio
+    displayLoop();
+
+    // Rebuild visualizer (was destroyed above)
+    buildVisualizer(VIZ_ORDER[vizIndex]);
+
+    // 7. New file
+    selectAudio();
+}
+
+// ── Mode toggle ───────────────────────────────────────────────────
+
+// When toggling during playback, reschedules remaining triggers
+// using the new source (beats or lyric starts).
+function toggleMode() {
+    currentMode = currentMode === 'A' ? 'B' : 'A';
+    if (audio && isPlaying && t0 !== null) {
+        const elapsed = audioContext.currentTime - t0;
+        const source  = (currentMode === 'A' ? beatTimestamps : LYRICS.map(l => l.start))
+                        .filter(ts => ts > elapsed);
+        clearScheduled();
+        scheduleAll(source);
+    }
+    statusMsg.textContent = `MODE ${currentMode}`;
+}
+
+// ── Preset toggle ─────────────────────────────────────────────────
+
+// Cycles through PRESET_ORDER. Reschedules triggers during playback
+// because preset changes may affect effect pool but NOT timing.
+// Note: Rescheduling is defensive — timing doesn't change per preset,
+// but the effect selection pool does. No need to reschedule actually.
+function togglePreset() {
+    const next = PRESET_ORDER[(PRESET_ORDER.indexOf(currentPreset) + 1) % PRESET_ORDER.length];
+    applyPreset(next);
+    if (audio && isPlaying && t0 !== null) {
+        const elapsed = audioContext.currentTime - t0;
+        const source  = (currentMode === 'A' ? beatTimestamps : LYRICS.map(l => l.start))
+                        .filter(ts => ts > elapsed);
+        clearScheduled();
+        scheduleAll(source);
+    }
+}
+
+// ── AR toggle ─────────────────────────────────────────────────────
+function toggleAR() {
+    isLandscape = !isLandscape;
+    stageEl.classList.toggle('ar-landscape', isLandscape);
+    arBtn.textContent = isLandscape ? '⊞ 9:16' : '⊞ 16:9';
+}
+
+// ── Utilities ─────────────────────────────────────────────────────
+function fmt(sec) {
+    if (isNaN(sec) || sec < 0) return '0:00';
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+function createDust(color) {
+   // Creates floating dust particles with random positions, sizes, and animation delays.
+    // Each particle has its own animation — 20 particles = 20 independent animations.
+    // This is fine for modern browsers but could be optimized by using a single
+    // canvas particle system. Not worth the complexity for this use case.
+    for (let i = 0; i < 20; i++) {
+        const d  = document.createElement('div');
+        const sz = 2 + Math.random() * 4;
+        d.classList.add('dust-particle');
+        d.style.cssText = `
+            width:${sz}px; height:${sz}px; background:${color};
+            left:${Math.random()*100}%; bottom:${Math.random()*40}px;
+            animation:kFloatUp ${6+Math.random()*12}s infinite linear;
+            animation-delay:${Math.random()*10}s;
+        `;
+        screenEl.appendChild(d);
+    }
+}
+
+// ── Event listeners ───────────────────────────────────────────────
+playBtn.onclick   = togglePlay;
+resetBtn.onclick  = resetAudio;
+modeBtn.onclick   = toggleMode;
+presetBtn.onclick = togglePreset;
+arBtn.onclick     = toggleAR;
+vizBtn.onclick    = cycleVisualizer;
+
+// ── Boot ──────────────────────────────────────────────────────────
+applyPreset(PRESET_ORDER[0]);
+bpmDisplay.textContent = `${bpm} BPM`;
+updateLyrics(0);
+displayLoop();
+buildVisualizer(VIZ_ORDER[vizIndex]);
+
+// ── Cleanup on unload ─────────────────────────────────────────────
+
+// Cancels all pending timers, animation frames, and closes audio context.
+// This prevents memory leaks when navigating away.
+window.addEventListener('beforeunload', () => {
+    clearScheduled();
+    activeVisualTimers.forEach(id => clearTimeout(id));
+    Object.values(effectRemovalTimers).forEach(id => clearTimeout(id));
+    if (animFrameId)  cancelAnimationFrame(animFrameId);
+    if (audio)        { audio.pause(); }
+    if (audioContext) audioContext.close();
+    if (vizs)   vizs.destroy();
+});
+</script>
+</body>
+</html>

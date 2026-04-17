@@ -37,7 +37,7 @@ A browser-based lyric visualizer with pre-analyzed, zero lag beat-synchronized a
 
 **Perfect for:** Promoting your AI slop when you can't afford rent.
 
-**This project is ~50KB of HTML/CSS/JS; don't expect to go viral, your lyrics sux anyways! ¯\\(ツ)/¯**
+**This project is ~50 - 70KB of HTML/CSS/JS; don't expect to go viral, your lyrics SUX anyways! ¯\\(ツ)/¯**
 
 ---
 
@@ -51,7 +51,7 @@ If this saved you from watermarks, give it a ⭐. It feeds the ego that started 
 
 ## Getting Started
 
-> *"Genuinely Simple This Time."*
+> *"One tool. Two workflows. Genuinely Simple This Time."*
 
 ### Prerequisites
 
@@ -62,67 +62,66 @@ If this saved you from watermarks, give it a ⭐. It feeds the ego that started 
 - Screen Recorder
 - Low expectations
 
-### Installation
-
-```bash
-git clone https://github.com/AmMoPy/FIZX
-cd FIZX
-```
-
 ### Usage
 
-**Auto mode: modify `lyrics.js`  with timestamps then run**
+#### Peasants (Non-Developers)
 
-```bash
-python compile.py <audio_file_path> [--preset rap|ethereal] [--out output.html]
-```
-
-**Manual mode: modify "INJECTED DATA" section in `fizx.html` as follows:** 
-
-**Step 1: Extract Beats (one time per audio file)**
-
-```bash
-python ex_beats.py <audio_file_path>
-```
-
-`beats.json` now lives next to `ex_beats.py`; in auto mode it gets injected into `fizx.html` by `compile.py` — no copy-paste needed.
-
-**Step 2: Add Your Lyrics Timestamps**
-
-Edit `lyrics.js`:
+- Right click `fizx.html` > open with > Notepad > search for `LYRICS` and `BEAT_DATA`, They look like this:
 
 ```javascript
-export const LYRICS = [
-    { text: "Your first line", start: 1.2, end: 2.8 },
-    { text: "Your second line", start: 3.0, end: 4.5 },
-    // ...
+/* @@LYRICS@@ */
+const LYRICS = [
+    { text: "Yeah...", start: 1.0, end: 1.48 },
+    { text: "They said I couldn't build it.", start: 1.48, end: 3.0 },
 ];
+/* @@END_LYRICS@@ */
+
+/* @@BEATS@@ */
+const BEAT_DATA = {
+    beats: [ 1.022, 1.486, 1.718, ...],
+     bpm:   129,
+};
+/* @@END_BEATS@@ */
+
 ```
 
-Timestamps in seconds. Get them from Audacity label tracks, CapCut captions export, or by listening and pausing like an animal.
+- Replace the example lyrics with your own. Timestamps in seconds.
 
-**Step 3: Add more presets if you must**
+- (Optional) Replace BEAT_DATA if you extracted beats. Or don't. Mode B (lyric triggers) works fine.
+ 
+- Save and close.
 
-Edit `presets.js`:
+- Note: you only get default 2 themes, if you are feeling fancy modify the values in `PRESETS`
 
-```javascript
-export const PRESETS = {
-    rap: {
-        label: 'RAP',
-        cssVars: {...}
-    // ...
-];
+#### Elites (Developers)
+
+- Edit `lyrics.js` → paste your timestamped lyrics
+
+```bash
+# Minimalist — defaults only (rap + ethereal presets, all visualizers)
+python compile.py song.mp3 --out fizx.html 
+
+# Single preset, single visualizer (smallest output)
+python compile.py song.mp3 --preset void --visualizer ring
+
+# Multiple presets, all visualizers
+python compile.py song.mp3 --preset rap,ethereal,void
+
+# Everything (maximum bloat, maximum flexibility)
+python compile.py song.mp3 --all
+
+# Custom output name
+python compile.py song.mp3 --out tiktok_ready.html
+
 ```
 
-**Open `src/fizx.html` (manual mode) or `root/<audio_stem>.html` (auto mode) in any browser. Click PLAY, select your audio file, start screen recording**
+#### Finally open `fizx.html` in any browser. Click PLAY, select your audio file, start screen recording
 
 ---
 
 ## Features
 
 > *"No subscriptions. No watermarks. No cloud. No bullshit.'"*
-
-### Core
 
 - **Beat-Sync Engine** — `AudioContext` clock-anchored `setTimeout` callbacks. Not polling. Not `requestAnimationFrame` jitter. Actual precision scheduling. Absorbs browser audio latency automatically by capturing `t0` at `play()` resolution.
 
@@ -133,13 +132,7 @@ export const PRESETS = {
   - **Mode B** — Lyric start timestamps (one trigger per line)
   - Switchable mid-playback, reschedules automatically
 
-### Presets
-
-- **RAP** — Sharp, punchy animations: shake, glitch, chromatic split, flicker, zoom. 
-
-- **ETHEREAL** — Slow ambient animations: drift, breathe, aurora glow, dissolve, float.
-
-- **Add Your Own** — Drop a new entry in `presets.js`. It auto-appears in the toggle cycle. See the existing presets for the schema.
+- **Presets/visualizers** — several themes to match different genres, dont like any? Just add your own!
 
 ### Controls
 
@@ -150,7 +143,7 @@ export const PRESETS = {
 | ⇄ MODE | Toggle A/B sync mode. Mid-playback safe. |
 | 🎨 PRESET | Cycle presets. Mid-playback safe. |
 | ⊞ AR | Toggle 9:16 ↔ 16:9 aspect ratio. |
-| ◎ CIRCLE | Toggle beat circle on/off. |
+| ◎ | Toggle visualizers on/off. |
 
 ## Project Structure
 
@@ -159,11 +152,14 @@ export const PRESETS = {
 ```
 .
 ├── src/
-│   ├── ex_beats.py     # Python onset extractor → writes beats.json
-│   ├── fizx.html       # Core structure, scheduler, playback logic
-│   ├── lyrics.js       # Your lyrics
-│   └── presets.js      # Theme CSS vars, animation pools, configs
-└── compile.py          # Entry point → writes <audio_stem>.html`
+│   ├── ex_beats.py         # Python beat extractor
+│   ├── template.html       # Layout only
+│   ├── lyrics.js           # User lyrics with timestamps
+│   ├── visualizers.js      # BaseVisualizer + classes
+│   ├── presets.js          # Preset styles, cssVars, effects
+│   └── compile.py          # Injects presets/visualizers/lyrics/beats into template
+├── fizx.html               # Compiled output (default)
+└── README.md
 ```
 
 ---
