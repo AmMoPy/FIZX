@@ -59,7 +59,7 @@
             background: var(--bg-container);
             display: flex;
             flex-direction: column;
-            padding: 10px 10px 14px 10px;
+            padding: 1px 2px 14px 2px;
             transition: background 0.5s ease;
         }
 
@@ -122,7 +122,7 @@
         }
 
         .current-line {
-            font-size: clamp(3rem, 6vw, 3rem);
+            font-size: clamp(2.5rem, 6vw, 3rem);
             font-weight: bold;
             color: var(--color-primary);
             text-shadow: 0 0 5px var(--color-dim), 0 0 8px var(--color-faint);
@@ -181,7 +181,7 @@
             background: var(--bg-stats);
             padding: 4px 10px;
             border-radius: 20px;
-            margin-top: 5px;
+            /*margin-top: 5px;*/
             font-family: monospace;
             transition: background 0.5s ease, color 0.5s ease;
         }
@@ -318,38 +318,32 @@
 
 /* ── ETHEREAL ── */
 @keyframes kDrift {
-                0%  { transform:translateY(0);    opacity:1; }
-                40% { transform:translateY(-4px); opacity:0.75; }
-                70% { transform:translateY(-2px); opacity:0.9; }
+                0%  { transform:translateY(-5px); opacity:0.7; }
                 100%{ transform:translateY(0);    opacity:1; }
             }
             @keyframes kBreathe {
-                0%  { letter-spacing:normal; opacity:1; filter:blur(0); }
-                50% { letter-spacing:0.06em; opacity:0.8; filter:blur(0.5px); }
-                100%{ letter-spacing:normal; opacity:1; filter:none; }
+                0%  { letter-spacing:0.08em; opacity:0.7; filter:blur(0.8px); }
+                100%{ letter-spacing:normal;  opacity:1;  filter:none; }
             }
             @keyframes kEtherealAurora {
-                0%  { text-shadow:0 0 8px #a855f7,0 0 20px #7c3aed; }
-                33% { text-shadow:0 0 12px #c084fc,0 0 28px #a855f7; }
-                66% { text-shadow:0 0 10px #818cf8,0 0 22px #6366f1; }
-                100%{ text-shadow:0 0 8px #a855f7,0 0 20px #7c3aed; }
+                0%  { text-shadow:0 0 18px #c084fc,0 0 36px #a855f7; }
+                60% { text-shadow:0 0 8px #818cf8,0 0 16px #6366f1; }
+                100%{ text-shadow:0 0 5px #a855f7; }
             }
             @keyframes kDissolve {
-                0%  { opacity:1;    filter:blur(0); }
-                30% { opacity:0.5;  filter:blur(2px); }
-                60% { opacity:0.85; filter:blur(0.5px); }
-                100%{ opacity:1;    filter:blur(0); }
+                0%  { opacity:0.45; filter:blur(2.5px); }
+                50% { opacity:0.8;  filter:blur(0.5px); }
+                100%{ opacity:1;    filter:none; }
             }
             @keyframes kFloat {
-                0%  { transform:scale(1)    translateY(0); }
-                50% { transform:scale(1.03) translateY(-3px); }
+                0%  { transform:scale(1.05) translateY(-4px); }
                 100%{ transform:scale(1)    translateY(0); }
             }
-            .fx-drift    { animation:kDrift         0.60s ease-in-out; }
-            .fx-breathe  { animation:kBreathe        0.80s ease-in-out; }
-            .fx-aurora   { animation:kEtherealAurora 0.70s ease-in-out; }
-            .fx-dissolve { animation:kDissolve       0.50s ease-in-out; }
-            .fx-float    { animation:kFloat          0.65s ease-in-out; }
+            .fx-drift    { animation:kDrift         0.25s ease-out; }
+            .fx-breathe  { animation:kBreathe        0.30s ease-out; }
+            .fx-aurora   { animation:kEtherealAurora 0.35s ease-out; }
+            .fx-dissolve { animation:kDissolve       0.28s ease-out; }
+            .fx-float    { animation:kFloat          0.22s ease-out; }
 /* @@END_STYLES@@ */
     </style>
 </head>
@@ -378,7 +372,7 @@
                 <button id="resetBtn"  data-tip="Reset + new file">⟳</button>
                 <button id="modeBtn"   data-tip="Sync mode A/B">⇄</button>
                 <button id="presetBtn" data-tip="Switch preset">🎨</button>
-                <button class="btn-util" id="vizBtn"   data-tip="Visualizer">◎ particles</button>
+                <button class="btn-util" id="vizBtn"   data-tip="Visualizer">◎</button>
             </div>
         </div>
         <div class="status-text" id="statusText"></div>
@@ -392,18 +386,46 @@
 // ═══════════════════════════════════════════════════════════════════
 
 /* @@VISUALIZERS@@ */
-const CANVAS_SCALE = 2.6; 
+const CANVAS_SCALE = 2.6;
 
 
+const ROOT_STYLE = document.documentElement;
+
+
+
+
+
+
+
+function readVizVars() {
+    const s = getComputedStyle(ROOT_STYLE);
+    return {
+        color:     s.getPropertyValue('--viz-color').trim()     || '#ffffff',
+        glow:      s.getPropertyValue('--viz-glow').trim()      || 'rgba(255,255,255,0.4)',
+        secondary: s.getPropertyValue('--viz-secondary').trim() || 'rgba(255,255,255,0.2)',
+    };
+}
+
+
+
+
+function easeOutExpo(t) {
+    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+}
 
 
 
 function easeOutSine(t) { return Math.sin((t * Math.PI) / 2); }
 
+
+
+
+
+
+
 class BaseVisualizer {
-    constructor(wrap, cfg) {
+    constructor(wrap) {
         this.wrap   = wrap;
-        this.cfg    = cfg;
         this.canvas = null;
         this.ctx    = null;
         this._rafId = null;
@@ -448,9 +470,9 @@ class BaseVisualizer {
         }
 
         this.wrap = null;
-        this.cfg  = null;
     }
 
+    
     
     _makeCanvas(w, h) {
         
@@ -469,182 +491,137 @@ class BaseVisualizer {
     }
 }
 
-class ParticlesVisualizer extends BaseVisualizer {
+
+
+
+
+
+
+
+
+class RingVisualizer extends BaseVisualizer {
     _init() {
-        this._particles = [];
-        const sz = this.cfg.baseSize * CANVAS_SCALE;
-        this.sz  = sz;
+        this.scale   = 1;
+        this.BASE    = 60;
+        this.MAX     = 1.65;
+        this.DECAY   = 0.88; 
+        this.RING_W  = 3;
+        const sz     = this.BASE * CANVAS_SCALE;
         this._makeCanvas(sz, sz);
         this._loop();
     }
 
     pulse() {
-        const { cfg, sz } = this;
-        const max   = cfg.maxParticles || 60;
-        const count = cfg.particlesPerBurst || 12;
-        const cx = sz / 2, cy = sz / 2;
         
-        if (this._particles.length + count > max) {
-            this._particles.splice(0, count);
-        }
-        for (let i = 0; i < count; i++) {
-            const angle = (Math.PI * 2 / count) * i + (Math.random() - 0.5) * 0.4;
-            const speed = cfg.baseSize * 0.012 + Math.random() * cfg.baseSize * 0.014;
-            this._particles.push({
-                x: cx, y: cy,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed,
-                r: 1.5 + Math.random() * 2,
-                life: 1.0,
-                decay: 0.018 + Math.random() * 0.012,
-            });
-        }
+        this.scale = this.MAX;
     }
 
     _loop() {
         if (!this.canvas) return;
-        const { ctx, sz, cfg } = this;
-        ctx.clearRect(0, 0, sz, sz);
-        this._particles = this._particles.filter(p => {
-            p.x   += p.vx;
-            p.y   += p.vy;
-            p.vx  *= 0.96; 
-            p.vy  *= 0.96;
-            p.life -= p.decay;
-            if (p.life <= 0) return false;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
-            ctx.fillStyle   = cfg.color;
-            ctx.shadowColor = cfg.glowColor;
-            ctx.shadowBlur  = 4;
-            ctx.globalAlpha = p.life * 0.85;
-            ctx.fill();
-            ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-            return true;
-        });
+        this.scale = 1 + (this.scale - 1) * this.DECAY;
+        this._draw();
         this._rafId = requestAnimationFrame(() => this._loop());
     }
 
-    _cleanup() { this._particles = []; }
+    _draw() {
+        const { canvas, ctx, scale, BASE, RING_W } = this;
+        const { color, glow } = readVizVars();
+        const cx = canvas.width / 2, cy = canvas.height / 2;
+        const r  = (BASE / 2) * scale;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = RING_W;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = 6 + (scale - 1) * 30;
+        ctx.globalAlpha = Math.min(1, 0.5 + (scale - 1) * 1.5);
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
 }
 
-class WaveformVisualizer extends BaseVisualizer {
+
+
+
+
+
+
+
+class BloomVisualizer extends BaseVisualizer {
     _init() {
-        this._amplitude = 0;
-        this._phase     = 0;
-        const w = this.cfg.baseSize * 3;
-        const h = this.cfg.baseSize * 1.4;
-        this.w  = w;
-        this.h  = h;
-        this._makeCanvas(w, h);
+        this.BASE      = 65;
+        this.intensity = 0;   
+        this.DECAY     = 0.92; 
+        this._cycleIdx = 0;
+        const sz       = this.BASE * CANVAS_SCALE;
+        this._makeCanvas(sz, sz);
         this._loop();
     }
 
     pulse() {
-        this._amplitude = this.cfg.waveAmplitude || 14;
+        this.intensity = 1.0; 
+        this._cycleIdx = (this._cycleIdx + 1) % 4;
     }
 
     _loop() {
         if (!this.canvas) return;
-        const { ctx, w, h, cfg } = this;
-        const freq     = cfg.waveFrequency || 3;
-        const maxAmp   = cfg.waveAmplitude || 14;
-        const decayRate = this._amplitude > 0.05
-            ? (this._amplitude / (cfg.pulseDuration / 16.67)) * 1.2
-            : 0;
-        this._amplitude = Math.max(0, this._amplitude - decayRate);
-        this._phase    += 0.04;
-
-        ctx.clearRect(0, 0, w, h);
-        ctx.beginPath();
-        const cy = h / 2;
-        for (let px = 0; px <= w; px++) {
-            const x   = px / w;
-            const env = Math.sin(x * Math.PI); 
-            const y   = cy - Math.sin(x * Math.PI * 2 * freq + this._phase) * this._amplitude * env;
-            px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
-        }
-        const intensity = this._amplitude / maxAmp;
-        ctx.strokeStyle = cfg.color;
-        ctx.lineWidth   = cfg.lineWidth || 2;
-        ctx.shadowColor = cfg.glowColor;
-        ctx.shadowBlur  = 4 + intensity * 12;
-        ctx.globalAlpha = 0.45 + intensity * 0.55;
-        ctx.stroke();
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        this.intensity *= this.DECAY;
+        this._draw();
         this._rafId = requestAnimationFrame(() => this._loop());
     }
-}
 
-class DNAVisualizer extends BaseVisualizer {
-    _init() {
-        this._restAmp = this.cfg.baseSize * 0.12;
-        this._maxAmp  = this.cfg.baseSize * 0.42;
-        this._amp     = this._restAmp;
-        this._phase   = 0;
-        const w = this.cfg.baseSize * 3;
-        const h = this.cfg.baseSize * 1.4;
-        this.w  = w;
-        this.h  = h;
-        this._makeCanvas(w, h);
-        this._loop();
-    }
-
-    pulse() { this._amp = this._maxAmp; }
-
-    _loop() {
+    _draw() {
         if (!this.canvas) return;
-        const { ctx, w, h, cfg } = this;
+        const { canvas, ctx, BASE, intensity } = this;
+        if (intensity < 0.005) { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+        const { glow } = readVizVars();
+        const cx = canvas.width / 2, cy = canvas.height / 2;
         
-        this._amp  = this._restAmp + (this._amp - this._restAmp) * 0.945;
-        this._phase += 0.03;
-        ctx.clearRect(0, 0, w, h);
-        const cy      = h / 2;
-        const freq    = 2.5;
-        const rungs   = 8;
-        const glow    = ((this._amp - this._restAmp) / (this._maxAmp - this._restAmp)) * 14;
-        const alpha   = 0.45 + ((this._amp - this._restAmp) / (this._maxAmp - this._restAmp)) * 0.4;
-        this._strand(ctx, w, cy, this._amp, freq, 0,         cfg, glow, alpha);
-        this._strand(ctx, w, cy, this._amp, freq, Math.PI,   cfg, glow, alpha * 0.7);
+        const r  = (BASE / 2) * (1 + intensity * 0.5);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        ctx.strokeStyle = cfg.color;
-        ctx.lineWidth   = (cfg.lineWidth || 1.5) * 0.6;
-        ctx.globalAlpha = alpha * 0.35;
-        ctx.shadowColor = cfg.glowColor;
-        ctx.shadowBlur  = glow * 0.5;
-        for (let i = 0; i <= rungs; i++) {
-            const xN = i / rungs;
-            const y1 = cy - Math.sin(xN * Math.PI * 2 * freq + this._phase) * this._amp;
-            const y2 = cy - Math.sin(xN * Math.PI * 2 * freq + this._phase + Math.PI) * this._amp;
-            ctx.beginPath(); ctx.moveTo(xN * w, y1); ctx.lineTo(xN * w, y2); ctx.stroke();
-        }
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
-        this._rafId = requestAnimationFrame(() => this._loop());
+        const aMod = 0.85 + this._cycleIdx * 0.05;
+
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.4);
+        g.addColorStop(0,    this._a(glow, intensity * 0.85 * aMod));
+        g.addColorStop(0.4,  this._a(glow, intensity * 0.55 * aMod));
+        g.addColorStop(0.75, this._a(glow, intensity * 0.2));
+        g.addColorStop(1,    'rgba(0,0,0,0)');
+
+        ctx.fillStyle   = g;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = 20 + intensity * 30;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
     }
 
-    _strand(ctx, w, cy, amp, freq, offset, cfg, glow, alpha) {
-        ctx.beginPath();
-        for (let px = 0; px <= w; px++) {
-            const y = cy - Math.sin((px / w) * Math.PI * 2 * freq + this._phase + offset) * amp;
-            px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
-        }
-        ctx.strokeStyle = cfg.color;
-        ctx.lineWidth   = cfg.lineWidth || 1.5;
-        ctx.shadowColor = cfg.glowColor;
-        ctx.shadowBlur  = glow;
-        ctx.globalAlpha = alpha;
-        ctx.stroke();
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    
+    
+    
+    _a(rgba, a) { 
+        return rgba.replace(/[\d.]+\)$/, `${Math.min(a,1).toFixed(3)})`); 
     }
 }
+
+
+
+
+
+
+
+
+
 
 class HeartbeatVisualizer extends BaseVisualizer {
     _init() {
-        this._lock = false;
-        const w    = this.cfg.baseSize * 3;
-        const h    = this.cfg.baseSize * 1.2;
-        this.w     = w;
-        this.h     = h;
+        this._lock    = false;
+        this.BASE     = 60;
+        this.DURATION = 280; 
+        const w = this.BASE * 3, h = this.BASE * 1.2;
+        this.w = w; this.h = h;
         this._makeCanvas(w, h);
         this._draw(0);
     }
@@ -653,26 +630,30 @@ class HeartbeatVisualizer extends BaseVisualizer {
         
         
         if (this._lock) return;
-        this._lock  = true;
-        const dur   = this.cfg.pulseDuration;
+        this._lock = true;
         const start = performance.now();
         const go = now => {
-            if (!this.canvas) return; 
-            const p = Math.min((now - start) / dur, 1);
-            this._draw(p);
+            if (!this.canvas) return;
+            const p = Math.min((now - start) / this.DURATION, 1);
+            
+            
+            const env = p < 0.5
+                ? easeOutExpo(p * 2)           
+                : 1 - easeOutExpo((p - 0.5)*2); 
+            this._draw(env);
             if (p < 1) this._rafId = requestAnimationFrame(go);
             else { this._draw(0); this._lock = false; }
         };
         if (this._rafId) cancelAnimationFrame(this._rafId);
         this._rafId = requestAnimationFrame(go);
     }
-
-    _draw(p) {
+    _draw(env) {
         if (!this.canvas) return;
-        const { ctx, w, h, cfg } = this;
+        const { ctx, w, h } = this;
+        const { color, glow } = readVizVars();
         ctx.clearRect(0, 0, w, h);
         const cy  = h / 2;
-        const amp = (h * 0.38) * Math.sin(p * Math.PI); 
+        const amp = (h * 0.38) * env;
 
         
         const profile = x => {
@@ -691,11 +672,11 @@ class HeartbeatVisualizer extends BaseVisualizer {
             const y = cy - profile(px / w) * amp;
             px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
         }
-        ctx.strokeStyle = cfg.color;
-        ctx.lineWidth   = cfg.lineWidth || 1.5;
-        ctx.shadowColor = cfg.glowColor;
-        ctx.shadowBlur  = 8 + amp * 0.3;
-        ctx.globalAlpha = 0.5 + p * 0.5;
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = 1.5;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = 4 + amp * 0.4;
+        ctx.globalAlpha = 0.4 + env * 0.6;
         ctx.stroke();
         ctx.shadowBlur = 0; ctx.globalAlpha = 1;
     }
@@ -703,39 +684,51 @@ class HeartbeatVisualizer extends BaseVisualizer {
     _cleanup() { this._lock = false; }
 }
 
+
+
+
+
+
+
+
+
 class RippleVisualizer extends BaseVisualizer {
     _init() {
-        this._rings = []; 
-        const sz    = this.cfg.baseSize * CANVAS_SCALE;
-        this.sz     = sz;
+        this._rings   = [];
+        this.BASE     = 50;
+        this.MAX_RINGS= 4;
+        this.DURATION = 600; 
+        const sz      = this.BASE * CANVAS_SCALE;
+        this.sz       = sz;
         this._makeCanvas(sz, sz);
         this._loop();
     }
 
     pulse() {
-        const max = this.cfg.maxRings || 4;
-        if (this._rings.length >= max) this._rings.shift(); 
-        this._rings.push({ startTime: performance.now(), duration: this.cfg.pulseDuration });
+        if (this._rings.length >= this.MAX_RINGS) this._rings.shift();
+        
+        this._rings.push({ t0: performance.now() - this.DURATION * 0.08, dur: this.DURATION });
     }
 
     _loop() {
         if (!this.canvas) return;
-        const { ctx, sz, cfg } = this;
+        const { ctx, sz, BASE } = this;
+        const { color, glow } = readVizVars();
         const cx = sz / 2, cy = sz / 2;
-        const maxR = (cfg.baseSize / 2) * 2.2;
+        const maxR = (BASE / 2) * 2.2;
         ctx.clearRect(0, 0, sz, sz);
         const now = performance.now();
         this._rings = this._rings.filter(ring => {
-            const p = (now - ring.startTime) / ring.duration;
+            const p = (now - ring.t0) / ring.dur;
             if (p >= 1) return false;
             const r = maxR * easeOutSine(p);
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            ctx.strokeStyle = cfg.color;
-            ctx.lineWidth   = (cfg.ringWidth || 1.5) * (1 - p * 0.5);
-            ctx.shadowColor = cfg.glowColor;
-            ctx.shadowBlur  = 12 * (1 - p);
-            ctx.globalAlpha = (1 - p) * 0.7;
+            ctx.strokeStyle = color;
+            ctx.lineWidth   = 1.8 * (1 - p * 0.6);
+            ctx.shadowColor = glow;
+            ctx.shadowBlur  = 14 * (1 - p);
+            ctx.globalAlpha = (1 - p) * 0.8;
             ctx.stroke();
             ctx.shadowBlur = 0; ctx.globalAlpha = 1;
             return true;
@@ -746,116 +739,231 @@ class RippleVisualizer extends BaseVisualizer {
     _cleanup() { this._rings = []; }
 }
 
-class RingVisualizer extends BaseVisualizer {
+
+
+
+
+
+
+
+
+class WaveformVisualizer extends BaseVisualizer {
     _init() {
-        this.scale = 1;
-        const sz   = this.cfg.baseSize * CANVAS_SCALE;
-        this._makeCanvas(sz, sz);
-        this._draw();
+        this._amp   = 0;
+        this._phase = 0;
+        this.MAX_AMP  = 16;
+        this.FREQ     = 3;
+        this.DECAY    = 0.91; 
+        const w = 60*3, h = 60*1.4;
+        this.w = w; this.h = h;
+        this._makeCanvas(w, h);
+        this._loop();
     }
 
     pulse() {
-        const { pulseDuration, pulseScale } = this.cfg;
-        const start = performance.now();
-        const go = now => {
-            const p    = Math.min((now - start) / pulseDuration, 1);
-            this.scale = 1 + (pulseScale - 1) * Math.sin(p * Math.PI);
-            this._draw();
-            if (p < 1) this._rafId = requestAnimationFrame(go);
-            else { this.scale = 1; this._draw(); }
-        };
-        if (this._rafId) cancelAnimationFrame(this._rafId);
-        this._rafId = requestAnimationFrame(go);
+        this._amp = this.MAX_AMP; 
     }
 
-    _draw() {
+    _loop() {
         if (!this.canvas) return;
-        const { ctx, cfg, scale } = this;
-        const cx = this.canvas.width / 2, cy = this.canvas.height / 2;
-        const r  = (cfg.baseSize / 2) * scale;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        const { ctx, w, h } = this;
+        const { color, glow } = readVizVars();
+        const cy = h / 2;
+
+        this._amp   *= this.DECAY;
+        this._phase += 0.05; 
+
+        ctx.clearRect(0, 0, w, h);
         ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.strokeStyle = cfg.color;
-        ctx.lineWidth   = cfg.ringWidth;
-        ctx.shadowColor = cfg.glowColor;
-        ctx.shadowBlur  = 10 + (scale - 1) * 20;
-        ctx.globalAlpha = 0.7 + (scale - 1) * 0.3;
+        for (let px = 0; px <= w; px++) {
+            const x   = px / w;
+            const env = Math.sin(x * Math.PI); 
+            const y   = cy - Math.sin(x * Math.PI * 2 * this.FREQ + this._phase) * this._amp * env;
+            px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+        }
+        const intensity = this._amp / this.MAX_AMP;
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = 2;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = 4 + intensity * 16;
+        ctx.globalAlpha = 0.35 + intensity * 0.65;
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+}
+
+
+
+
+
+
+
+
+
+
+class ParticlesVisualizer extends BaseVisualizer {
+    _init() {
+        this._particles = [];
+        this.MAX_P    = 72;
+        this.PER_BURST= 14; 
+        this.BASE     = 60;
+        const sz = this.BASE * CANVAS_SCALE;
+        this.sz  = sz;
+        this._makeCanvas(sz, sz);
+        this._loop();
+    }
+
+    pulse() {
+        const { sz, MAX_P, PER_BURST, BASE } = this;
+        const cx = sz / 2, cy = sz / 2;
+        
+        if (this._particles.length + PER_BURST > MAX_P) {
+            this._particles.splice(0, PER_BURST); 
+        }
+        for (let i = 0; i < PER_BURST; i++) {
+            const angle = (Math.PI * 2 / PER_BURST) * i + (Math.random() - 0.5) * 0.5;
+            const spd   = BASE * 0.016 + Math.random() * BASE * 0.018;
+            this._particles.push({
+                x: cx, y: cy,
+                vx: Math.cos(angle) * spd,
+                vy: Math.sin(angle) * spd,
+                r: 1.5 + Math.random() * 2.5,
+                life: 1.0,
+                decay: 0.022 + Math.random()*0.014, 
+            });
+        }
+    }
+
+    _loop() {
+        if (!this.canvas) return;
+        const { ctx, sz } = this;
+        const { color, glow } = readVizVars();
+        ctx.clearRect(0, 0, sz, sz);
+        this._particles = this._particles.filter(p => {
+            p.x += p.vx; p.y += p.vy;
+            p.vx *= 0.94; p.vy *= 0.94;
+            p.life -= p.decay;
+            if (p.life <= 0) return false;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r*p.life, 0, Math.PI*2);
+            ctx.fillStyle   = color;
+            ctx.shadowColor = glow;
+            ctx.shadowBlur  = 5;
+            ctx.globalAlpha = p.life * 0.9;
+            ctx.fill();
+            ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+            return true;
+        });
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+
+    _cleanup() { this._particles = []; }
+}
+
+
+
+
+
+
+
+
+
+class DNAVisualizer extends BaseVisualizer {
+    _init() {
+        this.BASE     = 60;
+        this._restAmp = this.BASE * 0.10;
+        this._maxAmp  = this.BASE * 0.44;
+        this._amp     = this._restAmp;
+        this.DECAY    = 0.93;
+        this._phase   = 0;
+        const w = this.BASE*3, h = this.BASE*1.4;
+        this.w = w; this.h = h;
+        this._makeCanvas(w, h);
+        this._loop();
+    }
+
+    pulse() { this._amp = this._maxAmp; }
+
+    _loop() {
+        if (!this.canvas) return;
+        const { ctx, w, h } = this;
+        const { color, glow, secondary } = readVizVars();
+        const cy    = h / 2;
+        const freq  = 2.5;
+        const rungs = 8;
+
+        
+        this._amp   = this._restAmp + (this._amp - this._restAmp) * this.DECAY;
+        this._phase += 0.03;
+
+        ctx.clearRect(0, 0, w, h);
+
+        const norm  = (this._amp - this._restAmp) / (this._maxAmp - this._restAmp);
+        const gBlur = norm * 16;
+        const alpha = 0.4 + norm * 0.5;
+
+        
+        this._strand(ctx, w, cy, freq, 0,       color,     gBlur,       alpha,       glow);
+        
+        this._strand(ctx, w, cy, freq, Math.PI, secondary, gBlur * 0.6, alpha * 0.65, glow);
+
+        
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = 0.9;
+        ctx.globalAlpha = alpha * 0.3;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = gBlur * 0.4;
+        for (let i = 0; i <= rungs; i++) {
+            const xN = i / rungs;
+            const y1 = cy - Math.sin(xN * Math.PI * 2 * freq + this._phase) * this._amp;
+            const y2 = cy - Math.sin(xN * Math.PI * 2 * freq + this._phase + Math.PI) * this._amp;
+            ctx.beginPath(); ctx.moveTo(xN * w, y1); ctx.lineTo(xN * w, y2); ctx.stroke();
+        }
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+
+    _strand(ctx, w, cy, freq, offset, strokeColor, glowBlur, alpha, shadowColor) {
+        ctx.beginPath();
+        for (let px = 0; px <= w; px++) {
+            const y = cy - Math.sin((px / w) * Math.PI * 2 * freq + this._phase + offset) * this._amp;
+            px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+        }
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth   = 1.5;
+        ctx.shadowColor = shadowColor;
+        ctx.shadowBlur  = glowBlur;
+        ctx.globalAlpha = alpha;
         ctx.stroke();
         ctx.shadowBlur = 0; ctx.globalAlpha = 1;
     }
 }
 
-class BloomVisualizer extends BaseVisualizer {
-    _init() {
-        this.scale     = 1;
-        this._colorIdx = 0;
-        this._curColor = (this.cfg.colorCycle && this.cfg.colorCycle.length)
-                          ? this.cfg.colorCycle[0]
-                          : this.cfg.glowColor;
-        const sz       = this.cfg.baseSize * CANVAS_SCALE;
-        this._makeCanvas(sz, sz);
-        this._draw();
-    }
 
-    pulse() {
-        if (this.cfg.colorCycle && this.cfg.colorCycle.length) {
-            this._colorIdx = (this._colorIdx + 1) % this.cfg.colorCycle.length;
-            this._curColor = this.cfg.colorCycle[this._colorIdx];
-        }
-        const { pulseDuration, pulseScale } = this.cfg;
-        const start = performance.now();
-        const go = now => {
-            const p    = Math.min((now - start) / pulseDuration, 1);
-            this.scale = 1 + (pulseScale - 1) * Math.sin(p * Math.PI);
-            this._draw();
-            if (p < 1) this._rafId = requestAnimationFrame(go);
-            else { this.scale = 1; this._draw(); }
-        };
-        if (this._rafId) cancelAnimationFrame(this._rafId);
-        this._rafId = requestAnimationFrame(go);
-    }
 
-    _draw() {
-        if (!this.canvas) return;
-        const { ctx, cfg, scale } = this;
-        const cx = this.canvas.width / 2, cy = this.canvas.height / 2;
-        const r  = (cfg.baseSize / 2) * scale;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.4);
-        const a = 0.12 + (scale - 1) * 0.5;
-        g.addColorStop(0,    this._alpha(this._curColor, a * 1.5));
-        g.addColorStop(0.4,  this._alpha(this._curColor, a));
-        g.addColorStop(0.75, this._alpha(this._curColor, a * 0.35));
-        g.addColorStop(1,    'rgba(0,0,0,0)');
-        ctx.fillStyle   = g;
-        ctx.shadowColor = this._curColor;
-        ctx.shadowBlur  = 28 + (scale - 1) * 40;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-    }
 
-    
-    
-    
-    _alpha(rgba, a) {
-        return rgba.replace(/[\d.]+\)$/, `${Math.min(a, 1).toFixed(2)})`);
-    }
-}
+
+
 
 const VISUALIZERS = {
-    particles: ParticlesVisualizer,
-    waveform: WaveformVisualizer,
-    dna: DNAVisualizer,
+    ring:      RingVisualizer,
+    bloom:     BloomVisualizer,
     heartbeat: HeartbeatVisualizer,
-    ripple: RippleVisualizer,
-    ring: RingVisualizer,
-    bloom: BloomVisualizer,
+    ripple:    RippleVisualizer,
+    waveform:  WaveformVisualizer,
+    particles: ParticlesVisualizer,
+    dna:       DNAVisualizer,
 };
 
-const VISUALIZER_ORDER = ["particles", "waveform", "dna", "heartbeat", "ripple", "ring", "bloom", "off"];
+
+
+
+
+
+
+const VISUALIZER_ORDER = ['particles', 'waveform', 'dna', 'heartbeat', 'ripple', 'ring', 'bloom', 'off'];
 /* @@END_VISUALIZERS@@ */
 
 /* @@PRESETS@@ */
@@ -878,7 +986,11 @@ rap: {
             '--bg-btn':        '#1a2a1a',
             '--border-btn':    '#3c9e3c',
             '--color-btn':     '#aaffaa',
-            '--crt-on':        '1'},
+            '--crt-on':        '1',
+            
+            '--viz-color':     '#1eff00',
+            '--viz-glow':      'rgba(30,255,0,0.55)',
+            '--viz-secondary': 'rgba(30,255,0,0.25)'},
 
         
         
@@ -894,16 +1006,7 @@ rap: {
             { className:'fx-chroma',  duration:200, useFlash:false, useScan:true  },
             { className:'fx-flicker', duration:220, useFlash:false, useScan:false },
             { className:'fx-zoom',    duration:160, useFlash:true,  useScan:false },
-        ],
-
-        visualizer: {
-            style:         'ring', 
-            baseSize:      60,
-            pulseScale:    1.6,
-            pulseDuration: 180,
-            ringWidth:     3,
-            color:         '#1eff00',
-            glowColor:     'rgba(30,255,0,0.5)'}},
+        ]},
 ethereal: {
         label: 'ETHEREAL',
 
@@ -922,30 +1025,24 @@ ethereal: {
             '--bg-btn':        '#140a28',
             '--border-btn':    '#5c3080',
             '--color-btn':     '#c4a0f0',
-            '--crt-on':        '0'},
+            '--crt-on':        '0',
+            '--viz-color':     '#c084fc',
+            '--viz-glow':      'rgba(160,80,255,0.5)',
+            '--viz-secondary': 'rgba(120,60,200,0.25)'},
 
         
 
         dustColor:  'rgba(160,100,255,0.15)',
-        flashColor: 'rgba(140,70,255,0.16)',
+        flashColor: 'rgba(140,70,255,0.20)',
 
         effects: [
             
-            { className:'fx-drift',    duration:600, useFlash:false, useScan:false },
-            { className:'fx-breathe',  duration:800, useFlash:false, useScan:false },
-            { className:'fx-aurora',   duration:700, useFlash:true,  useScan:false },
-            { className:'fx-dissolve', duration:500, useFlash:true,  useScan:false },
-            { className:'fx-float',    duration:650, useFlash:false, useScan:false },
-        ],
-
-        visualizer: {
-            style:         'bloom',
-            baseSize:      70,
-            pulseScale:    1.9,
-            pulseDuration: 700,
-            ringWidth:     0,
-            color:         'rgba(180,100,255,0.3)',
-            glowColor:     'rgba(150,80,255,0.5)'}}
+            { className:'fx-drift',    duration:250, useFlash:true,  useScan:false },
+            { className:'fx-breathe',  duration:300, useFlash:false, useScan:false },
+            { className:'fx-aurora',   duration:350, useFlash:true,  useScan:false },
+            { className:'fx-dissolve', duration:280, useFlash:true,  useScan:false },
+            { className:'fx-float',    duration:220, useFlash:false, useScan:false },
+        ]}
 };
 const PRESET_ORDER = ['rap', 'ethereal'];
 /* @@END_PRESETS@@ */
@@ -1059,9 +1156,8 @@ function buildVisualizer(key) {
     }
 
     visWrap.classList.remove('viz-off');
-    const cfg = PRESETS[currentPreset].visualizer;
     // Override style key to match the chosen visualizer
-    vizs = new VISUALIZERS[key](visWrap, { ...cfg, style: key });
+    vizs = new VISUALIZERS[key](visWrap);
     vizBtn.textContent = `◎ ${key}`;
 }
 
@@ -1099,9 +1195,9 @@ function applyPreset(key) {
     document.querySelectorAll('.dust-particle').forEach(el => el.remove());
     createDust(p.dustColor);
 
-    // Rebuild visualizer with new preset's visualizer config, keeping
-    // the currently selected visualizer type (vizIndex).
-    buildVisualizer(VIZ_ORDER[vizIndex]);
+    // Do NOT rebuild the visualizer here. CSS vars are now injected above,
+    // and the running visualizer reads them on its next draw frame automatically.
+    // This is zero-coupling contract: preset switch = CSS vars only.
 
     const nextKey = PRESET_ORDER[(PRESET_ORDER.indexOf(key) + 1) % PRESET_ORDER.length];
     presetBtn.setAttribute('data-tip', `→ ${PRESETS[nextKey].label}`);
@@ -1224,7 +1320,7 @@ function updateLyrics(t) {
     if (idx !== -1) {
         currentLineEl.textContent = LYRICS[idx].text;
         const next = LYRICS[idx + 1];
-        nextLineEl.textContent = next ? `➡ ${next.text}` : `🏁 FINISH`;
+        nextLineEl.textContent = next ? `➡ ${next.text}` : `Audit Complete`;
     } else if (LYRICS.length && t > LYRICS[LYRICS.length - 1].end) {
         currentLineEl.textContent = `@AmMoPy`;
         nextLineEl.textContent    = `⭐ SHOW SOME LOVE ⭐`;

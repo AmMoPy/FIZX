@@ -15,10 +15,18 @@
 //                 className  → applied to .current-line; removed after duration ms
 //                 duration   → ms before class is removed
 //                 useFlash   → fires screen-flash keyed to current flashColor
-//                 useScan    → fires scanline wipe (only on CRT presets)
-//   visualizer  : config consumed by the active visualizer class
-//                 style field must match a key in VISUALIZERS (visualizers.js)
-//                 TODO: this creates tight coupling, incoming refactor    
+//                 useScan    → fires scanline wipe (only on CRT presets)  
+//
+// WHAT A PRESET DOES NOT OWN:
+//   circle / visualizer config — visualizers are fully independent.
+//   Each visualizer reads --viz-color, --viz-glow, --viz-secondary
+//   from the active preset's CSS vars at runtime. Switching preset
+//   recolors the running visualizer automatically with zero rebuild.
+//
+// VISUALIZER COLOR VARS (must be present in every preset's cssVars):
+//   --viz-color      : primary stroke/fill color
+//   --viz-glow       : shadow/glow color (rgba with alpha)
+//   --viz-secondary  : secondary color for two-tone visualizers (DNA strands, ripple)
 //
 // DENSE BEAT DESIGN NOTE:
 //   Ambient/ethereal beats arrive 5-6× per second (~120-500ms apart).
@@ -35,11 +43,28 @@
 //   Never combine transform-based animations with duration > 200ms on
 //   dense beats — they will visually collide mid-animation.
 //
-// TO ADD A NEW PRESET (zero HTML changes required):
+//   Animation logic (all presets):
+//   to address latency problems where the animation spent
+//   its first 200-400ms building up to peak, causing visual 
+//   confirmation of the beat arrived late:
+//     1. INSTANT-PEAK keyframes: the visible effect (glow, opacity change,
+//        position shift) is at maximum at 0% of the animation, not 50%.
+//        Example: bad kDrift goes 0→-4px→-2px→0 (peak at 40%).
+//                 good kDrift goes -4px→-1px→0 (peak at 0%).
+//     2. Shorter durations on LAYER effects: 500-800ms → 200-350ms.
+//        At 60fps this gives 12-21 frames of visible effect, enough for
+//        the user to register it, but short enough to clear before
+//        the next beat at most tempos.
+//     3. useFlash: true added to more effects — screen flash has zero
+//        ramp-up time (CSS animation starts at max box-shadow) so it's
+//        the most reliable beat-sync indicator. More flash = more sync feel.
+//
+// TO ADD A NEW PRESET (zero template changes required):
 //   1. Copy any existing entry; give it a unique key.
 //   2. Write all required @keyframes and .fx-* classes into the styles string.
-//   3. Add the key to PRESET_ORDER.
-//   4. Run compile.py — done.
+//   3. Add --viz-color, --viz-glow, --viz-secondary to cssVars.
+//   4. Add the key to PRESET_ORDER.
+//   5. Run compile.py — done.
 // ═══════════════════════════════════════════════════════════════════
 
 export const PRESETS = {
@@ -66,6 +91,10 @@ export const PRESETS = {
             '--border-btn':    '#3c9e3c',
             '--color-btn':     '#aaffaa',
             '--crt-on':        '1',
+            // Visualizer color palette — read by visualizers at runtime
+            '--viz-color':     '#1eff00',
+            '--viz-glow':      'rgba(30,255,0,0.55)',
+            '--viz-secondary': 'rgba(30,255,0,0.25)',
         },
 
         // All CSS this preset needs. compile.py injects this verbatim into <style>.
@@ -129,16 +158,6 @@ export const PRESETS = {
             { className:'fx-flicker', duration:220, useFlash:false, useScan:false },
             { className:'fx-zoom',    duration:160, useFlash:true,  useScan:false },
         ],
-
-        visualizer: {
-            style:         'ring', // this is just a label, not a selector
-            baseSize:      60,
-            pulseScale:    1.6,
-            pulseDuration: 180,
-            ringWidth:     3,
-            color:         '#1eff00',
-            glowColor:     'rgba(30,255,0,0.5)',
-        },
     },
 
 
@@ -164,65 +183,52 @@ export const PRESETS = {
             '--border-btn':    '#5c3080',
             '--color-btn':     '#c4a0f0',
             '--crt-on':        '0',
+            '--viz-color':     '#c084fc',
+            '--viz-glow':      'rgba(160,80,255,0.5)',
+            '--viz-secondary': 'rgba(120,60,200,0.25)',
         },
 
         styles: `
             @keyframes kDrift {
-                0%  { transform:translateY(0);    opacity:1; }
-                40% { transform:translateY(-4px); opacity:0.75; }
-                70% { transform:translateY(-2px); opacity:0.9; }
+                0%  { transform:translateY(-5px); opacity:0.7; }
                 100%{ transform:translateY(0);    opacity:1; }
             }
             @keyframes kBreathe {
-                0%  { letter-spacing:normal; opacity:1; filter:blur(0); }
-                50% { letter-spacing:0.06em; opacity:0.8; filter:blur(0.5px); }
-                100%{ letter-spacing:normal; opacity:1; filter:none; }
+                0%  { letter-spacing:0.08em; opacity:0.7; filter:blur(0.8px); }
+                100%{ letter-spacing:normal;  opacity:1;  filter:none; }
             }
             @keyframes kEtherealAurora {
-                0%  { text-shadow:0 0 8px #a855f7,0 0 20px #7c3aed; }
-                33% { text-shadow:0 0 12px #c084fc,0 0 28px #a855f7; }
-                66% { text-shadow:0 0 10px #818cf8,0 0 22px #6366f1; }
-                100%{ text-shadow:0 0 8px #a855f7,0 0 20px #7c3aed; }
+                0%  { text-shadow:0 0 18px #c084fc,0 0 36px #a855f7; }
+                60% { text-shadow:0 0 8px #818cf8,0 0 16px #6366f1; }
+                100%{ text-shadow:0 0 5px #a855f7; }
             }
             @keyframes kDissolve {
-                0%  { opacity:1;    filter:blur(0); }
-                30% { opacity:0.5;  filter:blur(2px); }
-                60% { opacity:0.85; filter:blur(0.5px); }
-                100%{ opacity:1;    filter:blur(0); }
+                0%  { opacity:0.45; filter:blur(2.5px); }
+                50% { opacity:0.8;  filter:blur(0.5px); }
+                100%{ opacity:1;    filter:none; }
             }
             @keyframes kFloat {
-                0%  { transform:scale(1)    translateY(0); }
-                50% { transform:scale(1.03) translateY(-3px); }
+                0%  { transform:scale(1.05) translateY(-4px); }
                 100%{ transform:scale(1)    translateY(0); }
             }
-            .fx-drift    { animation:kDrift         0.60s ease-in-out; }
-            .fx-breathe  { animation:kBreathe        0.80s ease-in-out; }
-            .fx-aurora   { animation:kEtherealAurora 0.70s ease-in-out; }
-            .fx-dissolve { animation:kDissolve       0.50s ease-in-out; }
-            .fx-float    { animation:kFloat          0.65s ease-in-out; }
+            .fx-drift    { animation:kDrift         0.25s ease-out; }
+            .fx-breathe  { animation:kBreathe        0.30s ease-out; }
+            .fx-aurora   { animation:kEtherealAurora 0.35s ease-out; }
+            .fx-dissolve { animation:kDissolve       0.28s ease-out; }
+            .fx-float    { animation:kFloat          0.22s ease-out; }
         `,
 
         dustColor:  'rgba(160,100,255,0.15)',
-        flashColor: 'rgba(140,70,255,0.16)',
+        flashColor: 'rgba(140,70,255,0.20)',
 
         effects: [
             // LAYER — all opacity/filter/text-shadow, safe to stack
-            { className:'fx-drift',    duration:600, useFlash:false, useScan:false },
-            { className:'fx-breathe',  duration:800, useFlash:false, useScan:false },
-            { className:'fx-aurora',   duration:700, useFlash:true,  useScan:false },
-            { className:'fx-dissolve', duration:500, useFlash:true,  useScan:false },
-            { className:'fx-float',    duration:650, useFlash:false, useScan:false },
+            { className:'fx-drift',    duration:250, useFlash:true,  useScan:false },
+            { className:'fx-breathe',  duration:300, useFlash:false, useScan:false },
+            { className:'fx-aurora',   duration:350, useFlash:true,  useScan:false },
+            { className:'fx-dissolve', duration:280, useFlash:true,  useScan:false },
+            { className:'fx-float',    duration:220, useFlash:false, useScan:false },
         ],
-
-        visualizer: {
-            style:         'bloom',
-            baseSize:      70,
-            pulseScale:    1.9,
-            pulseDuration: 700,
-            ringWidth:     0,
-            color:         'rgba(180,100,255,0.3)',
-            glowColor:     'rgba(150,80,255,0.5)',
-        },
     },
 
 
@@ -248,61 +254,51 @@ export const PRESETS = {
             '--border-btn':    '#2a3060',
             '--color-btn':     '#8090c0',
             '--crt-on':        '0',
+            '--viz-color':     '#6080d0',
+            '--viz-glow':      'rgba(80,120,220,0.35)',
+            '--viz-secondary': 'rgba(60,80,160,0.2)',
         },
 
         styles: `
             @keyframes kVoidBlink {
-                0%{ opacity:1; } 50%{ opacity:0.05; } 100%{ opacity:1; }
+                0%{ opacity:0.05; } 15%{ opacity:1; } 100%{ opacity:1; }
             }
             @keyframes kVoidSlice {
-                0%  { clip-path:inset(0 0 0 0); }
-                40% { clip-path:inset(0 0 60% 0); }
-                70% { clip-path:inset(40% 0 0 0); }
+                0%  { clip-path:inset(0 0 60% 0); }
+                40% { clip-path:inset(40% 0 0 0); }
                 100%{ clip-path:inset(0 0 0 0); }
             }
             @keyframes kVoidDim {
-                0%  { opacity:1;   filter:none; }
-                50% { opacity:0.3; filter:brightness(0.4); }
-                100%{ opacity:1;   filter:none; }
+                0%  { opacity:0.25; filter:brightness(0.3); }
+                100%{ opacity:1;    filter:none; }
             }
             @keyframes kVoidShift {
-                0%  { letter-spacing:normal; }
-                40% { letter-spacing:0.12em; opacity:0.7; }
+                0%  { letter-spacing:0.14em; opacity:0.6; }
                 100%{ letter-spacing:normal; opacity:1; }
             }
             @keyframes kVoidStatic {
-                0%,100%{ text-shadow:0 0 2px #d0d8e8; }
-                25%    { text-shadow:3px 0 #fff,-3px 0 #6070a0; }
-                75%    { text-shadow:-2px 0 #fff,2px 0 #6070a0; }
+                0%  { text-shadow:4px 0 #fff,-4px 0 #6070a0; }
+                40% { text-shadow:-3px 0 #fff,3px 0 #6070a0; }
+                100%{ text-shadow:0 0 2px #d0d8e8; }
             }
-            .fx-void-blink  { animation:kVoidBlink  0.08s linear; }
-            .fx-void-slice  { animation:kVoidSlice  0.12s ease-out; }
-            .fx-void-dim    { animation:kVoidDim    0.10s linear; }
-            .fx-void-shift  { animation:kVoidShift  0.11s ease-in-out; }
-            .fx-void-static { animation:kVoidStatic 0.09s linear; }
+            .fx-void-blink  { animation:kVoidBlink  0.12s ease-out; }
+            .fx-void-slice  { animation:kVoidSlice  0.14s ease-out; }
+            .fx-void-dim    { animation:kVoidDim    0.18s ease-out; }
+            .fx-void-shift  { animation:kVoidShift  0.16s ease-out; }
+            .fx-void-static { animation:kVoidStatic 0.15s ease-out; }
         `,
 
         dustColor:  'rgba(160,180,255,0.07)',
-        flashColor: 'rgba(200,220,255,0.11)',
+        flashColor: 'rgba(200,220,255,0.14)',
 
         effects: [
             // ALL SHORT — each completes before next dense beat arrives
-            { className:'fx-void-blink',  duration:80,  useFlash:true,  useScan:false },
-            { className:'fx-void-slice',  duration:120, useFlash:false, useScan:false },
-            { className:'fx-void-dim',    duration:100, useFlash:false, useScan:false },
-            { className:'fx-void-shift',  duration:110, useFlash:true,  useScan:false },
-            { className:'fx-void-static', duration:90,  useFlash:false, useScan:false },
+            { className:'fx-void-blink',  duration:120, useFlash:true,  useScan:false },
+            { className:'fx-void-slice',  duration:140, useFlash:false, useScan:false },
+            { className:'fx-void-dim',    duration:180, useFlash:true,  useScan:false },
+            { className:'fx-void-shift',  duration:160, useFlash:false, useScan:false },
+            { className:'fx-void-static', duration:150, useFlash:true,  useScan:false },
         ],
-
-        visualizer: {
-            style:         'heartbeat',
-            baseSize:      60,
-            pulseScale:    1.0,
-            pulseDuration: 300,
-            color:         '#4060c0',
-            glowColor:     'rgba(80,120,220,0.3)',
-            lineWidth:     1.5,
-        },
     },
 
 
@@ -328,63 +324,50 @@ export const PRESETS = {
             '--border-btn':    '#1a6060',
             '--color-btn':     '#7ecece',
             '--crt-on':        '0',
+            '--viz-color':     '#7ee8e8',
+            '--viz-glow':      'rgba(100,220,220,0.35)',
+            '--viz-secondary': 'rgba(60,160,160,0.2)',
         },
 
         styles: `
             @keyframes kDreamFade {
-                0%  { opacity:1; }
-                50% { opacity:0.4; filter:blur(1px); }
-                100%{ opacity:1;  filter:none; }
+                0%  { opacity:0.35; filter:blur(1.5px); }
+                100%{ opacity:1;    filter:none; }
             }
             @keyframes kDreamFog {
-                0%  { filter:none; }
-                50% { filter:blur(1.5px) brightness(1.2); }
+                0%  { filter:blur(2px) brightness(1.3); }
                 100%{ filter:none; }
             }
             @keyframes kDreamPulse {
-                0%  { opacity:1;   }
-                40% { opacity:0.6; }
+                0%  { opacity:0.5; }
                 100%{ opacity:1;   }
             }
             @keyframes kDreamGlow {
-                0%  { text-shadow:0 0 5px #7ee8e8; }
-                50% { text-shadow:0 0 18px #7ee8e8,0 0 35px #3ab0b0; }
-                100%{ text-shadow:0 0 5px #7ee8e8; }
+                0%  { text-shadow:0 0 22px #7ee8e8,0 0 45px #3ab0b0; }
+                100%{ text-shadow:0 0 4px #7ee8e8; }
             }
             @keyframes kDreamRipple {
-                0%  { letter-spacing:normal; opacity:1;   }
-                50% { letter-spacing:0.04em; opacity:0.7; }
+                0%  { letter-spacing:0.06em; opacity:0.6; }
                 100%{ letter-spacing:normal; opacity:1;   }
             }
-            .fx-dream-fade   { animation:kDreamFade   0.14s ease-in-out; }
-            .fx-dream-fog    { animation:kDreamFog    0.18s ease-in-out; }
-            .fx-dream-pulse  { animation:kDreamPulse  0.12s linear; }
-            .fx-dream-glow   { animation:kDreamGlow   0.16s ease-in-out; }
-            .fx-dream-ripple { animation:kDreamRipple 0.13s ease-in-out; }
+            .fx-dream-fade   { animation:kDreamFade   0.22s ease-out; }
+            .fx-dream-fog    { animation:kDreamFog    0.25s ease-out; }
+            .fx-dream-pulse  { animation:kDreamPulse  0.18s ease-out; }
+            .fx-dream-glow   { animation:kDreamGlow   0.30s ease-out; }
+            .fx-dream-ripple { animation:kDreamRipple 0.20s ease-out; }
         `,
 
         dustColor:  'rgba(100,220,220,0.10)',
-        flashColor: 'rgba(60,200,200,0.09)',
+        flashColor: 'rgba(60,200,200,0.13)',
 
         effects: [
             // LAYER-safe: opacity + blur only, stacks on dense beats
-            { className:'fx-dream-fade',   duration:140, useFlash:false, useScan:false },
-            { className:'fx-dream-fog',    duration:180, useFlash:true,  useScan:false },
-            { className:'fx-dream-pulse',  duration:120, useFlash:false, useScan:false },
-            { className:'fx-dream-glow',   duration:160, useFlash:false, useScan:false },
-            { className:'fx-dream-ripple', duration:130, useFlash:true,  useScan:false },
+            { className:'fx-dream-fade',   duration:220, useFlash:true,  useScan:false },
+            { className:'fx-dream-fog',    duration:250, useFlash:false, useScan:false },
+            { className:'fx-dream-pulse',  duration:180, useFlash:true,  useScan:false },
+            { className:'fx-dream-glow',   duration:300, useFlash:false, useScan:false },
+            { className:'fx-dream-ripple', duration:200, useFlash:true,  useScan:false },
         ],
-
-        visualizer: {
-            style:         'ripple',
-            baseSize:      50,
-            pulseScale:    1.0,
-            pulseDuration: 900,
-            color:         '#7ee8e8',
-            glowColor:     'rgba(100,220,220,0.3)',
-            ringWidth:     1.5,
-            maxRings:      4,
-        },
     },
 
 
@@ -411,76 +394,58 @@ export const PRESETS = {
             '--border-btn':    '#3a2070',
             '--color-btn':     '#a0b8e8',
             '--crt-on':        '0',
+            '--viz-color':     '#a0b8ff',
+            '--viz-glow':      'rgba(120,80,255,0.45)',
+            '--viz-secondary': 'rgba(80,40,200,0.2)',
         },
 
         styles: `
             @keyframes kAuroraShift {
-                0%  { text-shadow:0 0 6px #a8d8ff; }
-                50% { text-shadow:0 0 14px #e080ff,0 0 6px #80ffcc; }
-                100%{ text-shadow:0 0 6px #a8d8ff; }
+                0%  { text-shadow:0 0 20px #e080ff,0 0 10px #80ffcc; }
+                100%{ text-shadow:0 0 4px #a8d8ff; }
             }
             @keyframes kAuroraSweep {
-                0%  { opacity:1; }
-                30% { opacity:0.6; filter:hue-rotate(40deg); }
-                100%{ opacity:1;  filter:none; }
+                0%  { opacity:0.55; filter:hue-rotate(60deg) brightness(1.3); }
+                100%{ opacity:1;    filter:none; }
             }
             @keyframes kAuroraSwell {
-                0%  { text-shadow:0 0 4px #a8d8ff; }
-                50% { text-shadow:0 0 24px #c080ff,0 0 48px #8040ff; }
+                0%  { text-shadow:0 0 30px #c080ff,0 0 60px #8040ff; }
                 100%{ text-shadow:0 0 4px #a8d8ff; }
             }
             @keyframes kAuroraShimmer {
-                0%,100%{ opacity:1; }
-                33%    { opacity:0.7; filter:brightness(1.4); }
-                66%    { opacity:0.9; }
+                0%  { opacity:0.5; filter:brightness(1.6); }
+                100%{ opacity:1;   filter:none; }
             }
             @keyframes kAuroraHaze {
-                0%  { filter:none; }
-                40% { filter:blur(0.5px) hue-rotate(30deg) brightness(1.15); }
+                0%  { filter:blur(0.8px) hue-rotate(50deg) brightness(1.25); }
                 100%{ filter:none; }
             }
-            .fx-aurora-shift   { animation:kAuroraShift   0.12s ease-in-out; }
-            .fx-aurora-sweep   { animation:kAuroraSweep   0.13s ease-out; }
-            .fx-aurora-swell   { animation:kAuroraSwell   0.60s ease-in-out; }
-            .fx-aurora-shimmer { animation:kAuroraShimmer 0.11s linear; }
-            .fx-aurora-haze    { animation:kAuroraHaze    0.58s ease-in-out; }
+            .fx-aurora-shift   { animation:kAuroraShift   0.22s ease-out; }
+            .fx-aurora-sweep   { animation:kAuroraSweep   0.20s ease-out; }
+            .fx-aurora-swell   { animation:kAuroraSwell   0.35s ease-out; }
+            .fx-aurora-shimmer { animation:kAuroraShimmer 0.18s ease-out; }
+            .fx-aurora-haze    { animation:kAuroraHaze    0.28s ease-out; }
         `,
 
         dustColor:  'rgba(120,100,255,0.10)',
-        flashColor: 'rgba(100,80,220,0.13)',
+        flashColor: 'rgba(100,80,220,0.18)',
         flashCycle: true,
         flashCycleColors: [
-            'rgba(180,80,255,0.14)',
-            'rgba(80,200,255,0.11)',
-            'rgba(255,80,160,0.11)',
-            'rgba(80,255,180,0.09)',
+            'rgba(180,80,255,0.20)',
+            'rgba(80,200,255,0.16)',
+            'rgba(255,80,160,0.16)',
+            'rgba(80,255,180,0.13)',
         ],
 
         effects: [
             // SHORT color-only — safe for dense beats
-            { className:'fx-aurora-shift',   duration:120, useFlash:true,  useScan:false },
-            { className:'fx-aurora-sweep',   duration:130, useFlash:false, useScan:false },
-            { className:'fx-aurora-shimmer', duration:110, useFlash:true,  useScan:false },
+            { className:'fx-aurora-shift',   duration:220, useFlash:true,  useScan:false },
+            { className:'fx-aurora-sweep',   duration:200, useFlash:true,  useScan:false },
+            { className:'fx-aurora-shimmer', duration:180, useFlash:true,  useScan:false },
             // LAYER text-shadow — safe to stack
-            { className:'fx-aurora-swell',   duration:600, useFlash:false, useScan:false },
-            { className:'fx-aurora-haze',    duration:580, useFlash:false, useScan:false },
+            { className:'fx-aurora-swell',   duration:350, useFlash:false, useScan:false },
+            { className:'fx-aurora-haze',    duration:280, useFlash:false, useScan:false },
         ],
-
-        visualizer: {
-            style:         'bloom',
-            baseSize:      65,
-            pulseScale:    1.8,
-            pulseDuration: 500,
-            ringWidth:     0,
-            color:         'rgba(140,100,255,0.0)',
-            glowColor:     'rgba(120,80,255,0.4)',
-            colorCycle: [
-                'rgba(180,80,255,0.5)',
-                'rgba(80,200,255,0.45)',
-                'rgba(255,80,160,0.4)',
-                'rgba(80,255,180,0.38)',
-            ],
-        },
     },
 
 
@@ -506,70 +471,58 @@ export const PRESETS = {
             '--border-btn':    '#6a2000',
             '--color-btn':     '#e08040',
             '--crt-on':        '0',
+            '--viz-color':     '#ff6020',
+            '--viz-glow':      'rgba(255,100,20,0.45)',
+            '--viz-secondary': 'rgba(180,50,0,0.2)',
         },
 
         styles: `
             @keyframes kEmberFlare {
-                0%  { text-shadow:0 0 4px #ff9040; }
-                50% { text-shadow:0 0 20px #ff4000,0 0 40px #ff2000; filter:brightness(1.5); }
+                0%  { text-shadow:0 0 28px #ff4000,0 0 50px #ff2000; filter:brightness(1.7); }
                 100%{ text-shadow:0 0 4px #ff9040; filter:none; }
             }
             @keyframes kEmberChar {
-                0%  { opacity:1; }
-                30% { opacity:0.5; filter:sepia(1) brightness(0.6); }
+                0%  { opacity:0.4; filter:sepia(1) brightness(0.5); }
                 100%{ opacity:1;   filter:none; }
             }
             @keyframes kEmberSmolder {
-                0%  { letter-spacing:normal; }
-                50% { letter-spacing:0.03em; text-shadow:0 0 12px #ff6020; }
-                100%{ letter-spacing:normal; }
+                0%  { letter-spacing:0.04em; text-shadow:0 0 18px #ff6020; }
+                100%{ letter-spacing:normal; text-shadow:none; }
             }
             @keyframes kEmberHeat {
-                0%  { filter:none; }
-                50% { filter:brightness(1.2) saturate(1.3) blur(0.3px); }
+                0%  { filter:brightness(1.4) saturate(1.5) blur(0.5px); }
                 100%{ filter:none; }
             }
             @keyframes kEmberPulse {
-                0%,100%{ opacity:1;   }
-                50%    { opacity:0.65; }
+                0%  { opacity:0.5; }
+                100%{ opacity:1;   }
             }
-            .fx-ember-flare   { animation:kEmberFlare   0.10s ease-out; }
-            .fx-ember-char    { animation:kEmberChar    0.12s ease-in-out; }
-            .fx-ember-smolder { animation:kEmberSmolder 0.13s ease-in-out; }
-            .fx-ember-heat    { animation:kEmberHeat    0.55s ease-in-out; }
-            .fx-ember-pulse   { animation:kEmberPulse   0.11s linear; }
+            .fx-ember-flare   { animation:kEmberFlare   0.18s ease-out; }
+            .fx-ember-char    { animation:kEmberChar    0.20s ease-out; }
+            .fx-ember-smolder { animation:kEmberSmolder 0.22s ease-out; }
+            .fx-ember-heat    { animation:kEmberHeat    0.25s ease-out; }
+            .fx-ember-pulse   { animation:kEmberPulse   0.16s ease-out; }
         `,
 
         dustColor:  'rgba(255,120,20,0.16)',
-        flashColor: 'rgba(220,80,10,0.19)',
+        flashColor: 'rgba(220,80,10,0.22)',
 
         effects: [
             // SHORT — rapid heat shimmer on dense beats
-            { className:'fx-ember-flare',   duration:100, useFlash:true,  useScan:false },
-            { className:'fx-ember-char',    duration:120, useFlash:false, useScan:false },
-            { className:'fx-ember-smolder', duration:130, useFlash:true,  useScan:false },
-            { className:'fx-ember-pulse',   duration:110, useFlash:false, useScan:false },
+            { className:'fx-ember-flare',   duration:180, useFlash:true,  useScan:false },
+            { className:'fx-ember-char',    duration:200, useFlash:false, useScan:false },
+            { className:'fx-ember-smolder', duration:220, useFlash:true,  useScan:false },
+            { className:'fx-ember-pulse',   duration:160, useFlash:true,  useScan:false },
             // LAYER — warm filter swell
-            { className:'fx-ember-heat',    duration:550, useFlash:false, useScan:false },
+            { className:'fx-ember-heat',    duration:250, useFlash:false, useScan:false },
         ],
-
-        visualizer: {
-            style:         'waveform',
-            baseSize:      60,
-            pulseScale:    1.0,
-            pulseDuration: 250,
-            color:         '#ff6020',
-            glowColor:     'rgba(255,100,20,0.4)',
-            lineWidth:     2,
-            waveAmplitude: 14,
-            waveFrequency: 3,
-        },
     },
 };
 
 // ─────────────────────────────────────────────────────────────────
 // PRESET_ORDER — controls the in-app toggle cycle sequence.
-// compile.py --preset flag selects which are included in output.
+// order must include all available presets, compile.py --preset
+// flag selects which are included in output.
 // ─────────────────────────────────────────────────────────────────
 export const PRESET_ORDER = ['rap', 'ethereal', 'void', 'dream', 'aurora', 'ember'];
 

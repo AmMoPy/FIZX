@@ -6,55 +6,38 @@ Produces a single self-contained HTML with zero external dependencies.
 USAGE:
     python compile.py <audio_file> [options]
 
-    <audio_file>       Path to audio file (MP3/WAV/OGG).
-                       If beats.json is missing or older than the audio,
-                       ex_beats.py is called automatically.
+    <audio_file>        Path to audio file (MP3/WAV/OGG).
+                        If beats.json is missing or stale,
+                        ex_beats.py is called automatically.
 
 OPTIONS:
-    --preset [name]    Include only this preset.
-                       Can be specified multiple times.
-                       No flag → defaults only (rap + ethereal).
-                       --all → include every preset defined in presets.js.
+    --preset [name[,name,...]]
+                        Include specific preset(s). Comma or pipe separated,
+                        or repeat the flag: --preset void --preset dream
+                        No flag: defaults only (rap + ethereal).
+                        --preset all: include every preset (alias for --all)
 
-    --visualizer [name]  Include only this visualizer class.
-                         Can be specified multiple times.
-                         No flag → include all visualizer classes (default).
-                         Rationale: visualizers are small; including all costs ~5KB.
-                         The --visualizer flag exists for extreme size optimization.
+    --all               Include all presets defined in presets.js.
 
-    --out [filename]   Output filename. Default: <audio_stem>.html
+    --visualizer [name[,name,...]]  
+                        Include specific visualizer(s). Comma or pipe separated.
+                        No flag → include all.
+                        Rationale: visualizers are small; including all costs ~5KB.
+                        The --visualizer flag exists for extreme size optimization.
 
-    -p / --preset shorthand supported.
+    --extract           Re-extract beats even if beats.json exists and valid
 
-WHAT IT DOES:
-    1. Checks beats.json; runs ex_beats.py automatically if absent/stale.
-    2. Reads src/presets.js → extracts cssVars, effects, visualizer per preset.
-       Extracts the `styles` string per preset for CSS injection.
-    3. Reads src/visualizers.js → extracts requested class source code.
-    4. Reads src/template.html → replaces injection blocks:
-         @@STYLES@@      → concatenated preset CSS (keyframes + fx classes)
-         @@VISUALIZERS@@ → BaseVisualizer + utility functions + requested classes
-                           + VISUALIZERS map + VISUALIZER_ORDER
-         @@PRESETS@@     → PRESETS object + PRESET_ORDER
-         @@LYRICS@@      → LYRICS array
-         @@BEATS@@       → BEAT_DATA object
-    5. Writes a single portable HTML. Open on any device — no server needed.
+    --out [filename]    Output filename. Default: <audio_stem>.html
 
-FLAG LOGIC SUMMARY:
-    No --preset flag  → include rap + ethereal (DEFAULT_PRESETS)
-    --preset void     → include only void preset
-    --preset void --preset dream → include void + dream
-    --all             → include all presets in PRESET_ORDER
-
-    No --visualizer flag → include all visualizer classes
-    --visualizer ring    → include only ring class (+ BaseVisualizer + utils)
-    --visualizer ring --visualizer bloom → ring + bloom only
-
-    TODO: --preset comma/pipe support, input validation default fallback
+INJECTION BLOCKS (in template.html):
+    /* @@STYLES@@     */ ... /* @@END_STYLES@@     */
+    /* @@VISUALIZERS@@*/ ... /* @@END_VISUALIZERS@@*/
+    /* @@PRESETS@@    */ ... /* @@END_PRESETS@@    */
+    /* @@LYRICS@@     */ ... /* @@END_LYRICS@@     */
+    /* @@BEATS@@      */ ... /* @@END_BEATS@@      */
 """
 
 import argparse
-import ast
 import json
 import re
 import subprocess
@@ -85,21 +68,16 @@ def run_beat_extractor(audio_path: Path) -> Path:
     return SRC / "beats.json"
 
 def needs_extraction(audio_path: Path, beats_json: Path) -> bool:
-    """True if beats.json is missing or older than the audio file."""
+    """True if beats.json is missing or has different file name"""
     if not beats_json.exists():
         return True
-    return beats_json.stat().st_mtime < audio_path.stat().st_mtime # TODO: usless
+    data = json.loads(beats_json.read_text())
+    return data.get('source') != audio_path.name
 
 
-# ═══════════════════════════════════════════════════════════════════
-# PRESETS EXTRACTION
-# Parses presets.js to extract:
-#   - The list of all preset keys (from PRESET_ORDER)
-#   - The list of default preset keys (from DEFAULT_PRESETS)
-#   - The `styles` string for each preset
-#   - A clean JS object literal for each preset (cssVars, effects, visualizer)
-#     with the `styles` key removed (it belongs in <style>, not in JS)
-# ═══════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────
+# SOURCE HELPERS
+# ─────────────────────────────────────────────────────────────────
 
 def _strip_export(src: str) -> str:
     """Remove ES module export keywords for inline use."""
@@ -109,64 +87,46 @@ def _strip_line_comments(src: str) -> str:
     """Remove // single-line comments. Preserves block comments and strings."""
     return re.sub(r'(?m)//.*$', '', src)
 
-def extract_preset_keys(src: str, var_name: str) -> list[str]:
-    """Extract string array values from a const declaration like:
-       const PRESET_ORDER = ['rap', 'ethereal', ...];
-    """
-    m = re.search(rf"const\s+{var_name}\s*=\s*\[([^\]]+)\]", src)
+def extract_array_values(src: str, var_name: str) -> list[str]:
+    """Extract string values from: const VAR = ['a', 'b', ...];"""
+    m = re.search(rf'const\s+{re.escape(var_name)}\s*=\s*\[([^\]]+)\]', src)
     if not m:
         return []
-    return re.findall(r"'([^']+)'|\"([^\"]+)\"", m.group(1))
+    return [a or b for a, b in re.findall(r"'([^']+)'|\"([^\"]+)\"", m.group(1))]
 
-def _flatten_keys(matches):
-    return [a or b for a, b in matches]
-
-def extract_styles_for_preset(src: str, key: str) -> str:
-    """Extract the value of the `styles` backtick string for a given preset key.
-    
-    We look for:
-        <key>: {
-            ...
-            styles: `...`,
-            ...
-        }
-    
-    Strategy: find the styles property within the preset block using a
-    balanced-brace walk rather than regex, since the styles string contains
-    CSS with braces that would break a naive regex.
+def brace_walk(src: str, start_pos: int) -> int:
     """
-    # Find the start of the preset block: "key: {"
-    key_pattern = re.compile(rf'\b{re.escape(key)}\s*:\s*\{{')
-    m = key_pattern.search(src)
-    if not m:
-        return ''
-
-    # Walk forward to find the matching closing brace of the preset block
+    Walk from start_pos (which must be at or before the opening '{') to
+    the matching '}'. Returns the index after the closing '}'.
+    """
+    i = src.find('{', start_pos)
+    if i == -1:
+        return -1
     depth = 0
-    block_start = m.start()
-    block_end   = m.end()
-    i = m.end() - 1  # start just before the opening {
     while i < len(src):
-        ch = src[i]
-        if ch == '{':
+        if src[i] == '{':
             depth += 1
-        elif ch == '}':
+        elif src[i] == '}':
             depth -= 1
             if depth == 0:
-                block_end = i + 1
-                break
+                return i + 1
         i += 1
+    return -1
 
-    block = src[block_start:block_end]
 
-    # Extract the backtick string value of `styles`
-    m2 = re.search(r'\bstyles\s*:\s*`(.*?)`', block, re.DOTALL)
-    if not m2:
-        return ''
-    return m2.group(1).strip()
+# ═══════════════════════════════════════════════════════════════════
+# PRESETS EXTRACTION
+# Parses presets.js to extract:
+#   - The list of all preset keys (from PRESET_ORDER)
+#   - The list of default preset keys (from DEFAULT_PRESETS)
+#   - The `styles` string for each preset
+#   - A clean JS object literal for each preset (cssVars, effects, ...)
+#     with the `styles` key removed (it belongs in <style>, not in JS)
+# ═══════════════════════════════════════════════════════════════════
 
 def build_presets_block(src: str, preset_keys: list[str]) -> str:
-    """Build PRESETS JS object containing ONLY the requested preset keys.
+    """
+    Build PRESETS JS object containing ONLY the requested preset keys.
     Also builds PRESET_ORDER array from those keys.
     """
     clean = _strip_line_comments(_strip_export(src))
@@ -182,24 +142,14 @@ def build_presets_block(src: str, preset_keys: list[str]) -> str:
             continue
         
         # Walk braces to capture the full preset object
-        depth = 0
         start = m.start()
-        i = m.end() - 1  # position before the opening '{'
-        while i < len(clean):
-            if clean[i] == '{':
-                depth += 1
-            elif clean[i] == '}':
-                depth -= 1
-                if depth == 0:
-                    end = i + 1
-                    break
-            i += 1
-        else:
+        end = brace_walk(clean, start)
+        if end == -1:
             print(f"⚠️  Could not find closing brace for preset '{key}'")
             continue
         
         preset_raw = clean[start:end]
-        # Remove the `styles: ` line (including its backtick string)
+        # Remove the `styles: ` backtick string — belongs in <style>, not JS
         preset_raw = re.sub(r'\bstyles\s*:\s*`.*?`\s*,?', '', preset_raw, flags=re.DOTALL)
         # Clean up double commas or trailing commas before '}'
         preset_raw = re.sub(r',\s*,', ',', preset_raw)
@@ -208,13 +158,12 @@ def build_presets_block(src: str, preset_keys: list[str]) -> str:
     
     # Build the final PRESETS object
     if not preset_definitions:
-        print("⚠️  No valid preset definitions found. Using empty object.")
-        presets_obj = "const PRESETS = {};"
-    else:
-        inner = ',\n'.join(preset_definitions.values())
-        presets_obj = f"const PRESETS = {{\n{inner}\n}};"
+        print("⚠️  No valid preset definitions found.")
+        return "const PRESETS = {};\nconst PRESET_ORDER = [];"
     
     # Build PRESET_ORDER array
+    inner = ',\n'.join(preset_definitions.values())
+    presets_obj = f"const PRESETS = {{\n{inner}\n}};"
     order_str = f"const PRESET_ORDER = {json.dumps(preset_keys)};"
     
     return presets_obj + "\n" + order_str
@@ -222,11 +171,46 @@ def build_presets_block(src: str, preset_keys: list[str]) -> str:
 
 # ═══════════════════════════════════════════════════════════════════
 # STYLES EXTRACTION
-# Collects the `styles` strings from all requested presets and
-# concatenates them into a single CSS block for injection into <style>.
 # ═══════════════════════════════════════════════════════════════════
 
+def extract_styles_for_preset(src: str, key: str) -> str:
+    """
+    Extract the backtick `styles` string from a named preset block.
+    Uses brace walking to find the preset block boundary first,
+    then regex inside that block for the backtick string.
+
+    We look for:
+        <key>: {
+            ...
+            styles: `...`,
+            ...
+        }
+    """
+    # Find the start of the preset block: "key: {"
+    key_pattern = re.compile(rf'\b{re.escape(key)}\s*:\s*\{{')
+    m = key_pattern.search(src)
+    if not m:
+        return ''
+
+    # Walk forward to find the matching closing brace of the preset block
+    start = m.start()
+    end = brace_walk(src, start)
+    if end == -1:
+        return ''
+
+    block = src[start:end]
+
+    # Extract the backtick string value of `styles`
+    m2 = re.search(r'\bstyles\s*:\s*`(.*?)`', block, re.DOTALL)
+    if not m2:
+        return ''
+    return m2.group(1).strip()
+
 def build_styles_block(src: str, preset_keys: list[str]) -> str:
+    """
+    Collects the `styles` strings from all requested presets and 
+    concatenates them into a single CSS block for injection into <style>.
+    """
     parts = []
     for key in preset_keys:
         css = extract_styles_for_preset(src, key)
@@ -256,94 +240,64 @@ def extract_class_source(src: str, class_name: str) -> str:
     m = pattern.search(src)
     if not m:
         return ''
-    # Find opening brace
-    brace_pos = src.find('{', m.end())
-    if brace_pos == -1:
-        return ''
-    depth = 0
-    i = brace_pos
-    while i < len(src):
-        if src[i] == '{': depth += 1
-        elif src[i] == '}':
-            depth -= 1
-            if depth == 0:
-                return src[m.start():i + 1]
-        i += 1
-    return ''
+    end = brace_walk(src, m.end())
+    return src[m.start():end] if end != -1 else ''
 
-def build_visualizers_block(src: str, viz_keys: list[str]) -> str:
-    """Build the full visualizers JS block for injection.
-    
-    Always includes:
-      - Module-level constants (CANVAS_SCALE) and utility functions
-      - BaseVisualizer class
-    
-    Then includes only the requested concrete classes and filters
-    VISUALIZERS map and VISUALIZER_ORDER accordingly.
+def build_visualizers_block(src: str, viz_keys: list[str], fltr: bool) -> str:
+    """
+    Build the full visualizers JS block for injection.
     """
     clean = _strip_line_comments(_strip_export(src))
+    
+    # default path - all included
+    if not fltr:
+        return clean
 
+    # filtered path - only requested keys
     parts = []
 
-    # 1. Preamble: everything up to the first "class" declaration
+    # Preamble: everything up to the first "class" declaration
     first_class = re.search(r'\bclass\s+\w+', clean)
     if first_class:
         preamble = clean[:first_class.start()].strip()
         if preamble:
             parts.append(preamble)
 
-    # 2. BaseVisualizer — always required
+    # BaseVisualizer — always required
     base_src = extract_class_source(clean, 'BaseVisualizer')
     if base_src:
         parts.append(base_src)
     else:
         print("⚠️  BaseVisualizer not found in visualizers.js")
 
-    # 3. Map from key to class name (convention: key → Titlecase + Visualizer)
-    key_to_class = {
-        'ring':      'RingVisualizer',
-        'bloom':     'BloomVisualizer',
-        'heartbeat': 'HeartbeatVisualizer',
-        'ripple':    'RippleVisualizer',
-        'waveform':  'WaveformVisualizer',
-        'particles': 'ParticlesVisualizer',
-        'dna':       'DNAVisualizer',
-    }
+    # Parse VISUALIZERS map from source
+    viz_map_match = re.search(r'const\s+VISUALIZERS\s*=\s*\{([^}]+)\}', clean, re.DOTALL)
+    key_to_class = {}
+    if viz_map_match:
+        for entry in re.finditer(r'(\w+)\s*:\s*(\w+)', viz_map_match.group(1)):
+            key_to_class[entry.group(1)] = entry.group(2)
 
-    # 4. Concrete classes for requested keys
+    # Concrete classes, filtered map, and order
+    entries = []
     for key in viz_keys:
         if key == 'off':
             continue
-        cls_name = key_to_class.get(key)
-        if not cls_name:
-            # Attempt auto-derive: key → Key + Visualizer
-            cls_name = key.capitalize() + 'Visualizer'
+        # Attempt auto-derive: key → Key + Visualizer
+        cls_name = key_to_class.get(key, key.capitalize() + 'Visualizer')
         cls_src = extract_class_source(clean, cls_name)
         if cls_src:
             parts.append(cls_src)
         else:
             print(f"⚠️  Class {cls_name} not found in visualizers.js (key: {key})")
-
-    # 5. VISUALIZERS map — filtered to requested keys
-    entries = []
-    for key in viz_keys:
-        if key == 'off':
-            continue
-        cls_name = key_to_class.get(key, key.capitalize() + 'Visualizer')
         entries.append(f"    {key}: {cls_name},")
+
     viz_map = "const VISUALIZERS = {\n" + "\n".join(entries) + "\n};"
     parts.append(viz_map)
 
-    # 6. VISUALIZER_ORDER — all requested keys + 'off' sentinel
+    # VISUALIZER_ORDER — all requested keys + 'off' sentinel
     # 'off' is always appended so the user can always disable the visualizer.
     order = [k for k in viz_keys if k != 'off'] + ['off']
     parts.append(f"const VISUALIZER_ORDER = {json.dumps(order)};")
-    print(f"{json.dumps(order)}")
-
-    # # 7. DEFAULT_VISUALIZERS — intersection of requested + defaults from source
-    # m_def = re.search(r'const\s+DEFAULT_VISUALIZERS\s*=\s*\[([^\]]+)\]', clean)
-    # if m_def:
-    #     parts.append(f"const DEFAULT_VISUALIZERS = {json.dumps(order[:2])};")
 
     return '\n\n'.join(parts)
 
@@ -360,12 +314,14 @@ def load_lyrics_js() -> str:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# BLOCK INJECTION
-# Replaces /* @@TAG@@ */ ... /* @@END_TAG@@ */ in HTML.
-# Robust against whitespace variations around markers.
+# BLOCK INJECTION AND REWRITE
 # ═══════════════════════════════════════════════════════════════════
 
 def inline_block(html: str, tag: str, replacement: str) -> str:
+    """
+    Replaces /* @@TAG@@ */ ... /* @@END_TAG@@ */ in HTML.
+    Robust against whitespace variations around markers.
+    """
     start_marker = f'/* @@{tag}@@ */'
     end_marker   = f'/* @@END_{tag}@@ */'
     
@@ -378,10 +334,10 @@ def inline_block(html: str, tag: str, replacement: str) -> str:
     middle, after = rest.split(end_marker, 1)
     
     # Reassemble with replacement in the middle
-    return before + start_marker + '\n' + replacement + '\n' + end_marker + after
+    return before + start_marker + '\n' + replacement.strip() + '\n' + end_marker + after
 
 def set_initial_preset(html: str, preset_key: str) -> str:
-    """Reorder PRESET_ORDER so the chosen preset is first (loads on boot)."""
+    """Reorder PRESET_ORDER so the chosen preset is first (loads on boot).""" 
     def reorder(m):
         keys = re.findall(r"'([^']+)'|\"([^\"]+)\"", m.group(1))
         flat = [a or b for a, b in keys]
@@ -392,6 +348,26 @@ def set_initial_preset(html: str, preset_key: str) -> str:
     return re.sub(r'const PRESET_ORDER\s*=\s*\[([^\]]+)\];', reorder, html)
 
 
+# ─────────────────────────────────────────────────────────────────
+# ARGUMENT PARSING HELPERS
+# --preset all is now handled explicitly, not as a literal name.
+# comma/pipe support so --preset void,dream works.
+# ─────────────────────────────────────────────────────────────────
+
+def parse_list_arg(values: list[str]) -> list[str]:
+    """
+    Flatten comma/pipe-separated values from repeated --flag arguments.
+    e.g. ['void,dream', 'ember'] → ['void', 'dream', 'ember']
+    """
+    result = []
+    for v in values:
+        for part in re.split(r'[,|]', v):
+            part = part.strip()
+            if part:
+                result.append(part)
+    return list(dict.fromkeys(result))  # deduplicate, preserve order
+
+
 # ═══════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════
@@ -399,12 +375,15 @@ def set_initial_preset(html: str, preset_key: str) -> str:
 def main():
     parser = argparse.ArgumentParser(description="FIZX Visualizer build script")
     parser.add_argument("audio",                   help="Path to audio file")
-    parser.add_argument("--preset",   "-p",        action="append", default=[], metavar="NAME",
-                        help="Include preset (repeatable). No flag = defaults only.")
+    parser.add_argument("--preset",   "-p",        action="append", default=[], metavar="NAME[,NAME]",
+                        help="Preset(s) to include. Comma-separated or repeat flag. "
+                             "'all' = include everything. No flag = defaults only.")
     parser.add_argument("--all",                   action="store_true",
-                        help="Include all presets")
-    parser.add_argument("--visualizer", "-v",      action="append", default=[], metavar="NAME",
-                        help="Include visualizer (repeatable). No flag = all.")
+                        help="Include all presets (shorthand for --preset all)")
+    parser.add_argument("--visualizer", "-v",      action="append", default=[], metavar="NAME[,NAME]",
+                        help="Visualizer(s) to include. No flag = all.")
+    parser.add_argument("--extract",  "-e",        action="store_true",
+                        help="Re-extract beats even if beats.json exists and valid")    
     parser.add_argument("--out",      "-o",        default=None,
                         help="Output filename (default: <stem>.html)")
     args = parser.parse_args()
@@ -416,55 +395,74 @@ def main():
 
     # ── Beat extraction ───────────────────────────────────────────
     beats_json = SRC / "beats.json"
-    if needs_extraction(audio_path, beats_json):
+    if args.extract or needs_extraction(audio_path, beats_json):
         beats_json = run_beat_extractor(audio_path)
     else:
         print(f"✅ beats.json up to date")
     beats_data = json.loads(beats_json.read_text())
 
-    # ── Read source files ─────────────────────────────────────────
+    # ── Read sources ─────────────────────────────────────────
     presets_src  = (SRC / "presets.js").read_text()
     viz_src      = (SRC / "visualizers.js").read_text()
     template     = (SRC / "template.html").read_text()
 
-    # ── Resolve preset keys ───────────────────────────────────────
-    all_preset_keys    = _flatten_keys(extract_preset_keys(presets_src, 'PRESET_ORDER'))
-    default_preset_keys = _flatten_keys(extract_preset_keys(presets_src, 'DEFAULT_PRESETS')) or ['rap', 'ethereal'] # fallback
+    all_preset_keys     = extract_array_values(presets_src, 'PRESET_ORDER')
+    default_preset_keys = extract_array_values(presets_src, 'DEFAULT_PRESETS')
+    # Remove 'off' sentinel — it is not a real class
+    all_viz_keys        = [k for k in extract_array_values(viz_src, 'VISUALIZER_ORDER') if k != 'off']
 
-    if args.all:
+    # ── Resolve preset keys ───────────────────────────────────────
+    # treat literal 'all' in --preset values same as --all flag
+    raw_presets = parse_list_arg(args.preset)
+    include_all = args.all or 'all' in raw_presets
+    raw_presets = [k for k in raw_presets if k != 'all']
+
+    if include_all:
         preset_keys = all_preset_keys
         print(f"📦 Including all presets: {preset_keys}")
-    elif args.preset:
+    elif raw_presets:
         # only add user-specified presets
-        preset_keys = list(dict.fromkeys(args.preset))
-        # Validate
-        for key in args.preset:
-            if key not in all_preset_keys:
-                print(f"⚠️  Preset '{key}' not found in presets.js (available: {all_preset_keys})")
+        preset_keys = []
+        for key in raw_presets:
+            if key in all_preset_keys:
+                preset_keys.append(key)
+            else:
+                print(f"⚠️  Preset '{key}' not found skipping")
+
+        if not preset_keys:
+            print(f"⚠️  No valid presets — falling back to defaults")
+            preset_keys = default_preset_keys
         print(f"📦 Presets: {preset_keys}")
     else:
         preset_keys = default_preset_keys
         print(f"📦 Default presets only: {preset_keys}")
 
     # ── Resolve visualizer keys ───────────────────────────────────
-    all_viz_keys = _flatten_keys(extract_preset_keys(viz_src, 'VISUALIZER_ORDER'))
-    # Remove 'off' sentinel — it is not a real class
-    all_viz_keys = [k for k in all_viz_keys if k != 'off']
+    raw_viz = parse_list_arg(args.visualizer)
 
-    if args.visualizer:
-        viz_keys = list(dict.fromkeys(args.visualizer))
-        for key in viz_keys:
-            if key not in all_viz_keys:
-                print(f"⚠️  Visualizer '{key}' not found (available: {all_viz_keys})")
+    if raw_viz:
+        viz_keys = []
+        fltr = True
+        for key in raw_viz:
+            if key in all_viz_keys:
+                viz_keys.append(key)
+            else:
+                print(f"⚠️  Visualizer '{key}' not found skipping")
+        
+        if not viz_keys:
+            print(f"⚠️  No valid Visualizer — falling back to defaults")
+            viz_keys = all_viz_keys
+            fltr = False
         print(f"🎨 Visualizers: {viz_keys}")
     else:
-        viz_keys = all_viz_keys
+        viz_keys = all_viz_keys # default all keys
+        fltr = False
         print(f"🎨 All visualizers included")
 
     # ── Build injection blocks ────────────────────────────────────
     styles_block    = build_styles_block(presets_src, preset_keys)
     presets_block   = build_presets_block(presets_src, preset_keys)
-    viz_block       = build_visualizers_block(viz_src, viz_keys)
+    viz_block       = build_visualizers_block(viz_src, viz_keys, fltr)
     lyrics_block    = load_lyrics_js()
     beats_block     = (
         f"const BEAT_DATA = {{\n"
@@ -497,11 +495,10 @@ def main():
     out_path.write_text(out)
 
     size_kb = out_path.stat().st_size / 1024
-    print(f"\n✅ Compiled → {out_path}")
+    print(f"\n✅ Success {out_path.name}  ({size_kb:.1f} KB)")
     print(f"   Presets     : {preset_keys}")
     print(f"   Visualizers : {viz_keys}")
     print(f"   Beats       : {len(beats_data['beats'])} onsets · {beats_data['bpm']} BPM")
-    print(f"   Size        : {size_kb:.1f} KB")
     print(f"\n   Open {out_name} — no server, no dependencies.")
 
 
