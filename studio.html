@@ -1,0 +1,2333 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FIZX STUDIO</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #00ff88;
+            --accent-dim: rgba(0,255,136,0.12);
+            --accent-glow: rgba(0,255,136,0.35);
+            --bg: #080808;
+            --surface: #0f0f0f;
+            --surface-2: #161616;
+            --border: rgba(255,255,255,0.07);
+            --border-accent: rgba(0,255,136,0.3);
+            --text: #e8e8e8;
+            --text-dim: #666;
+            --mono: 'Space Mono', monospace;
+            --sans: 'DM Sans', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            font-weight: 300;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 20px;
+            background-image: repeating-linear-gradient(
+                0deg,
+                transparent, transparent 2px,
+                rgba(0,255,136,0.008) 2px, rgba(0,255,136,0.008) 4px
+            );
+        }
+
+        .container { max-width: 780px; width: 100%; }
+
+        .header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 40px; }
+        .header h1 {
+            font-family: var(--mono);
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+        .header-sub { font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); letter-spacing: 0.1em; }
+        .header-line { flex: 1; height: 1px; background: linear-gradient(to right, var(--border-accent), transparent); }
+
+        .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+        .panel-label { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.18em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 14px; }
+
+        #drop-zone {
+            border: 1px dashed var(--border-accent);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            background: var(--accent-dim);
+            text-align: center;
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            color: var(--accent);
+            letter-spacing: 0.08em;
+            margin: 10px auto 20px;
+            width: 30%;
+            padding: 10px;
+        }
+        #drop-zone .dz-hint { font-size: 0.65rem; color: var(--text-dim); margin-top: 8px; letter-spacing: 0.05em; }
+        #drop-zone.hover, #drop-zone:hover { background: rgba(0,255,136,0.18); border-style: solid; border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
+        #drop-zone.loaded { border-style: solid; border-color: var(--accent); background: rgba(0,255,136,0.06); }
+
+        textarea {
+            width: 100%; height: 200px;
+            background: var(--bg); color: var(--text);
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 14px 16px;
+            font-family: var(--mono); font-size: 0.78rem; line-height: 1.7;
+            resize: vertical; transition: border 0.2s ease;
+        }
+        textarea:focus { outline: none; border-color: var(--border-accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+        textarea::placeholder { color: var(--text-dim); }
+
+        .mode-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+        .mode-option { position: relative; }
+        .mode-option input[type="radio"] { position: absolute; opacity: 0; width: 0; }
+        .mode-option label {
+            display: flex; flex-direction: column; gap: 6px;
+            padding: 14px 16px;
+            border: 1px solid var(--border); border-radius: 10px;
+            cursor: pointer; transition: all 0.2s ease;
+            background: var(--surface-2);
+        }
+        .mode-option label:hover { border-color: var(--border-accent); }
+        .mode-option input:checked + label { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 12px var(--accent-glow); }
+        .mode-title { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); font-weight: 700; letter-spacing: 0.05em; }
+        .mode-desc { font-size: 0.72rem; color: var(--text-dim); line-height: 1.4; }
+
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            border: none; padding: 11px 22px;
+            font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+            letter-spacing: 0.1em; text-transform: uppercase;
+            border-radius: 6px; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
+        }
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-primary:hover:not(:disabled) { box-shadow: 0 0 20px var(--accent-glow); transform: translateY(-1px); }
+        .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--border-accent); }
+        .btn-ghost:hover:not(:disabled) { background: var(--accent-dim); }
+        .btn-white { background: #fff; color: #000; }
+        .btn-white:hover:not(:disabled) { box-shadow: 0 0 20px rgba(255,255,255,0.3); }
+        .btn-muted { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); }
+        .btn-muted:hover:not(:disabled) { color: var(--text); border-color: var(--border-accent); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+        .btn-full { width: 100%; }
+
+        .stage {
+            background: #000; border: 1px solid var(--border-accent); border-radius: 12px;
+            padding: 40px 32px; text-align: center; margin-bottom: 16px;
+            box-shadow: 0 0 40px rgba(0,255,136,0.06), inset 0 0 60px rgba(0,0,0,0.5);
+            position: relative; overflow: hidden;
+        }
+        .stage::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(to right, transparent, var(--accent), transparent); opacity: 0.6;
+        }
+        #curr-line {
+            font-family: var(--sans); font-weight: 500;
+            font-size: clamp(1.4rem, 4vw, 2rem); color: #fff;
+            text-shadow: 0 0 30px var(--accent-glow);
+            min-height: 2.5rem; line-height: 1.3; letter-spacing: -0.01em;
+        }
+        .tap-hint { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); margin-top: 20px; letter-spacing: 0.12em; }
+        .tap-hint kbd { background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; font-family: var(--mono); color: var(--accent); }
+
+        .progress-track { width: 100%; height: 2px; background: var(--surface-2); border-radius: 1px; margin: 24px 0 16px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s ease; box-shadow: 0 0 8px var(--accent); }
+
+        .stats-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); }
+        .stat-val { color: var(--accent); font-weight: 700; }
+        .bpm-badge { background: var(--accent-dim); border: 1px solid var(--border-accent); padding: 3px 10px; border-radius: 4px; letter-spacing: 0.08em; }
+        .session-controls { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+
+        /* Analysis overlay */
+        #analysis-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(8,8,8,0.94); z-index: 100;
+            align-items: center; justify-content: center; flex-direction: column; gap: 20px;
+        }
+        #analysis-overlay.visible { display: flex; }
+        .analysis-label { font-family: var(--mono); font-size: 0.8rem; color: var(--accent); letter-spacing: 0.14em; }
+        .analysis-bar-track { width: 280px; height: 3px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+        .analysis-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.15s ease; box-shadow: 0 0 8px var(--accent); }
+        .analysis-sub { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.1em; }
+
+        .output-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+        .output-header h2 { font-family: var(--mono); font-size: 0.9rem; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); }
+        .output-summary { font-size: 0.75rem; color: var(--text-dim); font-family: var(--mono); }
+        .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+
+        #toast {
+            position: fixed; bottom: 24px; right: 24px;
+            background: var(--surface); border: 1px solid var(--border-accent);
+            color: var(--accent); font-family: var(--mono); font-size: 0.75rem;
+            padding: 10px 16px; border-radius: 6px;
+            opacity: 0; transform: translateY(6px); transition: all 0.2s ease;
+            pointer-events: none; letter-spacing: 0.06em;
+        }
+        #toast.show { opacity: 1; transform: translateY(0); }
+
+        .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+        @media (max-width: 600px) {
+            .mode-selector, .export-grid, .session-controls { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <h1>FIZX Studio</h1>
+        <span class="header-sub">X</span>
+        <div class="header-line"></div>
+    </div>
+
+    <div id="setup-view">
+        <textarea id="lyrics-input" placeholder="Paste lyrics here, one line per entry.&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;Leave empty to tap beats only."></textarea>
+        <div id="drop-zone">
+            DROP AUDIO FILE
+            <div class="dz-hint">MP3 · WAV · OGG · FLAC</div>
+        </div>
+        <input type="file" id="file-input" style="display:none" accept="audio/*">
+        <div class="panel-label">Tapping Mode</div>
+        <div class="mode-selector">
+            <div class="mode-option">
+                <input type="radio" name="mode" id="mode-buffer" value="buffer" checked>
+                <label for="mode-buffer">
+                    <span class="mode-title">Manual</span>
+                    <span class="mode-desc">200ms latency compensation. Tap spacebar as each line hits. Fastest to start.</span>
+                </label>
+            </div>
+            <div class="mode-option">
+                <input type="radio" name="mode" id="mode-snap" value="snap">
+                <label for="mode-snap">
+                    <span class="mode-title">Snap-to-Onset</span>
+                    <span class="mode-desc">Analyzes audio first. Each tap snaps to the nearest detected transient.</span>
+                </label>
+            </div>
+        </div>
+        <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+            <button id="start-btn" class="btn btn-primary">START SESSION</button>
+        </div>
+    </div>
+
+    <div id="session-view" style="display:none">
+        <div class="stage">
+            <div id="curr-line">READY — PRESS SPACEBAR</div>
+            <div class="tap-hint">TAP <kbd>SPACE</kbd> ON EACH LYRIC · <kbd>FINISH</kbd> WHEN DONE</div>
+            <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+            <div class="stats-row">
+                <span><span class="stat-val" id="line-counter">0</span> / <span id="total-lines">—</span> tapped</span>
+                <span id="bpm-display" class="bpm-badge">BPM —</span>
+                <span id="time-display" class="stat-val">0:00</span>
+            </div>
+        </div>
+        <div class="session-controls">
+            <button id="finish-btn" class="btn btn-white btn-full">FINISH & EXPORT</button>
+            <button id="cancel-btn" class="btn btn-muted">CANCEL</button>
+        </div>
+    </div>
+
+    <div id="output-view" style="display:none">
+        <div class="panel">
+            <div class="output-header">
+                <h2>EXPORT</h2>
+                <span class="output-summary" id="export-summary"></span>
+            </div>
+            <button id="generate-fizx-btn" class="btn btn-white btn-full" style="height:52px; font-size:0.85rem;">✦ GENERATE FIZX.HTML</button>
+            <div class="divider"></div>
+            <div class="export-grid">
+                <button id="download-beats-btn" class="btn btn-ghost">↓ beats.json</button>
+                <button id="download-lyrics-btn" class="btn btn-ghost">↓ lyrics.js</button>
+                <button id="copy-beats-btn" class="btn btn-muted">⎘ copy beats [ ]</button>
+                <button id="copy-lyrics-btn" class="btn btn-muted">⎘ copy lyrics [ ]</button>
+            </div>
+            <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+                <button id="new-session-btn" class="btn btn-muted">↩ NEW SESSION</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div id="analysis-overlay">
+    <div class="analysis-label" id="analysis-label">ANALYZING AUDIO</div>
+    <div class="analysis-bar-track"><div class="analysis-bar-fill" id="analysis-bar"></div></div>
+    <div class="analysis-sub" id="analysis-sub">decoding…</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// INJECTED BY compile.py
+// ═══════════════════════════════════════════════════════════════════
+const FIZX_TEMPLATE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>FIZX · DOX_BEST</title>
+    <style>
+        /* ── DESIGN TOKENS (defaults overwritten at runtime by applyPreset) ── */
+        :root {
+            --bg-body:       #030603;
+            --bg-container:  linear-gradient(145deg,#141a14,#0a0f0a);
+            --bg-screen:     #0a0e0a;
+            --border-screen: #2a4a2a;
+            --color-primary: #1eff00;
+            --color-dim:     #3c9e3c;
+            --color-faint:   #2a8a2a;
+            --color-muted:   #3a7a3a;
+            --shadow-screen: inset 0 0 25px rgba(0,255,0,0.06);
+            --shadow-outer:  0 0 0 2px #1a3a1a,0 20px 40px rgba(0,0,0,0.5);
+            --bg-stats:      #0a0c0a;
+            --bg-btn:        #1a2a1a;
+            --border-btn:    #3c9e3c;
+            --color-btn:     #aaffaa;
+            --flash-color:   rgba(0,255,0,0.4);
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+
+        body {
+            background: var(--bg-body);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New','Fira Code',monospace;
+            transition: background 0.5s ease;
+        }
+
+        /* ── STAGE ────────────────────────────────────────────────────
+           9:16 default. .ar-landscape flips to 16:9.
+           max-width = min() prevents overflow on both axes.
+        ── */
+        .stage {
+            aspect-ratio: 9 / 16;
+            max-width: min(100vw, calc(100vh * 9 / 16));
+            width: 100%;
+            position: relative;
+            box-shadow: var(--shadow-outer);
+            transition: box-shadow 0.5s ease, max-width 0.3s ease, aspect-ratio 0.3s ease;
+        }
+        .stage.ar-landscape {
+            aspect-ratio: 16 / 9;
+            max-width: min(100vw, calc(100vh * 16 / 9));
+        }
+
+        .container {
+            width: 100%;
+            height: 100%;
+            background: var(--bg-container);
+            display: flex;
+            flex-direction: column;
+            padding: 1px 2px 14px 2px;
+            transition: background 0.5s ease;
+        }
+
+        /* ── SCREEN ──────────────────────────────────────────────────── */
+        .screen {
+            flex: 1;
+            background: var(--bg-screen);
+            border-radius: 10px;
+            box-shadow: var(--shadow-screen);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border-screen);
+            margin-bottom: 6px;
+            transition: background 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
+        }
+
+        /* CRT scanlines — only active when preset sets --crt-on:1
+           toggled via .crt-on class by applyPreset() */
+        .screen.crt-on::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0,255,0,0.04) 0px, rgba(0,255,0,0.04) 2px,
+                transparent 2px, transparent 5px
+            );
+            pointer-events: none;
+            z-index: 5;
+        }
+        .screen.crt-on::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 40%, transparent 50%, rgba(0,0,0,0.5) 100%);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* Screen flash — color driven by --flash-color CSS var.
+           applyPreset() sets this per-preset so the flash is always
+           theme-appropriate without any JS branching. */
+        @keyframes kScreenFlash {
+            0%  { box-shadow: inset 0 0 60px var(--flash-color), 0 0 20px var(--flash-color); }
+            100%{ box-shadow: var(--shadow-screen); }
+        }
+        .screen.screen-flash { animation: kScreenFlash 0.12s ease-out; }
+
+        /* ── LYRIC AREA ──────────────────────────────────────────────── */
+        .lyric-area {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 10;
+            padding: 30px 20px 80px 20px;
+        }
+
+        .current-line {
+            font-size: clamp(2.5rem, 6vw, 3rem);
+            font-weight: bold;
+            color: var(--color-primary);
+            text-shadow: 0 0 5px var(--color-dim), 0 0 8px var(--color-faint);
+            margin-bottom: 16px;
+            line-height: 1.4;
+            /* GPU hint — this element is animated on every beat */
+            will-change: transform, opacity, filter;
+            transition: color 0.5s ease, text-shadow 0.5s ease;
+        }
+
+        .next-line {
+            font-size: clamp(0.5rem, 3vw, 1rem);
+            color: var(--color-dim);
+            opacity: 0.7;
+            border-top: 1px dashed var(--color-faint);
+            padding-top: 15px;
+            transition: color 0.5s ease, border-color 0.5s ease;
+        }
+
+        /* ── VISUALIZER WRAP ─────────────────────────────────────────── */
+        .visualizer-wrap {
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 12;
+            /* GPU hint — canvas is composited independently */
+            will-change: transform, opacity;
+        }
+        .visualizer-wrap.viz-off { display: none; }
+
+        /* ── DUST ────────────────────────────────────────────────────── */
+        .dust-particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 6;
+            filter: blur(1px);
+            /* GPU hint — dust is always animating */
+            will-change: transform, opacity;
+        }
+        @keyframes kFloatUp {
+            0%  { transform:translateY(0) translateX(0);         opacity:0; }
+            20% { opacity:0.5; }
+            80% { opacity:0.2; }
+            100%{ transform:translateY(-100px) translateX(30px); opacity:0; }
+        }
+
+        /* ── STATUS BAR ──────────────────────────────────────────────── */
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--color-faint);
+            font-size: 8px;
+            background: var(--bg-stats);
+            padding: 4px 10px;
+            border-radius: 20px;
+            /*margin-top: 5px;*/
+            font-family: monospace;
+            transition: background 0.5s ease, color 0.5s ease;
+        }
+
+        /* ── CONTROLS ────────────────────────────────────────────────── */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        /* Icon-only circular buttons — tooltip via data-tip + ::after */
+        button {
+            background: var(--bg-btn);
+            border: 1px solid var(--border-btn);
+            color: var(--color-btn);
+            font-family: monospace;
+            font-weight: bold;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 0.85rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: filter 0.1s, box-shadow 0.1s, border-color 0.4s, color 0.4s, background 0.4s;
+        }
+        button:hover {
+            filter: brightness(1.5);
+            box-shadow: 0 0 8px var(--color-primary);
+        }
+        button::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #111;
+            color: var(--color-btn);
+            font-size: 7px;
+            white-space: nowrap;
+            padding: 2px 6px;
+            border-radius: 4px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            border: 1px solid var(--border-btn);
+        }
+        button:hover::after { opacity: 1; }
+
+        .controls-row-main { 
+            display: flex; 
+            gap: 10px; 
+            justify-content: center; 
+        }
+
+        /* Util buttons — pill shape, smaller text */
+        button.btn-util {
+            width: auto;
+            height: 20px;
+            border-radius: 10px;
+            font-size: 0.6rem;
+            padding: 0 8px;
+            margin-top: 14px;
+        }
+        button.btn-util:hover::after { bottom:calc(100% + 4px); }
+
+        .status-text {
+            font-size: 7px;
+            text-align: center;
+            margin-top: 4px;
+            color: var(--color-muted);
+            font-family: monospace;
+            transition: color 0.5s ease;
+        }
+
+        /* ── PRESET STYLES INJECTION POINT ──────────────────────────────
+           compile.py replaces this block with CSS extracted from
+           each preset's \`styles\` property in presets.js.
+           The template itself contains ZERO theme-specific CSS.
+        ── */
+        /* @@STYLES@@ */
+/* ── RAP ── */
+@keyframes kShake {
+                0%  { transform:translate(0,0);      text-shadow:0 0 3px #0f0; }
+                25% { transform:translate(-2px,1px); text-shadow:2px 0 #ff00aa; }
+                50% { transform:translate(2px,-1px); text-shadow:-2px 0 #0effff; }
+                75% { transform:translate(-1px,1px); }
+                100%{ transform:translate(0,0);      text-shadow:0 0 5px #1eff00; }
+            }
+            @keyframes kGlitch {
+                0%  { text-shadow:-1px 0 #ff00aa,1px 0 #00ffff; opacity:1; }
+                50% { text-shadow:2px 0 #ff00aa,-2px 0 #00ffff; opacity:0.9; }
+                100%{ text-shadow:0 0 5px #1eff00; opacity:1; }
+            }
+            @keyframes kChroma {
+                0%  { filter:none; text-shadow:0 0 0 transparent; }
+                30% { text-shadow:-4px 0 #ff0044,4px 0 #00ffcc; filter:brightness(1.4); }
+                60% { text-shadow:3px 0 #ff0044,-3px 0 #00ffcc; }
+                100%{ filter:none; text-shadow:0 0 5px #1eff00; }
+            }
+            @keyframes kFlicker {
+                0%  { opacity:1; }  15%{ opacity:0.2; } 30%{ opacity:1; }
+                50% { opacity:0.5;} 65%{ opacity:1;  } 80%{ opacity:0.3; } 100%{ opacity:1; }
+            }
+            @keyframes kZoom {
+                0%  { transform:scale(1); }
+                40% { transform:scale(1.08); }
+                100%{ transform:scale(1); }
+            }
+            @keyframes kScanWipe {
+                0%  { background-position:0 -100%; }
+                100%{ background-position:0 200%; }
+            }
+            .screen.crt-on.scan-active::before {
+                background:
+                    repeating-linear-gradient(0deg,
+                        rgba(0,255,0,0.04) 0px,rgba(0,255,0,0.04) 2px,
+                        transparent 2px,transparent 5px),
+                    linear-gradient(to bottom,transparent 0%,rgba(0,255,0,0.18) 50%,transparent 100%);
+                background-size:100% 100%,100% 30%;
+                animation:kScanWipe 0.25s linear;
+            }
+            .fx-shake   { animation:kShake   0.08s ease-in-out; }
+            .fx-glitch  { animation:kGlitch  0.12s 2; }
+            .fx-chroma  { animation:kChroma  0.18s ease-out; }
+            .fx-flicker { animation:kFlicker 0.20s linear; }
+            .fx-zoom    { animation:kZoom    0.15s ease-out; }
+
+/* ── ETHEREAL ── */
+@keyframes kDrift {
+                0%  { transform:translateY(-5px); opacity:0.7; }
+                100%{ transform:translateY(0);    opacity:1; }
+            }
+            @keyframes kBreathe {
+                0%  { letter-spacing:0.08em; opacity:0.7; filter:blur(0.8px); }
+                100%{ letter-spacing:normal;  opacity:1;  filter:none; }
+            }
+            @keyframes kEtherealAurora {
+                0%  { text-shadow:0 0 18px #c084fc,0 0 36px #a855f7; }
+                60% { text-shadow:0 0 8px #818cf8,0 0 16px #6366f1; }
+                100%{ text-shadow:0 0 5px #a855f7; }
+            }
+            @keyframes kDissolve {
+                0%  { opacity:0.45; filter:blur(2.5px); }
+                50% { opacity:0.8;  filter:blur(0.5px); }
+                100%{ opacity:1;    filter:none; }
+            }
+            @keyframes kFloat {
+                0%  { transform:scale(1.05) translateY(-4px); }
+                100%{ transform:scale(1)    translateY(0); }
+            }
+            .fx-drift    { animation:kDrift         0.25s ease-out; }
+            .fx-breathe  { animation:kBreathe        0.30s ease-out; }
+            .fx-aurora   { animation:kEtherealAurora 0.35s ease-out; }
+            .fx-dissolve { animation:kDissolve       0.28s ease-out; }
+            .fx-float    { animation:kFloat          0.22s ease-out; }
+/* @@END_STYLES@@ */
+    </style>
+</head>
+<body>
+<div class="stage" id="stage">
+    <div class="container">
+        <div class="screen" id="screen">
+            <div class="lyric-area">
+                <div class="current-line" id="currentLine">⚡ FIZX READY ⚡</div>
+                <div class="next-line"    id="nextLine">▶ select audio file</div>
+            </div>
+            <div class="visualizer-wrap" id="visualizerWrap"></div>
+        </div>
+
+        <div class="stats">
+            <span id="statusMsg">click ▶ to load audio</span>
+            <span id="timeDisplay">0:00</span>
+            <span id="bpmDisplay">-- BPM</span>
+        </div>
+
+        <div class="controls">
+            <div class="controls-row-main">
+                <!-- data-tip = tooltip shown on hover -->
+                <button class="btn-util" id="arBtn"    data-tip="Aspect ratio">⊞ 16:9</button>
+                <button id="playBtn"   data-tip="Play / Pause">▶</button>
+                <button id="resetBtn"  data-tip="Reset + new file">⟳</button>
+                <button id="modeBtn"   data-tip="Sync mode A/B">⇄</button>
+                <button id="presetBtn" data-tip="Switch preset">🎨</button>
+                <button class="btn-util" id="vizBtn"   data-tip="Visualizer">◎</button>
+            </div>
+        </div>
+        <div class="status-text" id="statusText"></div>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// INJECTED BLOCKS
+// compile.py replaces each /* @@TAG@@ */ ... /* @@END_TAG@@ */ block.
+// ═══════════════════════════════════════════════════════════════════
+
+/* @@VISUALIZERS@@ */
+const CANVAS_SCALE = 2.6;
+
+
+const ROOT_STYLE = document.documentElement;
+
+
+
+
+
+
+
+function readVizVars() {
+    const s = getComputedStyle(ROOT_STYLE);
+    return {
+        color:     s.getPropertyValue('--viz-color').trim()     || '#ffffff',
+        glow:      s.getPropertyValue('--viz-glow').trim()      || 'rgba(255,255,255,0.4)',
+        secondary: s.getPropertyValue('--viz-secondary').trim() || 'rgba(255,255,255,0.2)',
+    };
+}
+
+
+
+
+function easeOutExpo(t) {
+    return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+}
+
+
+
+function easeOutSine(t) { return Math.sin((t * Math.PI) / 2); }
+
+
+
+
+
+
+
+class BaseVisualizer {
+    constructor(wrap) {
+        this.wrap   = wrap;
+        this.canvas = null;
+        this.ctx    = null;
+        this._rafId = null;
+        this._init();
+    }
+
+    
+    _init() { throw new Error('BaseVisualizer._init() must be implemented'); }
+
+    
+    pulse() { throw new Error('BaseVisualizer.pulse() must be implemented'); }
+
+    
+    
+    _cleanup() {}
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    destroy() {
+        this._cleanup();
+
+        if (this._rafId) {
+            cancelAnimationFrame(this._rafId);
+            this._rafId = null;
+        }
+
+        if (this.canvas) {
+            if (this.ctx) this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            this.canvas.width  = 0;
+            this.canvas.height = 0;
+            if (this.canvas.parentNode) this.canvas.parentNode.removeChild(this.canvas);
+            this.canvas = null;
+            this.ctx    = null;
+        }
+
+        this.wrap = null;
+    }
+
+    
+    
+    _makeCanvas(w, h) {
+        
+        this.wrap.innerHTML = '';
+        const canvas = document.createElement('canvas');
+        canvas.width  = w;
+        canvas.height = h;
+        
+        canvas.style.cssText = \`width:\${w}px;height:\${h}px;display:block;\`;
+        
+        canvas.style.willChange = 'transform, opacity';
+        this.wrap.appendChild(canvas);
+        this.canvas = canvas;
+        this.ctx    = canvas.getContext('2d');
+        return canvas;
+    }
+}
+
+
+
+
+
+
+
+
+
+class RingVisualizer extends BaseVisualizer {
+    _init() {
+        this.scale   = 1;
+        this.BASE    = 60;
+        this.MAX     = 1.65;
+        this.DECAY   = 0.88; 
+        this.RING_W  = 3;
+        const sz     = this.BASE * CANVAS_SCALE;
+        this._makeCanvas(sz, sz);
+        this._loop();
+    }
+
+    pulse() {
+        
+        this.scale = this.MAX;
+    }
+
+    _loop() {
+        if (!this.canvas) return;
+        this.scale = 1 + (this.scale - 1) * this.DECAY;
+        this._draw();
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+
+    _draw() {
+        const { canvas, ctx, scale, BASE, RING_W } = this;
+        const { color, glow } = readVizVars();
+        const cx = canvas.width / 2, cy = canvas.height / 2;
+        const r  = (BASE / 2) * scale;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = RING_W;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = 6 + (scale - 1) * 30;
+        ctx.globalAlpha = Math.min(1, 0.5 + (scale - 1) * 1.5);
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+}
+
+
+
+
+
+
+
+
+class BloomVisualizer extends BaseVisualizer {
+    _init() {
+        this.BASE      = 65;
+        this.intensity = 0;   
+        this.DECAY     = 0.92; 
+        this._cycleIdx = 0;
+        const sz       = this.BASE * CANVAS_SCALE;
+        this._makeCanvas(sz, sz);
+        this._loop();
+    }
+
+    pulse() {
+        this.intensity = 1.0; 
+        this._cycleIdx = (this._cycleIdx + 1) % 4;
+    }
+
+    _loop() {
+        if (!this.canvas) return;
+        this.intensity *= this.DECAY;
+        this._draw();
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+
+    _draw() {
+        if (!this.canvas) return;
+        const { canvas, ctx, BASE, intensity } = this;
+        if (intensity < 0.005) { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+        const { glow } = readVizVars();
+        const cx = canvas.width / 2, cy = canvas.height / 2;
+        
+        const r  = (BASE / 2) * (1 + intensity * 0.5);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const aMod = 0.85 + this._cycleIdx * 0.05;
+
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.4);
+        g.addColorStop(0,    this._a(glow, intensity * 0.85 * aMod));
+        g.addColorStop(0.4,  this._a(glow, intensity * 0.55 * aMod));
+        g.addColorStop(0.75, this._a(glow, intensity * 0.2));
+        g.addColorStop(1,    'rgba(0,0,0,0)');
+
+        ctx.fillStyle   = g;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = 20 + intensity * 30;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 1.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
+
+    
+    
+    
+    _a(rgba, a) { 
+        return rgba.replace(/[\\d.]+\\)$/, \`\${Math.min(a,1).toFixed(3)})\`); 
+    }
+}
+
+
+
+
+
+
+
+
+
+
+class HeartbeatVisualizer extends BaseVisualizer {
+    _init() {
+        this._lock    = false;
+        this.BASE     = 60;
+        this.DURATION = 280; 
+        const w = this.BASE * 3, h = this.BASE * 1.2;
+        this.w = w; this.h = h;
+        this._makeCanvas(w, h);
+        this._draw(0);
+    }
+
+    pulse() {
+        
+        
+        if (this._lock) return;
+        this._lock = true;
+        const start = performance.now();
+        const go = now => {
+            if (!this.canvas) return;
+            const p = Math.min((now - start) / this.DURATION, 1);
+            
+            
+            const env = p < 0.5
+                ? easeOutExpo(p * 2)           
+                : 1 - easeOutExpo((p - 0.5)*2); 
+            this._draw(env);
+            if (p < 1) this._rafId = requestAnimationFrame(go);
+            else { this._draw(0); this._lock = false; }
+        };
+        if (this._rafId) cancelAnimationFrame(this._rafId);
+        this._rafId = requestAnimationFrame(go);
+    }
+    _draw(env) {
+        if (!this.canvas) return;
+        const { ctx, w, h } = this;
+        const { color, glow } = readVizVars();
+        ctx.clearRect(0, 0, w, h);
+        const cy  = h / 2;
+        const amp = (h * 0.38) * env;
+
+        
+        const profile = x => {
+            if (x < 0.25) return 0;
+            if (x < 0.32) return -(x - 0.25) / 0.07 * 0.15;
+            if (x < 0.38) return  (x - 0.32) / 0.06;
+            if (x < 0.42) return 1 - (x - 0.38) / 0.04 * 1.6;
+            if (x < 0.46) return -0.6 + (x - 0.42) / 0.04 * 0.6;
+            if (x < 0.55) return 0;
+            if (x < 0.65) return Math.sin((x - 0.55) / 0.10 * Math.PI) * 0.18;
+            return 0;
+        };
+
+        ctx.beginPath();
+        for (let px = 0; px < w; px++) {
+            const y = cy - profile(px / w) * amp;
+            px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+        }
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = 1.5;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = 4 + amp * 0.4;
+        ctx.globalAlpha = 0.4 + env * 0.6;
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+
+    _cleanup() { this._lock = false; }
+}
+
+
+
+
+
+
+
+
+
+class RippleVisualizer extends BaseVisualizer {
+    _init() {
+        this._rings   = [];
+        this.BASE     = 50;
+        this.MAX_RINGS= 4;
+        this.DURATION = 600; 
+        const sz      = this.BASE * CANVAS_SCALE;
+        this.sz       = sz;
+        this._makeCanvas(sz, sz);
+        this._loop();
+    }
+
+    pulse() {
+        if (this._rings.length >= this.MAX_RINGS) this._rings.shift();
+        
+        this._rings.push({ t0: performance.now() - this.DURATION * 0.08, dur: this.DURATION });
+    }
+
+    _loop() {
+        if (!this.canvas) return;
+        const { ctx, sz, BASE } = this;
+        const { color, glow } = readVizVars();
+        const cx = sz / 2, cy = sz / 2;
+        const maxR = (BASE / 2) * 2.2;
+        ctx.clearRect(0, 0, sz, sz);
+        const now = performance.now();
+        this._rings = this._rings.filter(ring => {
+            const p = (now - ring.t0) / ring.dur;
+            if (p >= 1) return false;
+            const r = maxR * easeOutSine(p);
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.strokeStyle = color;
+            ctx.lineWidth   = 1.8 * (1 - p * 0.6);
+            ctx.shadowColor = glow;
+            ctx.shadowBlur  = 14 * (1 - p);
+            ctx.globalAlpha = (1 - p) * 0.8;
+            ctx.stroke();
+            ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+            return true;
+        });
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+
+    _cleanup() { this._rings = []; }
+}
+
+
+
+
+
+
+
+
+
+class WaveformVisualizer extends BaseVisualizer {
+    _init() {
+        this._amp   = 0;
+        this._phase = 0;
+        this.MAX_AMP  = 16;
+        this.FREQ     = 3;
+        this.DECAY    = 0.91; 
+        const w = 60*3, h = 60*1.4;
+        this.w = w; this.h = h;
+        this._makeCanvas(w, h);
+        this._loop();
+    }
+
+    pulse() {
+        this._amp = this.MAX_AMP; 
+    }
+
+    _loop() {
+        if (!this.canvas) return;
+        const { ctx, w, h } = this;
+        const { color, glow } = readVizVars();
+        const cy = h / 2;
+
+        this._amp   *= this.DECAY;
+        this._phase += 0.05; 
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.beginPath();
+        for (let px = 0; px <= w; px++) {
+            const x   = px / w;
+            const env = Math.sin(x * Math.PI); 
+            const y   = cy - Math.sin(x * Math.PI * 2 * this.FREQ + this._phase) * this._amp * env;
+            px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+        }
+        const intensity = this._amp / this.MAX_AMP;
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = 2;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = 4 + intensity * 16;
+        ctx.globalAlpha = 0.35 + intensity * 0.65;
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+}
+
+
+
+
+
+
+
+
+
+
+class ParticlesVisualizer extends BaseVisualizer {
+    _init() {
+        this._particles = [];
+        this.MAX_P    = 72;
+        this.PER_BURST= 14; 
+        this.BASE     = 60;
+        const sz = this.BASE * CANVAS_SCALE;
+        this.sz  = sz;
+        this._makeCanvas(sz, sz);
+        this._loop();
+    }
+
+    pulse() {
+        const { sz, MAX_P, PER_BURST, BASE } = this;
+        const cx = sz / 2, cy = sz / 2;
+        
+        if (this._particles.length + PER_BURST > MAX_P) {
+            this._particles.splice(0, PER_BURST); 
+        }
+        for (let i = 0; i < PER_BURST; i++) {
+            const angle = (Math.PI * 2 / PER_BURST) * i + (Math.random() - 0.5) * 0.5;
+            const spd   = BASE * 0.016 + Math.random() * BASE * 0.018;
+            this._particles.push({
+                x: cx, y: cy,
+                vx: Math.cos(angle) * spd,
+                vy: Math.sin(angle) * spd,
+                r: 1.5 + Math.random() * 2.5,
+                life: 1.0,
+                decay: 0.022 + Math.random()*0.014, 
+            });
+        }
+    }
+
+    _loop() {
+        if (!this.canvas) return;
+        const { ctx, sz } = this;
+        const { color, glow } = readVizVars();
+        ctx.clearRect(0, 0, sz, sz);
+        this._particles = this._particles.filter(p => {
+            p.x += p.vx; p.y += p.vy;
+            p.vx *= 0.94; p.vy *= 0.94;
+            p.life -= p.decay;
+            if (p.life <= 0) return false;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r*p.life, 0, Math.PI*2);
+            ctx.fillStyle   = color;
+            ctx.shadowColor = glow;
+            ctx.shadowBlur  = 5;
+            ctx.globalAlpha = p.life * 0.9;
+            ctx.fill();
+            ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+            return true;
+        });
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+
+    _cleanup() { this._particles = []; }
+}
+
+
+
+
+
+
+
+
+
+class DNAVisualizer extends BaseVisualizer {
+    _init() {
+        this.BASE     = 60;
+        this._restAmp = this.BASE * 0.10;
+        this._maxAmp  = this.BASE * 0.44;
+        this._amp     = this._restAmp;
+        this.DECAY    = 0.93;
+        this._phase   = 0;
+        const w = this.BASE*3, h = this.BASE*1.4;
+        this.w = w; this.h = h;
+        this._makeCanvas(w, h);
+        this._loop();
+    }
+
+    pulse() { this._amp = this._maxAmp; }
+
+    _loop() {
+        if (!this.canvas) return;
+        const { ctx, w, h } = this;
+        const { color, glow, secondary } = readVizVars();
+        const cy    = h / 2;
+        const freq  = 2.5;
+        const rungs = 8;
+
+        
+        this._amp   = this._restAmp + (this._amp - this._restAmp) * this.DECAY;
+        this._phase += 0.03;
+
+        ctx.clearRect(0, 0, w, h);
+
+        const norm  = (this._amp - this._restAmp) / (this._maxAmp - this._restAmp);
+        const gBlur = norm * 16;
+        const alpha = 0.4 + norm * 0.5;
+
+        
+        this._strand(ctx, w, cy, freq, 0,       color,     gBlur,       alpha,       glow);
+        
+        this._strand(ctx, w, cy, freq, Math.PI, secondary, gBlur * 0.6, alpha * 0.65, glow);
+
+        
+        ctx.strokeStyle = color;
+        ctx.lineWidth   = 0.9;
+        ctx.globalAlpha = alpha * 0.3;
+        ctx.shadowColor = glow;
+        ctx.shadowBlur  = gBlur * 0.4;
+        for (let i = 0; i <= rungs; i++) {
+            const xN = i / rungs;
+            const y1 = cy - Math.sin(xN * Math.PI * 2 * freq + this._phase) * this._amp;
+            const y2 = cy - Math.sin(xN * Math.PI * 2 * freq + this._phase + Math.PI) * this._amp;
+            ctx.beginPath(); ctx.moveTo(xN * w, y1); ctx.lineTo(xN * w, y2); ctx.stroke();
+        }
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        this._rafId = requestAnimationFrame(() => this._loop());
+    }
+
+    _strand(ctx, w, cy, freq, offset, strokeColor, glowBlur, alpha, shadowColor) {
+        ctx.beginPath();
+        for (let px = 0; px <= w; px++) {
+            const y = cy - Math.sin((px / w) * Math.PI * 2 * freq + this._phase + offset) * this._amp;
+            px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y);
+        }
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth   = 1.5;
+        ctx.shadowColor = shadowColor;
+        ctx.shadowBlur  = glowBlur;
+        ctx.globalAlpha = alpha;
+        ctx.stroke();
+        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    }
+}
+
+
+
+
+
+
+
+const VISUALIZERS = {
+    ring:      RingVisualizer,
+    bloom:     BloomVisualizer,
+    heartbeat: HeartbeatVisualizer,
+    ripple:    RippleVisualizer,
+    waveform:  WaveformVisualizer,
+    particles: ParticlesVisualizer,
+    dna:       DNAVisualizer,
+};
+
+
+
+
+
+
+
+const VISUALIZER_ORDER = ['particles', 'waveform', 'dna', 'heartbeat', 'ripple', 'ring', 'bloom', 'off'];
+/* @@END_VISUALIZERS@@ */
+
+/* @@PRESETS@@ */
+const PRESETS = {
+rap: {
+        label: 'RAP',
+
+        cssVars: {
+            '--bg-body':       '#030603',
+            '--bg-container':  'linear-gradient(145deg,#141a14,#0a0f0a)',
+            '--bg-screen':     '#0a0e0a',
+            '--border-screen': '#2a4a2a',
+            '--color-primary': '#1eff00',
+            '--color-dim':     '#3c9e3c',
+            '--color-faint':   '#2a8a2a',
+            '--color-muted':   '#3a7a3a',
+            '--shadow-screen': 'inset 0 0 25px rgba(0,255,0,0.06)',
+            '--shadow-outer':  '0 0 0 2px #1a3a1a,0 20px 40px rgba(0,0,0,0.5)',
+            '--bg-stats':      '#0a0c0a',
+            '--bg-btn':        '#1a2a1a',
+            '--border-btn':    '#3c9e3c',
+            '--color-btn':     '#aaffaa',
+            '--crt-on':        '1',
+            
+            '--viz-color':     '#1eff00',
+            '--viz-glow':      'rgba(30,255,0,0.55)',
+            '--viz-secondary': 'rgba(30,255,0,0.25)'},
+
+        
+        
+        
+
+        dustColor:  'rgba(30,255,0,0.25)',
+        flashColor: 'rgba(0,255,0,0.4)',
+
+        effects: [
+            
+            { className:'fx-shake',   duration:100, useFlash:true,  useScan:false },
+            { className:'fx-glitch',  duration:260, useFlash:false, useScan:false },
+            { className:'fx-chroma',  duration:200, useFlash:false, useScan:true  },
+            { className:'fx-flicker', duration:220, useFlash:false, useScan:false },
+            { className:'fx-zoom',    duration:160, useFlash:true,  useScan:false },
+        ]},
+ethereal: {
+        label: 'ETHEREAL',
+
+        cssVars: {
+            '--bg-body':       '#06030f',
+            '--bg-container':  'linear-gradient(145deg,#0e0819,#070410)',
+            '--bg-screen':     '#0b0718',
+            '--border-screen': '#2e1650',
+            '--color-primary': '#b388ff',
+            '--color-dim':     '#7c4daa',
+            '--color-faint':   '#4a2870',
+            '--color-muted':   '#2e1650',
+            '--shadow-screen': 'inset 0 0 35px rgba(140,70,220,0.06)',
+            '--shadow-outer':  '0 0 0 2px #1e0a38,0 20px 60px rgba(60,0,100,0.55)',
+            '--bg-stats':      '#080514',
+            '--bg-btn':        '#140a28',
+            '--border-btn':    '#5c3080',
+            '--color-btn':     '#c4a0f0',
+            '--crt-on':        '0',
+            '--viz-color':     '#c084fc',
+            '--viz-glow':      'rgba(160,80,255,0.5)',
+            '--viz-secondary': 'rgba(120,60,200,0.25)'},
+
+        
+
+        dustColor:  'rgba(160,100,255,0.15)',
+        flashColor: 'rgba(140,70,255,0.20)',
+
+        effects: [
+            
+            { className:'fx-drift',    duration:250, useFlash:true,  useScan:false },
+            { className:'fx-breathe',  duration:300, useFlash:false, useScan:false },
+            { className:'fx-aurora',   duration:350, useFlash:true,  useScan:false },
+            { className:'fx-dissolve', duration:280, useFlash:true,  useScan:false },
+            { className:'fx-float',    duration:220, useFlash:false, useScan:false },
+        ]}
+};
+const PRESET_ORDER = ['rap', 'ethereal'];
+/* @@END_PRESETS@@ */
+
+/* @@LYRICS@@ */
+const LYRICS = [[LYRICS_DATA]];
+/* @@END_LYRICS@@ */
+
+/* @@BEATS@@ */
+const BEAT_DATA = { beats: [[BEATS_DATA]], bpm: [[BPM_DATA]] };
+/* @@END_BEATS@@ */
+
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE
+// ═══════════════════════════════════════════════════════════════════
+
+// ── DOM ───────────────────────────────────────────────────────────
+const stageEl       = document.getElementById('stage');
+const screenEl      = document.getElementById('screen');
+const currentLineEl = document.getElementById('currentLine');
+const nextLineEl    = document.getElementById('nextLine');
+const timeDisplay   = document.getElementById('timeDisplay');
+const bpmDisplay    = document.getElementById('bpmDisplay');
+const statusMsg     = document.getElementById('statusMsg');
+const playBtn       = document.getElementById('playBtn');
+const resetBtn      = document.getElementById('resetBtn');
+const modeBtn       = document.getElementById('modeBtn');
+const presetBtn     = document.getElementById('presetBtn');
+const arBtn         = document.getElementById('arBtn');
+const vizBtn        = document.getElementById('vizBtn');
+const visWrap       = document.getElementById('visualizerWrap');
+
+// ── State ─────────────────────────────────────────────────────────
+let beatTimestamps = [...BEAT_DATA.beats]; // Copy to allow modification
+let bpm            = BEAT_DATA.bpm;
+let currentMode    = 'A'; // 'A' = beat triggers, 'B' = lyric start triggers
+let currentPreset  = PRESET_ORDER[0];
+let isLandscape    = false;
+let isPlaying      = false;
+
+// Visualizer cycling: VISUALIZER_ORDER is injected by compile.py from
+// visualizers.js. In the default template it is defined inline below.
+// The 'off' sentinel maps to null (no visualizer rendered).
+// If VISUALIZER_ORDER is not injected (non-technical user), default to particles/waveform/off.
+const VIZ_ORDER = (typeof VISUALIZER_ORDER !== 'undefined')
+    ? VISUALIZER_ORDER
+    : ['particles', 'waveform', 'off'];
+let vizIndex    = 0;   // current position in VIZ_ORDER
+let vizs        = null; // active BaseVisualizer instance or null
+
+// ── Audio ─────────────────────────────────────────────────────────
+let audio        = null;
+let audioContext = null;
+let t0           = null; // AudioContext.currentTime at play() resolution
+
+// ── Timer Registry ────────────────────────────────────────────────
+// Every setTimeout created by triggerVisual() is tracked here.
+// resetAudio() and song changes clear this registry before any new
+// allocations — prevents timers from firing against stale state.
+// This prevents memory leak if setTimeouts are never cancelled on reset.
+const activeVisualTimers = [];
+
+// Beat scheduler timers (AudioContext-anchored setTimeouts for each beat)
+const scheduledTimers = [];
+
+// Display loop rAF handle
+let animFrameId = null;
+
+// Flash cycle index for aurora-style presets
+let flashCycleIdx = 0;
+
+// Per-effect debounce: tracks the pending removal timer for each CSS class.
+// Key: className string → Value: setTimeout id.
+// When triggerVisual() fires the same class again before the previous
+// duration elapsed, this clears the old removal timer first.
+// This prevents the "stutter" where an animation class gets removed
+// mid-flight by a previous setTimeout that is now stale.
+const effectRemovalTimers = {};
+
+
+// ═══════════════════════════════════════════════════════════════════
+// VISUALIZER MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════
+
+function buildVisualizer(key) {
+    // Destroy existing instance with full GPU cleanup before creating new one.
+    // destroy() in BaseVisualizer zeros canvas dimensions → immediate GPU release.
+    if (vizs) {
+        vizs.destroy();
+        vizs = null;
+    }
+
+    if (key === 'off' || !key) {
+        visWrap.classList.add('viz-off');
+        vizBtn.textContent = '◎ off';
+        return;
+    }
+
+    // VISUALIZERS map is injected by compile.py. If not present (raw template),
+    // fall back gracefully — just hide the wrap.
+    if (typeof VISUALIZERS === 'undefined' || !VISUALIZERS[key]) {
+        visWrap.classList.add('viz-off');
+        return;
+    }
+
+    visWrap.classList.remove('viz-off');
+    // Override style key to match the chosen visualizer
+    vizs = new VISUALIZERS[key](visWrap);
+    vizBtn.textContent = \`◎ \${key}\`;
+}
+
+function cycleVisualizer() {
+    vizIndex = (vizIndex + 1) % VIZ_ORDER.length;
+    buildVisualizer(VIZ_ORDER[vizIndex]);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// PRESET APPLICATION
+// Injects CSS vars, sets flash color var, toggles CRT class,
+// rebuilds dust, rebuilds visualizer with new preset's visualizer config.
+// ═══════════════════════════════════════════════════════════════════
+function applyPreset(key) {
+    const p = PRESETS[key];
+    if (!p) return;
+
+    currentPreset = key;
+    flashCycleIdx = 0;
+
+    // CSS custom properties are injected via
+    // root.style.setProperty() which overrides any existing inline styles.
+    // This is intentional — presets fully own the visual theme.    
+    const root = document.documentElement;
+    Object.entries(p.cssVars).forEach(([k, v]) => root.style.setProperty(k, v));
+
+    // --flash-color drives @keyframes kScreenFlash — set here so the
+    // flash is always theme-correct with no JS branching in triggerVisual.
+    root.style.setProperty('--flash-color', p.flashColor);
+    // The '--crt-on' property is read as a string, not a boolean.
+    screenEl.classList.toggle('crt-on', p.cssVars['--crt-on'] === '1');
+
+    // Rebuild dust with preset color
+    document.querySelectorAll('.dust-particle').forEach(el => el.remove());
+    createDust(p.dustColor);
+
+    // Do NOT rebuild the visualizer here. CSS vars are now injected above,
+    // and the running visualizer reads them on its next draw frame automatically.
+    // This is zero-coupling contract: preset switch = CSS vars only.
+
+    const nextKey = PRESET_ORDER[(PRESET_ORDER.indexOf(key) + 1) % PRESET_ORDER.length];
+    presetBtn.setAttribute('data-tip', \`→ \${PRESETS[nextKey].label}\`);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// VISUAL TRIGGER
+// Called once per scheduled beat. Picks a random effect from the
+// active preset pool, applies it to .current-line, and pulses the
+// active visualizer.
+//
+// DEBOUNCE:
+//   effectRemovalTimers tracks the pending "remove class" timer per
+//   className. If the same effect fires again before expiry, the
+//   stale removal timer is cancelled first. Without this, fast beats
+//   cause the class to be removed mid-animation by the old timer,
+//   creating a stutter where the animation starts then abruptly stops.
+//
+// TIMER TRACKING:
+//   All setTimeouts pushed to activeVisualTimers so resetAudio() can
+//   clear them. This closes the leak in the previous implementation.
+// ═══════════════════════════════════════════════════════════════════
+function triggerVisual() {
+    const p      = PRESETS[currentPreset];
+    const effect = p.effects[Math.floor(Math.random() * p.effects.length)];
+
+    // Debounce: clear stale removal timer for this class before restarting
+    if (effectRemovalTimers[effect.className]) {
+        clearTimeout(effectRemovalTimers[effect.className]);
+        delete effectRemovalTimers[effect.className];
+    }
+
+    // void offsetWidth: forces browser to reflow, ensuring the class
+    // removal + re-add is treated as a fresh animation start.
+    // Without this, if the same class is re-added before the browser
+    // commits the removal, the animation does not restart.
+    currentLineEl.classList.remove(effect.className);
+    void currentLineEl.offsetWidth; // Force reflow — critical for animation restart
+    currentLineEl.classList.add(effect.className);
+
+    // Schedule class removal; track the timer ID for cleanup on reset
+    const removeId = setTimeout(() => {
+        currentLineEl.classList.remove(effect.className);
+        delete effectRemovalTimers[effect.className];
+        const idx = activeVisualTimers.indexOf(removeId);
+        if (idx !== -1) activeVisualTimers.splice(idx, 1);
+    }, effect.duration + 20);
+    activeVisualTimers.push(removeId);
+    effectRemovalTimers[effect.className] = removeId;
+
+    if (effect.useFlash) {
+        // Rotate flash color if preset uses flashCycle
+        if (p.flashCycle && p.flashCycleColors && p.flashCycleColors.length) {
+            flashCycleIdx = (flashCycleIdx + 1) % p.flashCycleColors.length;
+            document.documentElement.style.setProperty('--flash-color', p.flashCycleColors[flashCycleIdx]);
+        }
+        screenEl.classList.remove('screen-flash');
+        void screenEl.offsetWidth; // reflow guard — same reason as above
+        screenEl.classList.add('screen-flash');
+        const flashId = setTimeout(() => {
+            screenEl.classList.remove('screen-flash');
+            const idx = activeVisualTimers.indexOf(flashId);
+            if (idx !== -1) activeVisualTimers.splice(idx, 1);
+        }, 150);
+        activeVisualTimers.push(flashId);
+    }
+
+    if (effect.useScan && screenEl.classList.contains('crt-on')) {
+        screenEl.classList.add('scan-active');
+        const scanId = setTimeout(() => {
+            screenEl.classList.remove('scan-active');
+            const idx = activeVisualTimers.indexOf(scanId);
+            if (idx !== -1) activeVisualTimers.splice(idx, 1);
+        }, 280);
+        activeVisualTimers.push(scanId);
+    }
+
+    if (vizs) vizs.pulse();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// BEAT SCHEDULER
+// AudioContext-anchored setTimeout per beat.
+// t0 = AudioContext.currentTime sampled at play().then() resolution.
+// This absorbs browser audio startup latency automatically — the gap
+// between .play() call and the then() callback is the hardware latency,
+// and by sampling t0 there rather than before .play(), it is baked in.
+//
+// Timer IDs stored in scheduledTimers for full cleanup on reset.
+// ═══════════════════════════════════════════════════════════════════
+function scheduleAll(timestamps) {
+    clearScheduled();
+    const atx = audioContext.currentTime;
+    timestamps.forEach(ts => {
+        const ms = (t0 + ts - atx) * 1000;
+        if (ms < 0) return; // already past (e.g. resume after seek)
+        const id = setTimeout(triggerVisual, ms);
+        scheduledTimers.push(id);
+    });
+}
+
+function clearScheduled() {
+    scheduledTimers.forEach(id => clearTimeout(id));
+    scheduledTimers.length = 0; // in-place clear — avoids reallocation
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// DISPLAY LOOP
+// rAF loop for lyrics text updates and time counter only.
+// Beat triggering is NOT done here — it is handled by scheduled
+// setTimeouts in scheduleAll(). Separation of concerns:
+//   - Display loop: ~60fps polling, latency-insensitive
+//   - Beat scheduler: AudioContext-precise, fires independently
+// ═══════════════════════════════════════════════════════════════════
+function updateLyrics(t) {
+    const idx = LYRICS.findIndex(l => t >= l.start && t <= l.end); //  returns -1 in gaps
+    // dont clear textContent when idx === -1 as sticky behavior is desirable
+    // text remains on screen until next one triggers. This "end" time is a 
+    // metadata tag rather than a hard kill-switch
+    if (idx !== -1) {
+        currentLineEl.textContent = LYRICS[idx].text;
+        const next = LYRICS[idx + 1];
+        nextLineEl.textContent = next ? \`➡ \${next.text}\` : \`Audit Complete\`;
+    } else if (LYRICS.length && t > LYRICS[LYRICS.length - 1].end) {
+        currentLineEl.textContent = \`@AmMoPy\`;
+        nextLineEl.textContent    = \`⭐ SHOW SOME LOVE ⭐\`;
+    } else if (LYRICS.length && t < LYRICS[0].start) {
+        currentLineEl.textContent = \`⚡ FIZX READY ⚡\`;
+        nextLineEl.textContent    = \`➡ \${LYRICS[0].text}\`;
+    }
+}
+
+function displayLoop() {
+    if (audio && !audio.paused && !audio.ended) {
+        timeDisplay.textContent = fmt(audio.currentTime);
+        updateLyrics(audio.currentTime);
+    }
+    animFrameId = requestAnimationFrame(displayLoop);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// AUDIO LIFECYCLE
+// ═══════════════════════════════════════════════════════════════════
+async function setupAudio(file) {
+    const url = URL.createObjectURL(file);
+    if (audio) { audio.pause(); URL.revokeObjectURL(audio.src); audio = null; }
+
+    // Close existing AudioContext before creating a new one.
+    // Browsers accumulate "ghost" suspended contexts if not explicitly
+    // closed — each holds DSP resources and event handlers.
+    // await ensures closure completes before new context is created.
+    if (audioContext) {
+        await audioContext.close();
+        audioContext = null;
+    }
+
+    audio = new Audio(url);
+    audio.preload = 'auto';
+    audioContext  = new (window.AudioContext || window.webkitAudioContext)();
+
+    return new Promise(resolve => {
+        audio.onloadeddata = () => { bpmDisplay.textContent = \`\${bpm} BPM\`; resolve(); };
+        audio.onerror      = () => { statusMsg.textContent = \`❌ load error\`; resolve(); };
+        audio.onended      = () => { isPlaying = false; playBtn.textContent = '▶'; };
+    });
+}
+
+function selectAudio() {
+    const input  = document.createElement('input');
+    input.type   = 'file';
+    input.accept = 'audio/mpeg,audio/wav,audio/ogg,audio/mp3';
+    input.onchange = async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        statusMsg.textContent = \`⏳ \${file.name.slice(0, 28)}…\`;
+        await setupAudio(file);
+        updateLyrics(0);
+        timeDisplay.textContent = fmt(0);
+        statusMsg.textContent   = \`✅ \${beatTimestamps.length} beats · \${LYRICS.length} lines\`;
+    };
+    input.click();
+}
+
+// ── Play / Pause ──────────────────────────────────────────────────
+async function togglePlay() {
+    if (!audio) { selectAudio(); return; }
+
+    if (isPlaying) {
+        audio.pause();
+        clearScheduled();
+        isPlaying = false;
+        playBtn.textContent   = '▶';
+        statusMsg.textContent = \`⏸ \${fmt(audio.currentTime)}\`;
+        return;
+    }
+
+    if (audio.ended) audio.currentTime = 0;
+    if (audioContext.state === 'suspended') await audioContext.resume();
+
+    audio.play().then(() => {
+        // t0 sampled here — inside then() — so it includes startup latency.
+        // making setTimeout alignment accurate even on slow devices
+        // All beat delays computed as (t0 + beatTs - audioContext.currentTime).
+        t0 = audioContext.currentTime;
+
+        // On resume, filter to only future timestamps so we don't reschedule
+        // callbacks that already fired before the pause.
+        const elapsed = audio.currentTime;
+        const source  = (currentMode === 'A' ? beatTimestamps : LYRICS.map(l => l.start))
+                        .filter(ts => ts > elapsed);
+        scheduleAll(source);
+
+        isPlaying = true;
+        playBtn.textContent   = '⏸';
+        statusMsg.textContent = \`▶ \${PRESETS[currentPreset].label} · \${currentMode} · \${source.length}\`;
+    }).catch(() => { statusMsg.textContent = \`⚠️ tap again\`; });
+}
+
+// ── Reset ─────────────────────────────────────────────────────────
+// Full teardown sequence — the order matters:
+//   1. Stop audio + revoke blob URL
+//   2. Clear ALL timers (scheduled beats + visual effect timers)
+//   3. Cancel display rAF — stops canvas loops immediately
+//   4. Close AudioContext — prevents ghost context accumulation
+//   5. Destroy visualizer — releases GPU buffers
+//   6. Reset UI state
+//   7. Re-trigger file picker
+async function resetAudio() {
+    // 1. Audio
+    if (audio) { audio.pause(); URL.revokeObjectURL(audio.src); audio = null; }
+
+    // 2. All timers — beats + visual effects + effect debounce registry
+    clearScheduled();
+    activeVisualTimers.forEach(id => clearTimeout(id));
+    activeVisualTimers.length = 0;
+    Object.keys(effectRemovalTimers).forEach(k => {
+        clearTimeout(effectRemovalTimers[k]);
+        delete effectRemovalTimers[k];
+    });
+
+    // 3. Display loop
+    if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+
+    // 4. AudioContext — await ensures DSP resources are released before
+    //    a new context might be created by setupAudio()
+    if (audioContext) { await audioContext.close(); audioContext = null; }
+
+    // 5. Visualizer GPU cleanup
+    if (vizs) { vizs.destroy(); vizs = null; }
+
+    // 6. UI state
+    t0 = null; isPlaying = false;
+    timeDisplay.textContent   = fmt(0);
+    bpmDisplay.textContent    = \`-- BPM\`;
+    playBtn.textContent       = '▶';
+    currentLineEl.textContent = \`⚡ FIZX READY ⚡\`;
+    nextLineEl.textContent    = \`▶ select audio file\`;
+    statusMsg.textContent     = \`⟳ select new file\`;
+
+    // Restart display loop — it is display-only so safe to run without audio
+    displayLoop();
+
+    // Rebuild visualizer (was destroyed above)
+    buildVisualizer(VIZ_ORDER[vizIndex]);
+
+    // 7. New file
+    selectAudio();
+}
+
+// ── Mode toggle ───────────────────────────────────────────────────
+
+// When toggling during playback, reschedules remaining triggers
+// using the new source (beats or lyric starts).
+function toggleMode() {
+    currentMode = currentMode === 'A' ? 'B' : 'A';
+    if (audio && isPlaying && t0 !== null) {
+        const elapsed = audioContext.currentTime - t0;
+        const source  = (currentMode === 'A' ? beatTimestamps : LYRICS.map(l => l.start))
+                        .filter(ts => ts > elapsed);
+        clearScheduled();
+        scheduleAll(source);
+    }
+    statusMsg.textContent = \`MODE \${currentMode}\`;
+}
+
+// ── Preset toggle ─────────────────────────────────────────────────
+
+// Cycles through PRESET_ORDER. Reschedules triggers during playback
+// because preset changes may affect effect pool but NOT timing.
+// Note: Rescheduling is defensive — timing doesn't change per preset,
+// but the effect selection pool does. No need to reschedule actually.
+function togglePreset() {
+    const next = PRESET_ORDER[(PRESET_ORDER.indexOf(currentPreset) + 1) % PRESET_ORDER.length];
+    applyPreset(next);
+    if (audio && isPlaying && t0 !== null) {
+        const elapsed = audioContext.currentTime - t0;
+        const source  = (currentMode === 'A' ? beatTimestamps : LYRICS.map(l => l.start))
+                        .filter(ts => ts > elapsed);
+        clearScheduled();
+        scheduleAll(source);
+    }
+}
+
+// ── AR toggle ─────────────────────────────────────────────────────
+function toggleAR() {
+    isLandscape = !isLandscape;
+    stageEl.classList.toggle('ar-landscape', isLandscape);
+    arBtn.textContent = isLandscape ? '⊞ 9:16' : '⊞ 16:9';
+}
+
+// ── Utilities ─────────────────────────────────────────────────────
+function fmt(sec) {
+    if (isNaN(sec) || sec < 0) return '0:00';
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return \`\${m}:\${s < 10 ? '0' : ''}\${s}\`;
+}
+
+function createDust(color) {
+   // Creates floating dust particles with random positions, sizes, and animation delays.
+    // Each particle has its own animation — 20 particles = 20 independent animations.
+    // This is fine for modern browsers but could be optimized by using a single
+    // canvas particle system. Not worth the complexity for this use case.
+    for (let i = 0; i < 20; i++) {
+        const d  = document.createElement('div');
+        const sz = 2 + Math.random() * 4;
+        d.classList.add('dust-particle');
+        d.style.cssText = \`
+            width:\${sz}px; height:\${sz}px; background:\${color};
+            left:\${Math.random()*100}%; bottom:\${Math.random()*40}px;
+            animation:kFloatUp \${6+Math.random()*12}s infinite linear;
+            animation-delay:\${Math.random()*10}s;
+        \`;
+        screenEl.appendChild(d);
+    }
+}
+
+// ── Event listeners ───────────────────────────────────────────────
+playBtn.onclick   = togglePlay;
+resetBtn.onclick  = resetAudio;
+modeBtn.onclick   = toggleMode;
+presetBtn.onclick = togglePreset;
+arBtn.onclick     = toggleAR;
+vizBtn.onclick    = cycleVisualizer;
+
+// ── Boot ──────────────────────────────────────────────────────────
+applyPreset(PRESET_ORDER[0]);
+bpmDisplay.textContent = \`\${bpm} BPM\`;
+updateLyrics(0);
+displayLoop();
+buildVisualizer(VIZ_ORDER[vizIndex]);
+
+// ── Cleanup on unload ─────────────────────────────────────────────
+
+// Cancels all pending timers, animation frames, and closes audio context.
+// This prevents memory leaks when navigating away.
+window.addEventListener('beforeunload', () => {
+    clearScheduled();
+    activeVisualTimers.forEach(id => clearTimeout(id));
+    Object.values(effectRemovalTimers).forEach(id => clearTimeout(id));
+    if (animFrameId)  cancelAnimationFrame(animFrameId);
+    if (audio)        { audio.pause(); }
+    if (audioContext) audioContext.close();
+    if (vizs)   vizs.destroy();
+});
+<\/script>
+</body>
+</html>
+`;
+
+// ═══════════════════════════════════════════════════════════════════
+// WORKER SOURCE (inlined as Blob — no separate file needed)
+//
+// Algorithm mirrors ex_beats.py exactly:
+//   - Radix-2 Cooley-Tukey FFT  O(N log N) — replaces naive O(N²)
+//   - Hann window, N=2048, hop=512
+//   - Spectral flux envelope, aggregate = median per frame
+//   - Peak-pick: delta=0.07, wait=8 frames (~85ms)
+//   - backtrack to nearest preceding local minimum (backtrack=True)
+//   - Secondary 120ms de-dupe pass (MIN_GAP=0.12)
+//   - BPM via median inter-onset interval, clamped 40–300
+//
+// Receives: { samples: Float32Array, sr: number }  (buffer is transferred)
+// Posts:    { type:'progress', pct, label }
+//           { type:'done', onsets, bpm }
+//           { type:'error', message }
+// ═══════════════════════════════════════════════════════════════════
+const WORKER_SRC = `
+'use strict';
+
+// Radix-2 Cooley-Tukey in-place FFT.
+// re and im are Float64Arrays of length N (must be power of 2).
+function fft(re, im) {
+    const N = re.length;
+    // Bit-reversal permutation
+    let j = 0;
+    for (let i = 1; i < N; i++) {
+        let bit = N >> 1;
+        for (; j & bit; bit >>= 1) j ^= bit;
+        j ^= bit;
+        if (i < j) {
+            let t = re[i]; re[i] = re[j]; re[j] = t;
+                t = im[i]; im[i] = im[j]; im[j] = t;
+        }
+    }
+    // Butterfly passes
+    for (let len = 2; len <= N; len <<= 1) {
+        const half  = len >> 1;
+        const theta = -2 * Math.PI / len;
+        const wRe   = Math.cos(theta);
+        const wIm   = Math.sin(theta);
+        for (let i = 0; i < N; i += len) {
+            let curRe = 1, curIm = 0;
+            for (let k = 0; k < half; k++) {
+                const uRe = re[i+k],       uIm = im[i+k];
+                const vRe = re[i+k+half],  vIm = im[i+k+half];
+                const tRe = curRe*vRe - curIm*vIm;
+                const tIm = curRe*vIm + curIm*vRe;
+                re[i+k]      = uRe+tRe;  im[i+k]      = uIm+tIm;
+                re[i+k+half] = uRe-tRe;  im[i+k+half] = uIm-tIm;
+                const nr = curRe*wRe - curIm*wIm;
+                curIm = curRe*wIm + curIm*wRe;
+                curRe = nr;
+            }
+        }
+    }
+}
+
+// Median of a Float64Array — sorts a copy, leaves original intact.
+function median(arr) {
+    const s = Float64Array.from(arr).sort();
+    const m = s.length >> 1;
+    return (s.length & 1) ? s[m] : (s[m-1] + s[m]) * 0.5;
+}
+
+self.onmessage = function(e) {
+    const { samples, sr } = e.data;
+
+    const HOP  = 512;
+    const N    = 2048;
+    const HALF = N / 2 + 1;
+
+    // Hann window — precomputed once
+    const win = new Float64Array(N);
+    for (let i = 0; i < N; i++) win[i] = 0.5 * (1 - Math.cos(2*Math.PI*i/(N-1)));
+
+    const numFrames = Math.floor((samples.length - N) / HOP) + 1;
+
+    // Reusable per-frame buffers — single allocation, no GC pressure
+    const reArr   = new Float64Array(N);
+    const imArr   = new Float64Array(N);
+    const prevMag = new Float64Array(HALF);
+    const curMag  = new Float64Array(HALF);
+    const fluxBuf = new Float64Array(HALF);
+    const envelope = new Float64Array(numFrames);
+
+    const TICK = Math.max(1, Math.floor(numFrames / 50));
+
+    for (let f = 0; f < numFrames; f++) {
+        const off = f * HOP;
+        for (let i = 0; i < N; i++) { reArr[i] = samples[off+i] * win[i]; imArr[i] = 0; }
+
+        fft(reArr, imArr);
+
+        for (let k = 0; k < HALF; k++) curMag[k] = Math.sqrt(reArr[k]*reArr[k] + imArr[k]*imArr[k]);
+
+        // Half-wave rectified flux per bin
+        for (let k = 0; k < HALF; k++) { const d = curMag[k]-prevMag[k]; fluxBuf[k] = d > 0 ? d : 0; }
+
+        // aggregate = median  (matches librosa aggregate=np.median)
+        envelope[f] = median(fluxBuf);
+        prevMag.set(curMag);
+
+        if (f % TICK === 0) self.postMessage({ type:'progress', pct: Math.round(f/numFrames*82), label:'BUILDING ENVELOPE' });
+    }
+
+    self.postMessage({ type:'progress', pct:84, label:'PEAK PICKING' });
+
+    // Normalize to [0,1]
+    let maxVal = 0;
+    for (let i = 0; i < numFrames; i++) if (envelope[i] > maxVal) maxVal = envelope[i];
+    if (maxVal > 0) for (let i = 0; i < numFrames; i++) envelope[i] /= maxVal;
+
+    // Adaptive threshold: mean + delta
+    let sum = 0;
+    for (let i = 0; i < numFrames; i++) sum += envelope[i];
+    const threshold = (sum / numFrames) + 0.07;  // delta=0.07 matches ex_beats.py
+
+    const WAIT = 8;  // frames, ~85ms at 48kHz/512-hop
+    const rawOnsets = [];
+    let lastPeak = -WAIT - 1;
+
+    for (let i = 1; i < numFrames-1; i++) {
+        const v = envelope[i];
+        if (v > threshold && v >= envelope[i-1] && v >= envelope[i+1] && (i-lastPeak) >= WAIT) {
+            // backtrack=True: walk back to nearest preceding local minimum
+            let snap = i;
+            for (let j = i-1; j >= Math.max(0, i-WAIT); j--) {
+                if (envelope[j] <= envelope[j+1]) snap = j;
+                else break;
+            }
+            rawOnsets.push(snap);
+            lastPeak = i;
+        }
+    }
+
+    self.postMessage({ type:'progress', pct:94, label:'DE-DUPLICATION' });
+
+    // Frames → seconds, then 120ms de-dupe (MIN_GAP=0.12, matches ex_beats.py)
+    const onsets = [];
+    for (const f of rawOnsets) {
+        const t = parseFloat(((f * HOP) / sr).toFixed(3));
+        if (!onsets.length || (t - onsets[onsets.length-1]) >= 0.12) onsets.push(t);
+    }
+
+    // BPM via median inter-onset interval
+    let bpm = 0;
+    if (onsets.length > 1) {
+        const ivs = [];
+        for (let i = 1; i < onsets.length; i++) ivs.push(onsets[i] - onsets[i-1]);
+        const med = median(new Float64Array(ivs));
+        bpm = Math.round(60 / med);
+        if (bpm > 300) bpm = Math.round(bpm / 2);
+        if (bpm < 40)  bpm = Math.round(bpm * 2);
+    }
+
+    self.postMessage({ type:'progress', pct:100, label:'DONE' });
+    self.postMessage({ type:'done', onsets, bpm });
+};
+`;
+
+// Worker Blob URL — created once, reused across sessions
+let _workerUrl = null;
+function getWorkerUrl() {
+    if (!_workerUrl) _workerUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+    return _workerUrl;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+const state = {
+    audioFile:    null,
+    beats:        [],
+    bpm:          0,
+    lyrics:       [],
+    results:      [],
+    index:        0,
+    active:       false,
+    mode:         'buffer',
+    player:       null,
+    playerUrl:    null,   // stored separately — player.src becomes a resolved URL after assignment
+    rafId:        null,
+    activeWorker: null,   // kept so cancel can terminate mid-analysis
+    beatsJson: '', lyricsJs: '', beatsRaw: '', lyricsRaw: '',
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// DOM REFS
+// ═══════════════════════════════════════════════════════════════════
+const setupView       = document.getElementById('setup-view');
+const sessionView     = document.getElementById('session-view');
+const outputView      = document.getElementById('output-view');
+const dropZone        = document.getElementById('drop-zone');
+const fileInput       = document.getElementById('file-input');
+const lyricsInput     = document.getElementById('lyrics-input');
+const startBtn        = document.getElementById('start-btn');
+const finishBtn       = document.getElementById('finish-btn');
+const cancelBtn       = document.getElementById('cancel-btn');
+const currLine        = document.getElementById('curr-line');
+const lineCounterSpan = document.getElementById('line-counter');
+const totalLinesSpan  = document.getElementById('total-lines');
+const bpmDisplay      = document.getElementById('bpm-display');
+const timeDisplay     = document.getElementById('time-display');
+const progressFill    = document.getElementById('progress-fill');
+const exportSummary   = document.getElementById('export-summary');
+const analysisOverlay = document.getElementById('analysis-overlay');
+const analysisLabel   = document.getElementById('analysis-label');
+const analysisBar     = document.getElementById('analysis-bar');
+const analysisSub     = document.getElementById('analysis-sub');
+
+// ═══════════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════════
+let _toastTimer = null;
+function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ONSET EXTRACTION
+// Main thread: decode audio at native SR, transfer Float32Array to Worker.
+// Worker: full FFT pipeline, posts progress + final result.
+// ═══════════════════════════════════════════════════════════════════
+function extractOnsets(audioFile) {
+    return new Promise(async (resolve, reject) => {
+        analysisSub.textContent = 'decoding audio…';
+
+        let arrayBuffer;
+        try { arrayBuffer = await audioFile.arrayBuffer(); }
+        catch (err) { return reject(new Error('File read failed: ' + err.message)); }
+
+        // Decode at native sample rate — AudioContext respects the file's SR.
+        // OfflineAudioContext requires a length+SR upfront so we use regular AudioContext.
+        const tmpCtx = new AudioContext();
+        let audioBuffer;
+        try { audioBuffer = await tmpCtx.decodeAudioData(arrayBuffer); }
+        catch (err) { await tmpCtx.close(); return reject(new Error('Decode failed: ' + err.message)); }
+
+        const sr       = audioBuffer.sampleRate;
+        const duration = audioBuffer.duration;
+        // .slice() copies channel 0 into a plain Float32Array owned by this scope
+        const samples  = audioBuffer.getChannelData(0).slice();
+        await tmpCtx.close();  // release immediately — no longer needed
+
+        analysisSub.textContent = `${sr} Hz · ${duration.toFixed(1)}s`;
+
+        const worker = new Worker(getWorkerUrl());
+        state.activeWorker = worker;
+
+        worker.onmessage = (e) => {
+            const msg = e.data;
+            if (msg.type === 'progress') {
+                analysisLabel.textContent = msg.label;
+                analysisBar.style.width   = msg.pct + '%';
+                return;
+            }
+            if (msg.type === 'done') {
+                worker.terminate();
+                state.activeWorker = null;
+                console.log(`Onsets: ${msg.onsets.length} | BPM: ${msg.bpm} | SR: ${sr}Hz | ${duration.toFixed(2)}s`);
+                resolve({ onsets: msg.onsets, bpm: msg.bpm });
+                return;
+            }
+            if (msg.type === 'error') {
+                worker.terminate();
+                state.activeWorker = null;
+                reject(new Error(msg.message));
+            }
+        };
+        worker.onerror = (err) => {
+            worker.terminate();
+            state.activeWorker = null;
+            reject(new Error('Worker: ' + err.message));
+        };
+
+        // Transfer buffer — zero-copy handoff, samples is detached after this line
+        worker.postMessage({ samples, sr }, [samples.buffer]);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SESSION CLEANUP
+// ═══════════════════════════════════════════════════════════════════
+function cleanupSession() {
+    if (state.activeWorker) { state.activeWorker.terminate(); state.activeWorker = null; }
+    if (state.rafId)        { cancelAnimationFrame(state.rafId); state.rafId = null; }
+    if (state.player)       { state.player.pause(); state.player.src = ''; state.player = null; }
+    if (state.playerUrl)    { URL.revokeObjectURL(state.playerUrl); state.playerUrl = null; }
+    state.active = false; state.index = 0; state.results = [];
+    progressFill.style.width = '0%';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TIME LOOP
+// ═══════════════════════════════════════════════════════════════════
+function startTimeLoop() {
+    (function tick() {
+        if (!state.player || !state.active) return;
+        const t = state.player.currentTime;
+        timeDisplay.textContent = `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+        state.rafId = requestAnimationFrame(tick);
+    })();
+}
+
+function updateProgress() {
+    if (state.lyrics.length > 0)
+        progressFill.style.width = `${(state.index / state.lyrics.length) * 100}%`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// START SESSION
+// ═══════════════════════════════════════════════════════════════════
+startBtn.addEventListener('click', async () => {
+    if (!state.audioFile) { toast('Drop an audio file first'); return; }
+
+    state.lyrics = lyricsInput.value.split('\n').filter(l => l.trim());
+    state.mode   = document.querySelector('input[name="mode"]:checked').value;
+    startBtn.textContent = '⏳ STARTING…';
+    startBtn.disabled    = true;
+
+    try {
+        if (state.mode === 'snap') {
+            analysisOverlay.classList.add('visible');
+            analysisBar.style.width = '0%';
+            analysisLabel.textContent = 'ANALYZING AUDIO';
+
+            const result = await extractOnsets(state.audioFile);
+            state.beats = result.onsets;
+            state.bpm   = result.bpm;
+            analysisOverlay.classList.remove('visible');
+
+            if (!state.beats.length) {
+                toast('No onsets detected — switching to manual mode');
+                state.mode = 'buffer';
+            }
+        }
+
+        state.playerUrl = URL.createObjectURL(state.audioFile);
+        state.player    = new Audio(state.playerUrl);
+        state.results   = [];
+        state.index     = 0;
+
+        totalLinesSpan.textContent  = state.lyrics.length || '∞';
+        lineCounterSpan.textContent = '0';
+        bpmDisplay.textContent      = state.bpm > 0 ? `${state.bpm} BPM` : 'BPM —';
+        currLine.textContent        = state.lyrics.length > 0
+            ? state.lyrics[0]
+            : '⌁ NO LYRICS — TAP SPACEBAR TO MARK BEATS';
+
+        setupView.style.display   = 'none';
+        sessionView.style.display = 'block';
+        outputView.style.display  = 'none';
+
+        await state.player.play();
+        state.active = true;
+        startTimeLoop();
+        updateProgress();
+
+    } catch (err) {
+        analysisOverlay.classList.remove('visible');
+        console.error('Setup failed:', err);
+        toast('Setup failed: ' + (err.message || err));
+        startBtn.textContent = 'START SESSION';
+        startBtn.disabled    = false;
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// SPACEBAR TAP
+// ═══════════════════════════════════════════════════════════════════
+window.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || !state.active || !state.player) return;
+    e.preventDefault();
+
+    let t = state.player.currentTime;
+    if      (state.mode === 'buffer')                        t = Math.max(0, t - 0.2);
+    else if (state.mode === 'snap' && state.beats.length)    t = state.beats.reduce((p,c) => Math.abs(c-t) < Math.abs(p-t) ? c : p);
+
+    state.results.push({
+        text:  state.lyrics[state.index] || `beat_${state.index + 1}`,
+        start: parseFloat(t.toFixed(3)),
+        end:   parseFloat((t + 1).toFixed(3)),
+    });
+
+    state.index++;
+    lineCounterSpan.textContent = state.index;
+    updateProgress();
+
+    if (state.lyrics.length > 0 && state.index >= state.lyrics.length) {
+        currLine.textContent = '✓ ALL LINES TAPPED — PRESS FINISH';
+        state.active = false;
+        state.player.pause();
+    } else {
+        currLine.textContent = state.lyrics.length > 0
+            ? state.lyrics[state.index]
+            : `⌁ ${state.index} BEATS MARKED`;
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// FINISH
+// ═══════════════════════════════════════════════════════════════════
+finishBtn.addEventListener('click', () => {
+    if (!state.results.length) { toast('No taps recorded — press spacebar to mark lyrics'); return; }
+
+    state.active = false;
+    if (state.player) state.player.pause();
+    if (state.rafId)  { cancelAnimationFrame(state.rafId); state.rafId = null; }
+
+    state.beatsJson = JSON.stringify(state.beats, null, 2);
+    state.lyricsJs  = 'export const LYRICS = ' + JSON.stringify(state.results, null, 2) + ';';
+    state.beatsRaw  = JSON.stringify(state.beats);
+    state.lyricsRaw = JSON.stringify(state.results);
+
+    exportSummary.textContent = `${state.results.length} lines · ${state.beats.length} onsets · ${state.bpm || '—'} BPM`;
+    sessionView.style.display = 'none';
+    outputView.style.display  = 'block';
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// CANCEL
+// ═══════════════════════════════════════════════════════════════════
+cancelBtn.addEventListener('click', () => {
+    cleanupSession();
+    analysisOverlay.classList.remove('visible');
+    setupView.style.display   = 'block';
+    sessionView.style.display = 'none';
+    outputView.style.display  = 'none';
+    startBtn.disabled    = false;
+    startBtn.textContent = 'START SESSION';
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════════════
+document.getElementById('generate-fizx-btn').addEventListener('click', () => {
+    if (!state.lyricsRaw) { toast('No tapping data found'); return; }
+    download('fizx_compiled.html', FIZX_TEMPLATE
+        .replace(/\[\[LYRICS_DATA\]\]/g, state.lyricsRaw)
+        .replace(/\[\[BEATS_DATA\]\]/g,  state.beatsRaw)
+        .replace(/\[\[BPM_DATA\]\]/g,    String(state.bpm || 0))
+    );
+});
+
+document.getElementById('download-beats-btn').addEventListener('click', () =>
+    download('beats_tapper.json', JSON.stringify({ beats: state.beats, bpm: state.bpm }, null, 2))
+);
+document.getElementById('download-lyrics-btn').addEventListener('click', () =>
+    download('lyrics_tapper.js', state.lyricsJs)
+);
+document.getElementById('copy-beats-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(state.beatsRaw); toast('⎘ Beats copied');
+});
+document.getElementById('copy-lyrics-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(state.lyricsRaw); toast('⎘ Lyrics copied');
+});
+document.getElementById('new-session-btn').addEventListener('click', () => {
+    cleanupSession();
+    setupView.style.display = 'block'; sessionView.style.display = 'none'; outputView.style.display = 'none';
+    startBtn.disabled = false; startBtn.textContent = 'START SESSION';
+    lyricsInput.value = '';
+    dropZone.innerHTML = 'DROP AUDIO FILE<div class="dz-hint">MP3 · WAV · OGG · FLAC</div>';
+    dropZone.classList.remove('loaded');
+    state.audioFile = null; state.beats = []; state.bpm = 0;
+});
+
+function download(filename, content) {
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DRAG & DROP
+// ═══════════════════════════════════════════════════════════════════
+function setAudioFile(file) {
+    if (!file || !file.type.startsWith('audio/')) { toast('Drop an audio file (MP3, WAV, OGG, FLAC)'); return; }
+    state.audioFile = file;
+    dropZone.innerHTML = `${file.name}<div class="dz-hint">${(file.size/1048576).toFixed(1)} MB</div>`;
+    dropZone.classList.add('loaded');
+}
+
+dropZone.addEventListener('click',     () => fileInput.click());
+dropZone.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('hover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
+dropZone.addEventListener('drop',      (e) => { e.preventDefault(); dropZone.classList.remove('hover'); setAudioFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change',   (e) => setAudioFile(e.target.files[0]));
+</script>
+</body>
+</html>

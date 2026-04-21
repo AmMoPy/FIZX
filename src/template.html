@@ -576,7 +576,10 @@ function clearScheduled() {
 //   - Beat scheduler: AudioContext-precise, fires independently
 // ═══════════════════════════════════════════════════════════════════
 function updateLyrics(t) {
-    const idx = LYRICS.findIndex(l => t >= l.start && t <= l.end);
+    const idx = LYRICS.findIndex(l => t >= l.start && t <= l.end); //  returns -1 in gaps
+    // dont clear textContent when idx === -1 as sticky behavior is desirable
+    // text remains on screen until next one triggers. This "end" time is a 
+    // metadata tag rather than a hard kill-switch
     if (idx !== -1) {
         currentLineEl.textContent = LYRICS[idx].text;
         const next = LYRICS[idx + 1];

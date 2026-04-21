@@ -27,6 +27,9 @@ OPTIONS:
 
     --extract           Re-extract beats even if beats.json exists and valid
 
+    --studio            Compile template_studio.html → studio.html.
+                        Injects the FIZX template and Essentia WASM binary.
+
     --out [filename]    Output filename. Default: <audio_stem>.html
 
 INJECTION BLOCKS (in template.html):
@@ -35,9 +38,17 @@ INJECTION BLOCKS (in template.html):
     /* @@PRESETS@@    */ ... /* @@END_PRESETS@@    */
     /* @@LYRICS@@     */ ... /* @@END_LYRICS@@     */
     /* @@BEATS@@      */ ... /* @@END_BEATS@@      */
+
+INJECTION BLOCKS (in studio.html):
+    /* @@FIZX_TEMPLATE@@ */   — replaced with the full compiled FIZX template,
+                                backtick-escaped, so studio can use it as a JS string.
+    /* @@WASM_DATA@@ */       — replaced with:
+                                const ESSENTIA_WASM_BASE64 = "<base64>";
+                                so the inline WASM loader works without ext/ files.
 """
 
 import argparse
+import base64
 import json
 import re
 import subprocess
@@ -46,6 +57,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 SRC  = ROOT / "src"
+EXT  = ROOT / "ext"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -348,6 +360,49 @@ def set_initial_preset(html: str, preset_key: str) -> str:
     return re.sub(r'const PRESET_ORDER\s*=\s*\[([^\]]+)\];', reorder, html)
 
 
+# ═══════════════════════════════════════════════════════════════════
+# STUDIO BUILD
+# ═══════════════════════════════════════════════════════════════════
+
+def escape_for_js_backtick(s: str) -> str:
+    """
+    Escape a string for safe embedding inside a JS template literal.
+    Escapes backticks, backslashes, and ${...} interpolation sequences.
+    The compiled FIZX template contains all three in practice.
+    """
+    s = s.replace('\\', '\\\\')
+    s = s.replace('`', '\\`')
+    s = s.replace('${', '\\${')
+    s = s.replace('</script>', '<\\/script>')
+    return s
+
+def build_studio(fizx_template: str) -> str:
+    """
+    Produce a self-contained studio.html by injecting into template_studio.html:
+      - The compiled FIZX template (backtick-escaped) at /* @@FIZX_TEMPLATE@@ */
+
+    template_studio.html must use these single-line markers (no END_ counterpart):
+        const FIZX_TEMPLATE = `/* @@FIZX_TEMPLATE@@ */`;
+    """
+    studio_path = SRC / "template_studio.html"
+    if not studio_path.exists():
+        print(f"❌ template_studio.html not found at {studio_path}")
+        sys.exit(1)
+
+    studio = studio_path.read_text()
+
+    # ── Inject FIZX template ───────────────────────────────────
+    template_marker = '/* @@FIZX_TEMPLATE@@ */'
+    if template_marker not in studio:
+        print(f"⚠️  {template_marker} not found in template_studio.html — skipping template injection")
+    else:
+        escaped = escape_for_js_backtick(fizx_template)
+        studio = studio.replace(template_marker, escaped)
+        print(f"   FIZX template injected ({len(fizx_template)//1024} KB)")
+
+    return studio
+
+
 # ─────────────────────────────────────────────────────────────────
 # ARGUMENT PARSING HELPERS
 # --preset all is now handled explicitly, not as a literal name.
@@ -383,7 +438,9 @@ def main():
     parser.add_argument("--visualizer", "-v",      action="append", default=[], metavar="NAME[,NAME]",
                         help="Visualizer(s) to include. No flag = all.")
     parser.add_argument("--extract",  "-e",        action="store_true",
-                        help="Re-extract beats even if beats.json exists and valid")    
+                        help="Re-extract beats even if beats.json exists and valid")
+    parser.add_argument("--studio",   "-s",        action="store_true",
+                        help="Compile template_studio.html → studio.html")   
     parser.add_argument("--out",      "-o",        default=None,
                         help="Output filename (default: <stem>.html)")
     args = parser.parse_args()
@@ -500,6 +557,43 @@ def main():
     print(f"   Visualizers : {viz_keys}")
     print(f"   Beats       : {len(beats_data['beats'])} onsets · {beats_data['bpm']} BPM")
     print(f"\n   Open {out_name} — no server, no dependencies.")
+
+    # ── Optionally compile studio ─────────────────────────────────
+    if args.studio:
+        print(f"\n⚙️  Building studio…")
+        # The template injected into the studio is the bare template.html
+        # with all blocks populated but WITHOUT audio-specific data (no beats,
+        # no lyrics). Studio will substitute [[LYRICS_DATA]], [[BEATS_DATA]]
+        # and [[BPM_DATA]] at export time using its own tapping session results.
+        #
+        # We reuse the already-compiled `out` string but replace the
+        # injected beats/lyrics with the placeholder tokens that studio
+        # expects, so the Quine strategy works correctly.
+        studio_template = out
+        studio_template = inline_block(
+            studio_template, 
+            'BEATS', 
+            'const BEAT_DATA = { beats: [[BEATS_DATA]], bpm: [[BPM_DATA]] };'
+        )
+        # Replace the full LYRICS const assignment with the placeholder.
+        # _strip_export already ran, so it's `const LYRICS = [...]`.
+        studio_template = inline_block(
+            studio_template, 
+            'LYRICS', 
+            'const LYRICS = [[LYRICS_DATA]];'
+        )
+
+        studio_html = build_studio(studio_template)
+        studio_out  = ROOT / "studio.html"
+        studio_out.write_text(studio_html)
+
+        studio_kb = studio_out.stat().st_size / 1024
+        print(f"✅ studio.html  ({studio_kb:.1f} KB)")
+        print(f"   Contains: FIZX template")
+
+    print(f"\n   Open {out_name} in any browser — no server, no dependencies.")
+    if args.studio:
+        print(f"   Open studio.html to tap lyrics and export new fizx files.")
 
 
 if __name__ == "__main__":
