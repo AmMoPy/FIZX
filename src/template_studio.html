@@ -41,6 +41,7 @@
 
         .container { max-width: 780px; width: 100%; }
 
+        /* ── Header ──────────────────────────────────────────────── */
         .header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 40px; }
         .header h1 {
             font-family: var(--mono);
@@ -53,9 +54,11 @@
         .header-sub { font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); letter-spacing: 0.1em; }
         .header-line { flex: 1; height: 1px; background: linear-gradient(to right, var(--border-accent), transparent); }
 
+        /* ── Panels ──────────────────────────────────────────────── */
         .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
         .panel-label { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.18em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 14px; }
 
+        /* ── Drop Zone ───────────────────────────────────────────── */
         #drop-zone {
             border: 1px dashed var(--border-accent);
             border-radius: 10px;
@@ -75,6 +78,7 @@
         #drop-zone.hover, #drop-zone:hover { background: rgba(0,255,136,0.18); border-style: solid; border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
         #drop-zone.loaded { border-style: solid; border-color: var(--accent); background: rgba(0,255,136,0.06); }
 
+        /* ── Textarea ────────────────────────────────────────────── */
         textarea {
             width: 100%; height: 200px;
             background: var(--bg); color: var(--text);
@@ -86,7 +90,10 @@
         textarea:focus { outline: none; border-color: var(--border-accent); box-shadow: 0 0 0 3px var(--accent-dim); }
         textarea::placeholder { color: var(--text-dim); }
 
+        /* ── Mode Selector ───────────────────────────────────────── */
+        /* 3-column for primary mode row; sub-engine row uses same class */
         .mode-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+        .mode-selector.three-col { grid-template-columns: 1fr 1fr 1fr; }
         .mode-option { position: relative; }
         .mode-option input[type="radio"] { position: absolute; opacity: 0; width: 0; }
         .mode-option label {
@@ -101,6 +108,15 @@
         .mode-title { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); font-weight: 700; letter-spacing: 0.05em; }
         .mode-desc { font-size: 0.72rem; color: var(--text-dim); line-height: 1.4; }
 
+        /* Sub-engine selector — hidden until snap mode is chosen */
+        #engine-row {
+            display: none; /* toggled by JS when snap is selected */
+            margin-top: 10px;
+        }
+        #engine-row.visible { display: block; }
+        .engine-label { font-family: var(--mono); font-size: 0.6rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+
+        /* ── Buttons ─────────────────────────────────────────────── */
         .btn {
             display: inline-flex; align-items: center; justify-content: center; gap: 8px;
             border: none; padding: 11px 22px;
@@ -119,9 +135,10 @@
         .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
         .btn-full { width: 100%; }
 
+        /* ── Stage (session) ─────────────────────────────────────── */
         .stage {
             background: #000; border: 1px solid var(--border-accent); border-radius: 12px;
-            padding: 40px 32px; text-align: center; margin-bottom: 16px;
+            padding: 32px 32px 24px; text-align: center; margin-bottom: 16px;
             box-shadow: 0 0 40px rgba(0,255,136,0.06), inset 0 0 60px rgba(0,0,0,0.5);
             position: relative; overflow: hidden;
         }
@@ -135,18 +152,85 @@
             text-shadow: 0 0 30px var(--accent-glow);
             min-height: 2.5rem; line-height: 1.3; letter-spacing: -0.01em;
         }
-        .tap-hint { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); margin-top: 20px; letter-spacing: 0.12em; }
+        .tap-hint { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); margin-top: 16px; letter-spacing: 0.12em; }
         .tap-hint kbd { background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; font-family: var(--mono); color: var(--accent); }
 
-        .progress-track { width: 100%; height: 2px; background: var(--surface-2); border-radius: 1px; margin: 24px 0 16px; overflow: hidden; }
+        /* ── Playback bar ────────────────────────────────────────── */
+        .playback-bar {
+            display: flex; align-items: center; gap: 12px;
+            margin-top: 20px; padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .pb-btn {
+            background: none; border: 1px solid var(--border-accent);
+            color: var(--accent); border-radius: 6px;
+            width: 34px; height: 34px; cursor: pointer;
+            font-size: 0.85rem; display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s ease; flex-shrink: 0;
+        }
+        .pb-btn:hover { background: var(--accent-dim); }
+        /* Seek track — clicking sets playback position */
+        .seek-track {
+            flex: 1; height: 3px; background: var(--surface-2);
+            border-radius: 2px; position: relative; cursor: pointer;
+        }
+        .seek-fill { height: 100%; background: var(--accent); width: 0%; border-radius: 2px; box-shadow: 0 0 6px var(--accent); pointer-events: none; }
+        .pb-time { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); flex-shrink: 0; min-width: 70px; text-align: right; }
+
+        /* ── Progress + stats (tap progress, separate from seek) ─── */
+        .progress-track { width: 100%; height: 2px; background: var(--surface-2); border-radius: 1px; margin: 20px 0 12px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s ease; box-shadow: 0 0 8px var(--accent); }
 
         .stats-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); }
         .stat-val { color: var(--accent); font-weight: 700; }
         .bpm-badge { background: var(--accent-dim); border: 1px solid var(--border-accent); padding: 3px 10px; border-radius: 4px; letter-spacing: 0.08em; }
-        .session-controls { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+        .session-controls { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; }
 
-        /* Analysis overlay */
+        /* ── Preview iframe ──────────────────────────────────────── */
+        /*
+         * The preview is an iframe rendered inline below the stage,
+         * rather than a new window. This avoids popup blockers and keeps
+         * the session context alive. The iframe is sandboxed with allow-scripts
+         * so the FIZX visualizer JS runs, but allow-same-origin is intentionally
+         * omitted — the iframe cannot reach parent state.
+         *
+         * Tradeoff: the sandboxed iframe will block Web Audio API in some
+         * browsers (Chrome ≥ 74 requires allow-same-origin for AudioContext
+         * inside a sandboxed iframe). Since FIZX uses AudioContext only for
+         * beat-sync playback and the preview is visual-only, this is acceptable.
+         */
+        #preview-wrap {
+            display: none; /* shown by showPreview() */
+            margin: 16px auto;
+            border: 1px solid var(--border-accent);
+            border-radius: 12px; 
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0,255,136,0.08);
+            max-width: min(100vw, calc(100vh * 9 / 16));
+
+        }
+        #preview-wrap.visible { display: block; }
+        #preview-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 16px; background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim);
+            letter-spacing: 0.1em;
+        }
+        #preview-bar span { color: var(--accent); }
+        #close-preview-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 1rem; padding: 0 4px; }
+        #close-preview-btn:hover { color: var(--accent); }
+        #preview-frame {
+            border: none; 
+            display: block;
+            /* 9:16 aspect ratio — matches default FIZX stage */
+            max-width: min(100vw, calc(100vh * 9 / 16)); 
+            aspect-ratio: 9 / 16;
+            /*max-height: 70vh;*/
+            background: #000;
+        }
+
+        /* ── Analysis overlay ────────────────────────────────────── */
         #analysis-overlay {
             display: none; position: fixed; inset: 0;
             background: rgba(8,8,8,0.94); z-index: 100;
@@ -157,12 +241,28 @@
         .analysis-bar-track { width: 280px; height: 3px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
         .analysis-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.15s ease; box-shadow: 0 0 8px var(--accent); }
         .analysis-sub { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.1em; }
+        /* Spinner — shown for Essentia (blocks main thread, no incremental progress).
+           Radix uses the progress bar instead (Worker posts real progress ticks).
+           Visibility toggled by showOverlay(engine). */
+        .analysis-spinner {
+            width: 28px; height: 28px;
+            border: 2px solid rgba(0,255,136,0.15);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #analysis-spinner-wrap { display: none; }
+        #analysis-bar-wrap     { display: none; }
 
+        /* ── Output view ─────────────────────────────────────────── */
         .output-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
         .output-header h2 { font-family: var(--mono); font-size: 0.9rem; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); }
         .output-summary { font-size: 0.75rem; color: var(--text-dim); font-family: var(--mono); }
         .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
 
+        /* ── Toast ───────────────────────────────────────────────── */
         #toast {
             position: fixed; bottom: 24px; right: 24px;
             background: var(--surface); border: 1px solid var(--border-accent);
@@ -176,7 +276,7 @@
         .divider { height: 1px; background: var(--border); margin: 20px 0; }
 
         @media (max-width: 600px) {
-            .mode-selector, .export-grid, .session-controls { grid-template-columns: 1fr; }
+            .mode-selector, .mode-selector.three-col, .export-grid, .session-controls { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -185,17 +285,19 @@
 
     <div class="header">
         <h1>FIZX Studio</h1>
-        <span class="header-sub">X</span>
+        <span class="header-sub">@AmMoPy</span>
         <div class="header-line"></div>
     </div>
 
     <div id="setup-view">
         <textarea id="lyrics-input" placeholder="Paste lyrics here, one line per entry.&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;Leave empty to tap beats only."></textarea>
+        
         <div id="drop-zone">
             DROP AUDIO FILE
             <div class="dz-hint">MP3 · WAV · OGG · FLAC</div>
         </div>
         <input type="file" id="file-input" style="display:none" accept="audio/*">
+        
         <div class="panel-label">Tapping Mode</div>
         <div class="mode-selector">
             <div class="mode-option">
@@ -209,29 +311,77 @@
                 <input type="radio" name="mode" id="mode-snap" value="snap">
                 <label for="mode-snap">
                     <span class="mode-title">Snap-to-Onset</span>
-                    <span class="mode-desc">Analyzes audio first. Each tap snaps to the nearest detected transient.</span>
+                    <span class="mode-desc">Analyzes audio first. Each tap snaps to the nearest detected beat.</span>
                 </label>
             </div>
         </div>
+
+        <!-- Engine sub-row — only relevant when snap mode is active.
+             Shown/hidden via JS to avoid layout noise in manual mode. -->
+        <div id="engine-row">
+            <div class="engine-label" style="margin-top:14px;">Analysis Engine</div>
+            <div class="mode-selector three-col">
+                <div class="mode-option">
+                    <input type="radio" name="engine" id="engine-radix" value="radix" checked>
+                    <label for="engine-radix">
+                        <span class="mode-title">Radix FFT</span>
+                        <span class="mode-desc">Balanced Speed & Accuracy</span>
+                    </label>
+                </div>
+                <div class="mode-option">
+                    <input type="radio" name="engine" id="engine-essentia" value="essentia">
+                    <label for="engine-essentia">
+                        <span class="mode-title">Essentia WASM</span>
+                        <span class="mode-desc">Beat-grid based, experimental.</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
         <div style="margin-top:16px; display:flex; justify-content:flex-end;">
             <button id="start-btn" class="btn btn-primary">START SESSION</button>
         </div>
     </div>
 
-    <div id="session-view" style="display:none">
+    <div id="session-view" style="display:none">     
         <div class="stage">
             <div id="curr-line">READY — PRESS SPACEBAR</div>
             <div class="tap-hint">TAP <kbd>SPACE</kbd> ON EACH LYRIC · <kbd>FINISH</kbd> WHEN DONE</div>
+
+            <!-- Playback bar: play/pause toggles, stop resets position to 0 -->
+            <div class="playback-bar">
+                <button class="pb-btn" id="pb-play" title="Play / Pause">▶</button>
+                <button class="pb-btn" id="pb-stop" title="Stop">■</button>
+                <div class="seek-track" id="seek-track">
+                    <div class="seek-fill" id="seek-fill"></div>
+                </div>
+                <span class="pb-time" id="time-display">0:00 / 0:00</span>
+            </div>
+
+            <!-- Tap progress: separate from seek, tracks lyric lines tapped -->
             <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
             <div class="stats-row">
                 <span><span class="stat-val" id="line-counter">0</span> / <span id="total-lines">—</span> tapped</span>
                 <span id="bpm-display" class="bpm-badge">BPM —</span>
-                <span id="time-display" class="stat-val">0:00</span>
             </div>
         </div>
+        
         <div class="session-controls">
-            <button id="finish-btn" class="btn btn-white btn-full">FINISH & EXPORT</button>
+            <button id="preview-btn" class="btn btn-ghost">⊞ PREVIEW</button>
+            <button id="finish-btn" class="btn btn-white">FINISH & EXPORT</button>
             <button id="cancel-btn" class="btn btn-muted">CANCEL</button>
+        </div>
+
+        <!-- Inline preview — rendered below controls, expands/collapses -->
+        <div id="preview-wrap">
+            <div id="preview-bar">
+                <span>PREVIEW</span>
+                <button id="close-preview-btn" title="Close preview">✕</button>
+            </div>
+            <!-- sandbox: allow-scripts enables FIZX JS; omitting allow-same-origin
+                 prevents the iframe from accessing parent localStorage/state.
+                 See CSS comment above for AudioContext tradeoff note. -->
+            <iframe id="preview-frame" sandbox="allow-scripts"></iframe>
         </div>
     </div>
 
@@ -257,17 +407,45 @@
 
 </div>
 
+<!-- Analysis overlay — covers the page while Worker or Essentia is running -->
 <div id="analysis-overlay">
     <div class="analysis-label" id="analysis-label">ANALYZING AUDIO</div>
-    <div class="analysis-bar-track"><div class="analysis-bar-fill" id="analysis-bar"></div></div>
+    <!-- Bar: shown for Radix (real progress from Worker) -->
+    <div id="analysis-bar-wrap">
+        <div class="analysis-bar-track"><div class="analysis-bar-fill" id="analysis-bar"></div></div>
+    </div>
+    <!-- Spinner: shown for Essentia (synchronous/blocking, no progress ticks) -->
+    <div id="analysis-spinner-wrap">
+        <div class="analysis-spinner"></div>
+    </div>
     <div class="analysis-sub" id="analysis-sub">decoding…</div>
 </div>
 
 <div id="toast"></div>
 
+<!-- Essentia core Scripts -->
+<script src="./ext/essentia-wasm.web.js"></script>
+<script src="./ext/essentia.js-core.js"></script>
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
-// INJECTED BY compile.py
+// INJECTED BY compile.py — do not edit this line.
+// Essentia WASM init pattern:
+//   - EssentiaWASM (the module loader) is provided by essentia-wasm.web.js
+//   - Essentia (the high-level API) is provided by essentia.js-core.js
+//   - The .wasm binary is loaded via a Base64 blob URL injected by compile.py
+//     (/* @@WASM_DATA@@ */ marker), bypassing CORS restrictions on file://
+//    
+// Tradeoff: bloated file but fully local and offline
+// ═══════════════════════════════════════════════════════════════════
+/* @@WASM_DATA@@ */
+
+// ═══════════════════════════════════════════════════════════════════
+// INJECTED BY compile.py — do not edit this line.
+// compile.py backtick-escapes the full compiled FIZX template and
+// replaces the marker inside the backtick string below.
+// The template still contains [[BEATS_DATA]], [[LYRICS_DATA]],
+// [[BPM_DATA]] as placeholders; those are substituted at export time.
 // ═══════════════════════════════════════════════════════════════════
 const FIZX_TEMPLATE = `/* @@FIZX_TEMPLATE@@ */`;
 
@@ -275,27 +453,28 @@ const FIZX_TEMPLATE = `/* @@FIZX_TEMPLATE@@ */`;
 // WORKER SOURCE (inlined as Blob — no separate file needed)
 //
 // Algorithm mirrors ex_beats.py exactly:
-//   - Radix-2 Cooley-Tukey FFT  O(N log N) — replaces naive O(N²)
+//   - Radix-2 Cooley-Tukey FFT, O(N log N)
 //   - Hann window, N=2048, hop=512
 //   - Spectral flux envelope, aggregate = median per frame
-//   - Peak-pick: delta=0.07, wait=8 frames (~85ms)
+//     (matches librosa aggregate=np.median)
+//   - Peak-pick: delta=0.07, wait=8 frames (~85ms at 48kHz/512-hop)
 //   - backtrack to nearest preceding local minimum (backtrack=True)
 //   - Secondary 120ms de-dupe pass (MIN_GAP=0.12)
-//   - BPM via median inter-onset interval, clamped 40–300
 //
 // Receives: { samples: Float32Array, sr: number }  (buffer is transferred)
 // Posts:    { type:'progress', pct, label }
 //           { type:'done', onsets, bpm }
 //           { type:'error', message }
 // ═══════════════════════════════════════════════════════════════════
-const WORKER_SRC = `
+const RADIX_WORKER_SRC = `
 'use strict';
 
-// Radix-2 Cooley-Tukey in-place FFT.
-// re and im are Float64Arrays of length N (must be power of 2).
+// ── Radix-2 Cooley-Tukey in-place FFT ────────────────────────────
+// re, im: Float64Arrays of length N (power of 2).
+// Uses iterative butterfly, no recursion — avoids stack depth limits
+// on large N.
 function fft(re, im) {
     const N = re.length;
-    // Bit-reversal permutation
     let j = 0;
     for (let i = 1; i < N; i++) {
         let bit = N >> 1;
@@ -306,160 +485,400 @@ function fft(re, im) {
                 t = im[i]; im[i] = im[j]; im[j] = t;
         }
     }
-    // Butterfly passes
     for (let len = 2; len <= N; len <<= 1) {
         const half  = len >> 1;
         const theta = -2 * Math.PI / len;
-        const wRe   = Math.cos(theta);
-        const wIm   = Math.sin(theta);
+        const wRe = Math.cos(theta), wIm = Math.sin(theta);
         for (let i = 0; i < N; i += len) {
             let curRe = 1, curIm = 0;
             for (let k = 0; k < half; k++) {
-                const uRe = re[i+k],       uIm = im[i+k];
-                const vRe = re[i+k+half],  vIm = im[i+k+half];
-                const tRe = curRe*vRe - curIm*vIm;
-                const tIm = curRe*vIm + curIm*vRe;
-                re[i+k]      = uRe+tRe;  im[i+k]      = uIm+tIm;
-                re[i+k+half] = uRe-tRe;  im[i+k+half] = uIm-tIm;
+                const uRe = re[i+k], uIm = im[i+k];
+                const vRe = re[i+k+half], vIm = im[i+k+half];
+                const tRe = curRe*vRe - curIm*vIm, tIm = curRe*vIm + curIm*vRe;
+                re[i+k] = uRe+tRe; im[i+k] = uIm+tIm;
+                re[i+k+half] = uRe-tRe; im[i+k+half] = uIm-tIm;
                 const nr = curRe*wRe - curIm*wIm;
-                curIm = curRe*wIm + curIm*wRe;
-                curRe = nr;
+                curIm = curRe*wIm + curIm*wRe; curRe = nr;
             }
         }
     }
 }
 
-// Median of a Float64Array — sorts a copy, leaves original intact.
+// Median — sorts a copy, O(n log n). Float64Array for typed sort.
 function median(arr) {
     const s = Float64Array.from(arr).sort();
     const m = s.length >> 1;
     return (s.length & 1) ? s[m] : (s[m-1] + s[m]) * 0.5;
 }
 
+// ── BPM via autocorrelation of the onset envelope ─────────────────
+// Rationale: runs autocorrelation on the onset
+// strength  signal to find the dominant periodicity,
+// then resolves octave ambiguity via a log-BPM prior:
+//   1. Compute autocorrelation of the normalized envelope.
+//   2. Convert the lag with the highest correlation to BPM.
+//   3. Apply octave correction: if a sub-harmonic lag (×2) has
+//      correlation ≥ 0.9× the best, prefer the lower BPM (more musical).
+// env: Float64Array of normalized onset strengths.
+// sr, HOP: sample rate and hop size, used to convert lag → BPM.
+// BPM range 40–240 constrains the lag search window.
+function bpmFromAutocorrelation(env, sr, HOP) {
+    const frameRate = sr / HOP;  // frames per second (~93.75 at 48kHz/512)
+
+    // Convert BPM bounds to frame-lag bounds
+    const lagMin = Math.floor(frameRate * 60 / 240);  // 240 BPM → shortest lag
+    const lagMax = Math.ceil(frameRate * 60 / 40);    // 40 BPM  → longest lag
+    const N = env.length;
+
+    let bestLag = lagMin, bestCorr = -Infinity;
+
+    // Unbiased autocorrelation at each candidate lag.
+    // We normalize by (N - lag) so longer lags are not penalized
+    // relative to shorter ones — same convention as librosa.
+    for (let lag = lagMin; lag <= Math.min(lagMax, N - 1); lag++) {
+        let corr = 0;
+        for (let i = 0; i < N - lag; i++) corr += env[i] * env[i + lag];
+        corr /= (N - lag);  // unbiased normalization
+        if (corr > bestCorr) { bestCorr = corr; bestLag = lag; }
+    }
+
+    let bpm = Math.round(frameRate * 60 / bestLag);
+
+    // Octave correction: prefer higher BPM if the half-lag (2× tempo)
+    // has correlation ≥ 93% of the best. This handles the common case
+    // where the autocorrelation peaks at the half-tempo period (every
+    // 2 beats) before the beat period, producing 64 instead of 129.
+    // We check upward (÷2 lag = ×2 BPM) before downward to match
+    // librosa's log-BPM prior which biases toward the higher tempo
+    // when the signal is ambiguous.
+    const halfLag = Math.round(bestLag / 2);
+    if (halfLag >= lagMin) {
+        let corrHalf = 0;
+        for (let i = 0; i < N - halfLag; i++) corrHalf += env[i] * env[i + halfLag];
+        corrHalf /= (N - halfLag);
+        if (corrHalf >= bestCorr * 0.93) bpm = Math.round(frameRate * 60 / halfLag);
+    }
+
+    return bpm;
+}
+
 self.onmessage = function(e) {
     const { samples, sr } = e.data;
+    const HOP = 512, N = 2048, HALF = N / 2 + 1;
 
-    const HOP  = 512;
-    const N    = 2048;
-    const HALF = N / 2 + 1;
-
-    // Hann window — precomputed once
+    // Hann window — precomputed once, reused every frame
     const win = new Float64Array(N);
     for (let i = 0; i < N; i++) win[i] = 0.5 * (1 - Math.cos(2*Math.PI*i/(N-1)));
 
     const numFrames = Math.floor((samples.length - N) / HOP) + 1;
 
-    // Reusable per-frame buffers — single allocation, no GC pressure
+    // Single allocation for all per-frame working buffers.
+    // No per-frame allocation means no GC pressure in the hot loop.
     const reArr   = new Float64Array(N);
     const imArr   = new Float64Array(N);
     const prevMag = new Float64Array(HALF);
     const curMag  = new Float64Array(HALF);
     const fluxBuf = new Float64Array(HALF);
     const envelope = new Float64Array(numFrames);
-
     const TICK = Math.max(1, Math.floor(numFrames / 50));
 
     for (let f = 0; f < numFrames; f++) {
         const off = f * HOP;
         for (let i = 0; i < N; i++) { reArr[i] = samples[off+i] * win[i]; imArr[i] = 0; }
-
         fft(reArr, imArr);
-
         for (let k = 0; k < HALF; k++) curMag[k] = Math.sqrt(reArr[k]*reArr[k] + imArr[k]*imArr[k]);
-
-        // Half-wave rectified flux per bin
+        // Half-wave rectified spectral flux (only positive increases pass through)
         for (let k = 0; k < HALF; k++) { const d = curMag[k]-prevMag[k]; fluxBuf[k] = d > 0 ? d : 0; }
-
-        // aggregate = median  (matches librosa aggregate=np.median)
+        // Median across bins — matches librosa aggregate=np.median, suppresses noise
         envelope[f] = median(fluxBuf);
         prevMag.set(curMag);
-
-        if (f % TICK === 0) self.postMessage({ type:'progress', pct: Math.round(f/numFrames*82), label:'BUILDING ENVELOPE' });
+        if (f % TICK === 0) self.postMessage({ type:'progress', pct: Math.round(f/numFrames*75), label:'BUILDING ENVELOPE' });
     }
 
-    self.postMessage({ type:'progress', pct:84, label:'PEAK PICKING' });
+    self.postMessage({ type:'progress', pct:78, label:'PEAK PICKING' });
 
-    // Normalize to [0,1]
+    // Normalize envelope to [0,1] before peak picking and autocorrelation
     let maxVal = 0;
     for (let i = 0; i < numFrames; i++) if (envelope[i] > maxVal) maxVal = envelope[i];
     if (maxVal > 0) for (let i = 0; i < numFrames; i++) envelope[i] /= maxVal;
 
-    // Adaptive threshold: mean + delta
+    // Adaptive threshold: mean + delta (delta=0.07 matches ex_beats.py)
     let sum = 0;
     for (let i = 0; i < numFrames; i++) sum += envelope[i];
-    const threshold = (sum / numFrames) + 0.07;  // delta=0.07 matches ex_beats.py
+    const threshold = (sum / numFrames) + 0.07;
 
-    const WAIT = 8;  // frames, ~85ms at 48kHz/512-hop
+    const WAIT = 8;  // ~85ms minimum gap between detections at 48kHz/512-hop
     const rawOnsets = [];
     let lastPeak = -WAIT - 1;
 
     for (let i = 1; i < numFrames-1; i++) {
         const v = envelope[i];
         if (v > threshold && v >= envelope[i-1] && v >= envelope[i+1] && (i-lastPeak) >= WAIT) {
-            // backtrack=True: walk back to nearest preceding local minimum
+            // backtrack=True: snap to nearest preceding local minimum so the
+            // timestamp lands on the attack transient, not the peak
             let snap = i;
             for (let j = i-1; j >= Math.max(0, i-WAIT); j--) {
-                if (envelope[j] <= envelope[j+1]) snap = j;
-                else break;
+                if (envelope[j] <= envelope[j+1]) snap = j; else break;
             }
             rawOnsets.push(snap);
             lastPeak = i;
         }
     }
 
-    self.postMessage({ type:'progress', pct:94, label:'DE-DUPLICATION' });
+    self.postMessage({ type:'progress', pct:90, label:'DE-DUPLICATION' });
 
-    // Frames → seconds, then 120ms de-dupe (MIN_GAP=0.12, matches ex_beats.py)
+    // Frames → seconds + 120ms de-dupe (MIN_GAP=0.12, matches ex_beats.py)
     const onsets = [];
     for (const f of rawOnsets) {
         const t = parseFloat(((f * HOP) / sr).toFixed(3));
         if (!onsets.length || (t - onsets[onsets.length-1]) >= 0.12) onsets.push(t);
     }
 
-    // BPM via median inter-onset interval
-    let bpm = 0;
-    if (onsets.length > 1) {
-        const ivs = [];
-        for (let i = 1; i < onsets.length; i++) ivs.push(onsets[i] - onsets[i-1]);
-        const med = median(new Float64Array(ivs));
-        bpm = Math.round(60 / med);
-        if (bpm > 300) bpm = Math.round(bpm / 2);
-        if (bpm < 40)  bpm = Math.round(bpm * 2);
-    }
+    self.postMessage({ type:'progress', pct:95, label:'BPM DETECTION' });
+
+    // Autocorrelation BPM — see bpmFromAutocorrelation() header comment
+    const bpm = bpmFromAutocorrelation(envelope, sr, HOP);
 
     self.postMessage({ type:'progress', pct:100, label:'DONE' });
     self.postMessage({ type:'done', onsets, bpm });
 };
 `;
 
+// ═══════════════════════════════════════════════════════════════════
+// BPM VIA AUTOCORRELATION — shared by both engines (main thread copy)
+//
+// This is a copy of the same function inside RADIX_WORKER_SRC.
+// It cannot be shared directly because the worker runs in a separate
+// global scope with no access to main-thread variables.
+//
+// Used by extractEssentia as a fallback. Essentia's result.bpm is 
+// preferred when available and > 0; this runs only when it isn't 
+// (e.g. degara method omits it).
+//
+// env: normalized Float32/64 Array of onset strengths (values 0–1).
+// sr, HOP: sample rate and hop size used to convert lag → BPM.
+// Search window: 40–240 BPM. Octave correction prefers higher tempo
+// when the half-lag correlation is ≥ 93% of the peak (see worker
+// header for full rationale).
+// ═══════════════════════════════════════════════════════════════════
+function bpmFromAutocorrelation(env, sr, HOP) {
+    const frameRate = sr / HOP;
+    const lagMin = Math.floor(frameRate * 60 / 240);
+    const lagMax = Math.ceil(frameRate * 60 / 40);
+    const N = env.length;
+    let bestLag = lagMin, bestCorr = -Infinity;
+    for (let lag = lagMin; lag <= Math.min(lagMax, N - 1); lag++) {
+        let corr = 0;
+        for (let i = 0; i < N - lag; i++) corr += env[i] * env[i + lag];
+        corr /= (N - lag);
+        if (corr > bestCorr) { bestCorr = corr; bestLag = lag; }
+    }
+    let bpm = Math.round(frameRate * 60 / bestLag);
+    const halfLag = Math.round(bestLag / 2);
+    if (halfLag >= lagMin) {
+        let corrHalf = 0;
+        for (let i = 0; i < N - halfLag; i++) corrHalf += env[i] * env[i + halfLag];
+        corrHalf /= (N - halfLag);
+        if (corrHalf >= bestCorr * 0.93) bpm = Math.round(frameRate * 60 / halfLag);
+    }
+    return bpm;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ESSENTIA EXTRACTION
+// Falls back to beat-grid based
+// Tradeoff vs Radix: faster, but designed for steady 4/4 tempo — will
+// quantize to a grid and can miss syncopated onsets. Use Radix
+// when onset accuracy matters over speed.
+// ═══════════════════════════════════════════════════════════════════
+let essn = null; // Initialized only once
+
+// Convert Base64 to Blob URL
+function getWasmBlobUrl(base64) {
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    return URL.createObjectURL(new Blob([bytes], { type: 'application/wasm' }));
+}
+
+// Initialize Essentia
+async function initializeEssentia() {
+    // ESSENTIA_WASM_BASE64 must be available globally (injected by compile.py).
+    // check here rather than at page load so the error is surfaced at the
+    // moment the user actually tries to use this engine, not on startup.
+    if (typeof ESSENTIA_WASM_BASE64 === 'undefined') {
+        throw new Error('Essentia WASM not loaded — run compile.py --studio to inject it');
+    }
+
+    console.log("Initializing Essentia WASM...");
+    // Decode inlined Base64 WASM
+    const wasmUrl = getWasmBlobUrl(ESSENTIA_WASM_BASE64);
+    // Resolve the WASM Module Factory, EssentiaWASM is a
+    // Function that returns a Promise for the Emscripten module 
+    const wasmModule = await EssentiaWASM({ locateFile: () => wasmUrl });
+    // Instantiate the High-Level API, pass the resolved 
+    // 'wasmModule' (not the factory function) to Essentia
+    essn = new Essentia(wasmModule);
+    console.log("Essentia ready!");
+}
+
+// Run Essentia beat detection
+async function extractEssentia(audioFile) {
+    const arrayBuffer = await audioFile.arrayBuffer();
+    const tmpCtx = new AudioContext();
+    let audioBuffer;
+    try {
+        audioBuffer = await tmpCtx.decodeAudioData(arrayBuffer);
+    } catch(err) {
+        await tmpCtx.close();
+        throw new Error('Audio decode failed: ' + err.message);
+    }
+    // const sr = audioBuffer.sampleRate;
+    const samples = audioBuffer.getChannelData(0);
+    await tmpCtx.close();
+
+    if (!essn) {
+        try {
+            await initializeEssentia();
+        } catch (err) {
+            throw new Error('Essentia Initialization error: ' + err.message);
+        }
+    }
+    
+    // convert the JS float32 typed array into std::vector<float>
+    const vector = essn.arrayToVector(samples);
+    
+    // RhythmExtractor2013 algorithm supports two approaches via "method" param:  
+    // slower and more accurate multifeature (default) vs. faster degara, returns:
+    // bpm: tempo estimation
+    // ticks: estimated tick locations
+    // confidence: detected beat confidence (ignored if using 'degara' method)
+    // estimates: bpm estimates
+    // bpmIntervals: list of beats interval
+    const result = essn.RhythmExtractor2013(vector); // faster algorithm BeatTrackerDegara - returns only ticks
+    // Convert the "Keyed Object" into a clean Float array
+    // result.ticks returns as { "0": value, "1": value }
+    // Using ticks as its common between algorithms
+    const beats  = Array.from(
+        essn.vectorToArray(result.ticks)
+        ).map(t => parseFloat(
+            t.toFixed(3))
+        ).sort((a, b) => a - b); // Sorting is a safety measure
+    
+    // Calculate BPM - prefer result.bpm if available
+    let bpm = 0;
+    if (beats.length > 1) {
+        if (typeof result.bpm === 'number' && result.bpm > 0) { // not all algorithms return bpm
+            bpm = Math.round(result.bpm);
+        } else {
+            // Build a sparse onset envelope from beat timestamps:
+            // map each beat to its nearest frame index, set env[frame]=1.
+            // This gives autocorrelation a clean periodic signal to work with.
+            const HOP_FAKE = 512, SR_FAKE = 44100; // nominal values — only the ratio matters
+            const frameRate = SR_FAKE / HOP_FAKE;
+            const lastFrame = Math.ceil(beats[beats.length - 1] * frameRate) + 1;
+            const env = new Float32Array(lastFrame);
+            for (const t of beats) {
+                const f = Math.round(t * frameRate);
+                if (f < lastFrame) env[f] = 1;
+            }
+            bpm = bpmFromAutocorrelation(env, SR_FAKE, HOP_FAKE);
+        }
+        console.log(`[Essentia] beats:${beats.length} bpm:${bpm}`);
+    } else {
+        console.warn('[Essentia] no beats detected');
+    }
+
+    // Free WASM heap allocation — Essentia vectors are malloc'd on the
+    // WASM heap and not GC'd; explicit delete is required to avoid leaks.
+    vector.delete();
+    
+    return { onsets: beats, bpm };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RADIX EXTRACTION (Worker wrapper)
+// Main thread: decode → transfer Float32Array → Worker runs FFT pipeline.
+// Zero-copy transfer via Transferable — samples.buffer is detached after
+// postMessage, preventing accidental re-use on main thread.
+// ═══════════════════════════════════════════════════════════════════
+
 // Worker Blob URL — created once, reused across sessions
-let _workerUrl = null;
-function getWorkerUrl() {
-    if (!_workerUrl) _workerUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
-    return _workerUrl;
+let _radixWorkerUrl = null;
+function getRadixWorkerUrl() {
+    // Blob URL created once and reused — creating per-call would leak
+    if (!_radixWorkerUrl) _radixWorkerUrl = URL.createObjectURL(new Blob([RADIX_WORKER_SRC], { type: 'text/javascript' }));
+    return _radixWorkerUrl;
+}
+
+function extractRadix(audioFile, onProgress) {
+    return new Promise(async (resolve, reject) => {
+        onProgress(5, 'decoding audio…');
+
+        let arrayBuffer;
+        try { arrayBuffer = await audioFile.arrayBuffer(); }
+        catch (err) { return reject(new Error('File read failed: ' + err.message)); }
+
+        // AudioContext at native SR — avoids the timestamp drift that occurs
+        // when the browser resamples to 44100 before we decode (same as sr=None in librosa)
+        const tmpCtx = new AudioContext();
+        let audioBuffer;
+        try { audioBuffer = await tmpCtx.decodeAudioData(arrayBuffer); }
+        catch (err) { await tmpCtx.close(); return reject(new Error('Decode failed: ' + err.message)); }
+
+        const sr      = audioBuffer.sampleRate;
+        const dur     = audioBuffer.duration;
+        const samples = audioBuffer.getChannelData(0).slice(); // copy — original tied to AudioBuffer
+        await tmpCtx.close();
+
+        onProgress(10, `${sr} Hz · ${dur.toFixed(1)}s`);
+
+        const worker = new Worker(getRadixWorkerUrl());
+        state.activeWorker = worker;
+
+        worker.onmessage = (e) => {
+            const msg = e.data;
+            if (msg.type === 'progress') { onProgress(msg.pct, msg.label); return; }
+            if (msg.type === 'done') {
+                worker.terminate(); state.activeWorker = null;
+                console.log(`[Radix] onsets:${msg.onsets.length} bpm:${msg.bpm} sr:${sr} dur:${dur.toFixed(2)}s`);
+                resolve({ onsets: msg.onsets, bpm: msg.bpm });
+                return;
+            }
+            if (msg.type === 'error') { worker.terminate(); state.activeWorker = null; reject(new Error(msg.message)); }
+        };
+        worker.onerror = (err) => { worker.terminate(); state.activeWorker = null; reject(new Error('Worker: ' + err.message)); };
+
+        // Transfer — zero-copy handoff, samples.buffer is detached after this call
+        worker.postMessage({ samples, sr }, [samples.buffer]);
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // STATE
+// Single flat object — no nested objects to avoid accidental shared refs.
+// beatsJson/lyricsJs/beatsRaw/lyricsRaw are populated at FINISH time.
 // ═══════════════════════════════════════════════════════════════════
 const state = {
     audioFile:    null,
     beats:        [],
     bpm:          0,
-    lyrics:       [],
-    results:      [],
-    index:        0,
+    lyrics:       [],  // lines from textarea, split at session start
+    results:      [],  // tapped entries: { text, start, end }
+    index:        0,   // current lyrics line index
     active:       false,
-    mode:         'buffer',
+    mode:         'buffer',  // 'buffer' | 'snap'
+    engine:       'radix',   // 'radix' | 'essentia'
     player:       null,
     playerUrl:    null,   // stored separately — player.src becomes a resolved URL after assignment
-    rafId:        null,
+    rafId:        null,   // rAF handle for seek bar loop; cancelled on cleanup
     activeWorker: null,   // kept so cancel can terminate mid-analysis
+    // Serialised export strings — populated by finishSession()
     beatsJson: '', lyricsJs: '', beatsRaw: '', lyricsRaw: '',
+    // Active preview blob URL — tracked so it can be revoked on close
+    previewBlobUrl: null,
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// DOM REFS
+// DOM REFS — gathered once at startup
 // ═══════════════════════════════════════════════════════════════════
 const setupView       = document.getElementById('setup-view');
 const sessionView     = document.getElementById('session-view');
@@ -474,16 +893,25 @@ const currLine        = document.getElementById('curr-line');
 const lineCounterSpan = document.getElementById('line-counter');
 const totalLinesSpan  = document.getElementById('total-lines');
 const bpmDisplay      = document.getElementById('bpm-display');
-const timeDisplay     = document.getElementById('time-display');
 const progressFill    = document.getElementById('progress-fill');
+const timeDisplay     = document.getElementById('time-display');
 const exportSummary   = document.getElementById('export-summary');
 const analysisOverlay = document.getElementById('analysis-overlay');
 const analysisLabel   = document.getElementById('analysis-label');
 const analysisBar     = document.getElementById('analysis-bar');
 const analysisSub     = document.getElementById('analysis-sub');
+const analysisBarWrap   = document.getElementById('analysis-bar-wrap');
+const analysisSpinWrap  = document.getElementById('analysis-spinner-wrap');
+const engineRow       = document.getElementById('engine-row');
+const previewWrap     = document.getElementById('preview-wrap');
+const previewFrame    = document.getElementById('preview-frame');
+const pbPlay          = document.getElementById('pb-play');
+const pbStop          = document.getElementById('pb-stop');
+const seekTrack       = document.getElementById('seek-track');
+const seekFill        = document.getElementById('seek-fill');
 
 // ═══════════════════════════════════════════════════════════════════
-// TOAST
+// TOAST AND OVERLAY
 // ═══════════════════════════════════════════════════════════════════
 let _toastTimer = null;
 function toast(msg) {
@@ -494,78 +922,40 @@ function toast(msg) {
     _toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// ONSET EXTRACTION
-// Main thread: decode audio at native SR, transfer Float32Array to Worker.
-// Worker: full FFT pipeline, posts progress + final result.
-// ═══════════════════════════════════════════════════════════════════
-function extractOnsets(audioFile) {
-    return new Promise(async (resolve, reject) => {
-        analysisSub.textContent = 'decoding audio…';
-
-        let arrayBuffer;
-        try { arrayBuffer = await audioFile.arrayBuffer(); }
-        catch (err) { return reject(new Error('File read failed: ' + err.message)); }
-
-        // Decode at native sample rate — AudioContext respects the file's SR.
-        // OfflineAudioContext requires a length+SR upfront so we use regular AudioContext.
-        const tmpCtx = new AudioContext();
-        let audioBuffer;
-        try { audioBuffer = await tmpCtx.decodeAudioData(arrayBuffer); }
-        catch (err) { await tmpCtx.close(); return reject(new Error('Decode failed: ' + err.message)); }
-
-        const sr       = audioBuffer.sampleRate;
-        const duration = audioBuffer.duration;
-        // .slice() copies channel 0 into a plain Float32Array owned by this scope
-        const samples  = audioBuffer.getChannelData(0).slice();
-        await tmpCtx.close();  // release immediately — no longer needed
-
-        analysisSub.textContent = `${sr} Hz · ${duration.toFixed(1)}s`;
-
-        const worker = new Worker(getWorkerUrl());
-        state.activeWorker = worker;
-
-        worker.onmessage = (e) => {
-            const msg = e.data;
-            if (msg.type === 'progress') {
-                analysisLabel.textContent = msg.label;
-                analysisBar.style.width   = msg.pct + '%';
-                return;
-            }
-            if (msg.type === 'done') {
-                worker.terminate();
-                state.activeWorker = null;
-                console.log(`Onsets: ${msg.onsets.length} | BPM: ${msg.bpm} | SR: ${sr}Hz | ${duration.toFixed(2)}s`);
-                resolve({ onsets: msg.onsets, bpm: msg.bpm });
-                return;
-            }
-            if (msg.type === 'error') {
-                worker.terminate();
-                state.activeWorker = null;
-                reject(new Error(msg.message));
-            }
-        };
-        worker.onerror = (err) => {
-            worker.terminate();
-            state.activeWorker = null;
-            reject(new Error('Worker: ' + err.message));
-        };
-
-        // Transfer buffer — zero-copy handoff, samples is detached after this line
-        worker.postMessage({ samples, sr }, [samples.buffer]);
-    });
+// showOverlay(engine) — shows the overlay with the correct indicator.
+// Radix posts incremental progress → progress bar.
+// Essentia is synchronous after initializeEssentia (blocks main thread)
+// → spinner (indeterminate), no bar.
+function showOverlay(engine) {
+    analysisBar.style.width            = '0%';
+    analysisLabel.textContent          = 'ANALYZING AUDIO';
+    analysisSub.textContent            = 'decoding…';
+    const useBar = engine === 'radix';
+    analysisBarWrap.style.display      = useBar ? 'block' : 'none';
+    analysisSpinWrap.style.display     = useBar ? 'none'  : 'flex';
+    analysisOverlay.classList.add('visible');
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // SESSION CLEANUP
+// Order matters: Worker first (stops sending messages), then rAF
+// (stops the seek loop), then player (stops audio), then URL revoke.
+// Reversing this order can cause rAF to reference a null player.
 // ═══════════════════════════════════════════════════════════════════
 function cleanupSession() {
     if (state.activeWorker) { state.activeWorker.terminate(); state.activeWorker = null; }
     if (state.rafId)        { cancelAnimationFrame(state.rafId); state.rafId = null; }
     if (state.player)       { state.player.pause(); state.player.src = ''; state.player = null; }
     if (state.playerUrl)    { URL.revokeObjectURL(state.playerUrl); state.playerUrl = null; }
-    state.active = false; state.index = 0; state.results = [];
+    // Clear iframe src to stop any running FIZX visualizer
+    // inside the preview then revoke the blob URL to free memory.
+    previewFrame.src = 'about:blank';
+    if (state.previewBlobUrl) { URL.revokeObjectURL(state.previewBlobUrl); state.previewBlobUrl = null; }
+    previewWrap.classList.remove('visible');
+    state.active = false; state.index = 0; state.results = []; state.beats = []; state.lyrics = []; state.bpm = 0;
     progressFill.style.width = '0%';
+    seekFill.style.width = '0%';
+    pbPlay.textContent = '▶';
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -573,9 +963,16 @@ function cleanupSession() {
 // ═══════════════════════════════════════════════════════════════════
 function startTimeLoop() {
     (function tick() {
-        if (!state.player || !state.active) return;
-        const t = state.player.currentTime;
-        timeDisplay.textContent = `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+        if (!state.player) return;
+        const t   = state.player.currentTime;
+        const dur = state.player.duration || 1;
+        const pct = (t / dur) * 100;
+        seekFill.style.width = pct + '%';
+        const m  = Math.floor(t / 60);
+        const s  = String(Math.floor(t % 60)).padStart(2, '0');
+        const dm = Math.floor(dur / 60);
+        const ds = String(Math.floor(dur % 60)).padStart(2, '0');
+        timeDisplay.textContent = `${m}:${s} / ${dm}:${ds}`;
         state.rafId = requestAnimationFrame(tick);
     })();
 }
@@ -586,6 +983,50 @@ function updateProgress() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// PLAYBACK CONTROLS
+// ═══════════════════════════════════════════════════════════════════
+pbPlay.addEventListener('click', () => {
+    if (!state.player) return;
+    if (state.player.paused) {
+        state.player.play();
+        state.active = true;
+        pbPlay.textContent = '⏸';
+        if (!state.rafId) startSeekLoop();
+    } else {
+        state.player.pause();
+        state.active = false;
+        pbPlay.textContent = '▶';
+    }
+});
+
+pbStop.addEventListener('click', () => {
+    if (!state.player) return;
+    state.player.pause();
+    state.player.currentTime = 0;
+    state.active = false;
+    pbPlay.textContent = '▶';
+});
+
+// Seek by clicking the seek track — maps click X to audio position
+seekTrack.addEventListener('click', (e) => {
+    if (!state.player || !state.player.duration) return;
+    const rect = seekTrack.getBoundingClientRect();
+    const pct  = (e.clientX - rect.left) / rect.width;
+    state.player.currentTime = pct * state.player.duration;
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// SNAP ENGINE VISIBILITY
+// Show the engine sub-row only when snap mode is selected.
+// Reduces cognitive load for users who just want manual tapping.
+// ═══════════════════════════════════════════════════════════════════
+document.querySelectorAll('input[name="mode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+        engineRow.classList.toggle('visible', document.getElementById('mode-snap').checked);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════
 // START SESSION
 // ═══════════════════════════════════════════════════════════════════
 startBtn.addEventListener('click', async () => {
@@ -593,16 +1034,25 @@ startBtn.addEventListener('click', async () => {
 
     state.lyrics = lyricsInput.value.split('\n').filter(l => l.trim());
     state.mode   = document.querySelector('input[name="mode"]:checked').value;
+    state.engine = document.querySelector('input[name="engine"]:checked')?.value || 'radix';
     startBtn.textContent = '⏳ STARTING…';
     startBtn.disabled    = true;
 
     try {
         if (state.mode === 'snap') {
-            analysisOverlay.classList.add('visible');
-            analysisBar.style.width = '0%';
-            analysisLabel.textContent = 'ANALYZING AUDIO';
+            showOverlay(state.engine);
 
-            const result = await extractOnsets(state.audioFile);
+            const onProgress = (pct, label) => {
+                analysisBar.style.width   = pct + '%';
+                analysisLabel.textContent = label; // sub-label, not the main label
+            };
+
+            let result;
+            if (state.engine === 'essentia') {
+                result = await extractEssentia(state.audioFile);
+            } else {
+                result = await extractRadix(state.audioFile, onProgress);
+            }
             state.beats = result.onsets;
             state.bpm   = result.bpm;
             analysisOverlay.classList.remove('visible');
@@ -613,6 +1063,7 @@ startBtn.addEventListener('click', async () => {
             }
         }
 
+        // Build audio player — store URL separately for reliable revoke later
         state.playerUrl = URL.createObjectURL(state.audioFile);
         state.player    = new Audio(state.playerUrl);
         state.results   = [];
@@ -628,6 +1079,7 @@ startBtn.addEventListener('click', async () => {
         setupView.style.display   = 'none';
         sessionView.style.display = 'block';
         outputView.style.display  = 'none';
+        pbPlay.textContent        = '⏸';
 
         await state.player.play();
         state.active = true;
@@ -645,9 +1097,12 @@ startBtn.addEventListener('click', async () => {
 
 // ═══════════════════════════════════════════════════════════════════
 // SPACEBAR TAP
+// Runs regardless of whether audio is playing (active flag allows
+// tapping while paused, useful for careful re-tapping).
 // ═══════════════════════════════════════════════════════════════════
 window.addEventListener('keydown', (e) => {
-    if (e.code !== 'Space' || !state.active || !state.player) return;
+    // Guard: only handle space when session view is visible
+    if (e.code !== 'Space' || !state.player || sessionView.style.display === 'none') return;
     e.preventDefault();
 
     let t = state.player.currentTime;
@@ -666,8 +1121,7 @@ window.addEventListener('keydown', (e) => {
 
     if (state.lyrics.length > 0 && state.index >= state.lyrics.length) {
         currLine.textContent = '✓ ALL LINES TAPPED — PRESS FINISH';
-        state.active = false;
-        state.player.pause();
+        // Keep player running so user can review timing before finishing
     } else {
         currLine.textContent = state.lyrics.length > 0
             ? state.lyrics[state.index]
@@ -676,23 +1130,83 @@ window.addEventListener('keydown', (e) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
+// PREVIEW
+// Builds a fizx_compiled.html string from current tap state and injects
+// it into the sandboxed iframe. Works with zero spacebar taps (renders
+// the visualizer without any lyrics).
+//
+// The preview reuses buildFizxHtml() — the same function used by the
+// generate button — so what you preview is exactly what you export.
+//
+// WHY BLOB URL INSTEAD OF srcdoc:
+// srcdoc="<html>...<script>...<\/script>...</html>" is parsed by the
+// browser's HTML parser as an attribute value. The parser terminates
+// any <script> block at the first literal <\/script> it encounters in
+// the attribute, even when that token appears inside a JS string
+// inside the script. The compiled FIZX template contains <\/script>
+// inside its own script block (e.g. in template literal content),
+// which causes the iframe to stop executing mid-JS, silently.
+//
+// logic: create a Blob URL and set iframe.src. The browser fetches the
+// blob as a standalone HTML document with a fresh parser — no
+// attribute-value context, no premature <\/script> termination.
+// The sandbox attribute still applies; the blob origin is null.
+// ═══════════════════════════════════════════════════════════════════
+function buildFizxHtml() {
+    const lyricsRaw = JSON.stringify(state.results);
+    const beatsRaw  = JSON.stringify(state.beats);
+    return FIZX_TEMPLATE
+        .replace(/\[\[LYRICS_DATA\]\]/g, lyricsRaw)
+        .replace(/\[\[BEATS_DATA\]\]/g,  beatsRaw)
+        .replace(/\[\[BPM_DATA\]\]/g,    String(state.bpm || 0));
+}
+
+function showPreview() {
+    // Revoke previous blob URL before creating a new one
+    if (state.previewBlobUrl) {
+        URL.revokeObjectURL(state.previewBlobUrl);
+        state.previewBlobUrl = null;
+    }
+    const html = buildFizxHtml();
+    state.previewBlobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    previewFrame.src = state.previewBlobUrl;
+    previewWrap.classList.add('visible');
+    previewWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.getElementById('preview-btn').addEventListener('click', showPreview);
+document.getElementById('close-preview-btn').addEventListener('click', () => {
+    previewFrame.src = 'about:blank'; // stops iframe JS execution immediately
+    if (state.previewBlobUrl) { URL.revokeObjectURL(state.previewBlobUrl); state.previewBlobUrl = null; }
+    previewWrap.classList.remove('visible');
+});
+
+// ═══════════════════════════════════════════════════════════════════
 // FINISH
+// Empty results produce an empty LYRICS array.
+// This is intentional: users may want to export beats-only
+// or just test the template without any lyric timestamps.
 // ═══════════════════════════════════════════════════════════════════
 finishBtn.addEventListener('click', () => {
-    if (!state.results.length) { toast('No taps recorded — press spacebar to mark lyrics'); return; }
-
-    state.active = false;
     if (state.player) state.player.pause();
     if (state.rafId)  { cancelAnimationFrame(state.rafId); state.rafId = null; }
+    pbPlay.textContent = '▶';
 
+    // Serialise export data — results may be empty array, which is valid
     state.beatsJson = JSON.stringify(state.beats, null, 2);
     state.lyricsJs  = 'export const LYRICS = ' + JSON.stringify(state.results, null, 2) + ';';
     state.beatsRaw  = JSON.stringify(state.beats);
     state.lyricsRaw = JSON.stringify(state.results);
 
-    exportSummary.textContent = `${state.results.length} lines · ${state.beats.length} onsets · ${state.bpm || '—'} BPM`;
+    const tapNote = state.results.length === 0 ? ' (no taps)' : '';
+    exportSummary.textContent = `${state.results.length} lines${tapNote} · ${state.beats.length} onsets · ${state.bpm || '—'} BPM`;
+
     sessionView.style.display = 'none';
     outputView.style.display  = 'block';
+    // use these methods only if not planning on re-using Essentia again.
+    // essn.shutdown(); // call internal essentia::shutdown C++ method
+    // essn.delete(); // delete EssentiaJS instance, free JS memory
+    // essn = null;
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -712,15 +1226,11 @@ cancelBtn.addEventListener('click', () => {
 // EXPORT
 // ═══════════════════════════════════════════════════════════════════
 document.getElementById('generate-fizx-btn').addEventListener('click', () => {
-    if (!state.lyricsRaw) { toast('No tapping data found'); return; }
-    download('fizx_compiled.html', FIZX_TEMPLATE
-        .replace(/\[\[LYRICS_DATA\]\]/g, state.lyricsRaw)
-        .replace(/\[\[BEATS_DATA\]\]/g,  state.beatsRaw)
-        .replace(/\[\[BPM_DATA\]\]/g,    String(state.bpm || 0))
-    );
+    download('fizx_compiled.html', buildFizxHtml());
 });
 
 document.getElementById('download-beats-btn').addEventListener('click', () =>
+    // beats.json includes bpm so it matches ex_beats.py output format exactly
     download('beats_tapper.json', JSON.stringify({ beats: state.beats, bpm: state.bpm }, null, 2))
 );
 document.getElementById('download-lyrics-btn').addEventListener('click', () =>
@@ -734,18 +1244,24 @@ document.getElementById('copy-lyrics-btn').addEventListener('click', () => {
 });
 document.getElementById('new-session-btn').addEventListener('click', () => {
     cleanupSession();
-    setupView.style.display = 'block'; sessionView.style.display = 'none'; outputView.style.display = 'none';
-    startBtn.disabled = false; startBtn.textContent = 'START SESSION';
+    setupView.style.display = 'block'; 
+    sessionView.style.display = 'none'; 
+    outputView.style.display = 'none';
+    startBtn.disabled = false; 
+    startBtn.textContent = 'START SESSION';
     lyricsInput.value = '';
     dropZone.innerHTML = 'DROP AUDIO FILE<div class="dz-hint">MP3 · WAV · OGG · FLAC</div>';
+    fileInput.value = '';  // Without it, re-selecting the same file fires no change event
     dropZone.classList.remove('loaded');
-    state.audioFile = null; state.beats = []; state.bpm = 0;
+    state.audioFile = null; state.beats = []; state.lyrics = []; state.bpm = 0;
 });
 
+// download() creates and immediately revokes the blob URL to avoid memory leaks
 function download(filename, content) {
     const url = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
     const a = Object.assign(document.createElement('a'), { href: url, download: filename });
     a.click();
+    // 100ms delay gives the browser time to initiate the download before revoke
     setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 

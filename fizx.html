@@ -963,7 +963,7 @@ const VISUALIZERS = {
 
 
 
-const VISUALIZER_ORDER = ['particles', 'waveform', 'dna', 'heartbeat', 'ripple', 'ring', 'bloom', 'off'];
+const VISUALIZER_ORDER = ['off', 'particles', 'waveform', 'dna', 'heartbeat', 'ripple', 'ring', 'bloom'];
 /* @@END_VISUALIZERS@@ */
 
 /* @@PRESETS@@ */
@@ -1096,7 +1096,7 @@ let isPlaying      = false;
 // If VISUALIZER_ORDER is not injected (non-technical user), default to particles/waveform/off.
 const VIZ_ORDER = (typeof VISUALIZER_ORDER !== 'undefined')
     ? VISUALIZER_ORDER
-    : ['particles', 'waveform', 'off'];
+    : ['off', 'particles', 'waveform'];
 let vizIndex    = 0;   // current position in VIZ_ORDER
 let vizs        = null; // active BaseVisualizer instance or null
 
@@ -1316,7 +1316,10 @@ function clearScheduled() {
 //   - Beat scheduler: AudioContext-precise, fires independently
 // ═══════════════════════════════════════════════════════════════════
 function updateLyrics(t) {
-    const idx = LYRICS.findIndex(l => t >= l.start && t <= l.end);
+    const idx = LYRICS.findIndex(l => t >= l.start && t <= l.end); //  returns -1 in gaps
+    // dont clear textContent when idx === -1 as sticky behavior is desirable
+    // text remains on screen until next one triggers. This "end" time is a 
+    // metadata tag rather than a hard kill-switch
     if (idx !== -1) {
         currentLineEl.textContent = LYRICS[idx].text;
         const next = LYRICS[idx + 1];

@@ -356,7 +356,7 @@ let isPlaying      = false;
 // If VISUALIZER_ORDER is not injected (non-technical user), default to particles/waveform/off.
 const VIZ_ORDER = (typeof VISUALIZER_ORDER !== 'undefined')
     ? VISUALIZER_ORDER
-    : ['particles', 'waveform', 'off'];
+    : ['off', 'particles', 'waveform'];
 let vizIndex    = 0;   // current position in VIZ_ORDER
 let vizs        = null; // active BaseVisualizer instance or null
 

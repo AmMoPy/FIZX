@@ -668,4 +668,4 @@ export const VISUALIZERS = {
 // order must include all available visualizers, 
 // filtering happens inside compile.py if required.
 // ─────────────────────────────────────────────────────────────────
-export const VISUALIZER_ORDER = ['particles', 'waveform', 'dna', 'heartbeat', 'ripple', 'ring', 'bloom', 'off'];
+export const VISUALIZER_ORDER = ['off', 'particles', 'waveform', 'dna', 'heartbeat', 'ripple', 'ring', 'bloom'];

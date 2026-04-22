@@ -308,7 +308,7 @@ def build_visualizers_block(src: str, viz_keys: list[str], fltr: bool) -> str:
 
     # VISUALIZER_ORDER — all requested keys + 'off' sentinel
     # 'off' is always appended so the user can always disable the visualizer.
-    order = [k for k in viz_keys if k != 'off'] + ['off']
+    order = ['off'] + [k for k in viz_keys if k != 'off']
     parts.append(f"const VISUALIZER_ORDER = {json.dumps(order)};")
 
     return '\n\n'.join(parts)
@@ -376,13 +376,31 @@ def escape_for_js_backtick(s: str) -> str:
     s = s.replace('</script>', '<\\/script>')
     return s
 
+def load_wasm_base64() -> str:
+    """
+    Load essentia-wasm.web.wasm and return as a Base64 string.
+    Exits with an error message if the file is not found.
+    """
+    wasm_path = EXT / "essentia-wasm.web.wasm"
+    if not wasm_path.exists():
+        print(f"❌ WASM binary not found: {wasm_path}")
+        print(f"   Put essentia-wasm.web.wasm in ext/ or drop --studio.")
+        sys.exit(1)
+    raw = wasm_path.read_bytes()
+    encoded = base64.b64encode(raw).decode('ascii')
+    size_kb = len(raw) / 1024
+    print(f"📦 WASM binary: {size_kb:.1f} KB → Base64 ({len(encoded)//1024} KB encoded)")
+    return encoded
+
 def build_studio(fizx_template: str) -> str:
     """
     Produce a self-contained studio.html by injecting into template_studio.html:
       - The compiled FIZX template (backtick-escaped) at /* @@FIZX_TEMPLATE@@ */
+      - The Essentia WASM binary as a Base64 const at /* @@WASM_DATA@@ */
 
     template_studio.html must use these single-line markers (no END_ counterpart):
-        const FIZX_TEMPLATE = `/* @@FIZX_TEMPLATE@@ */`;
+        - const FIZX_TEMPLATE = `/* @@FIZX_TEMPLATE@@ */`;
+        - /* @@WASM_DATA@@ */
     """
     studio_path = SRC / "template_studio.html"
     if not studio_path.exists():
@@ -399,6 +417,17 @@ def build_studio(fizx_template: str) -> str:
         escaped = escape_for_js_backtick(fizx_template)
         studio = studio.replace(template_marker, escaped)
         print(f"   FIZX template injected ({len(fizx_template)//1024} KB)")
+
+    # ── Inject WASM binary ─────────────────────────────────────
+    wasm_marker = '/* @@WASM_DATA@@ */'
+    if wasm_marker not in studio:
+        print(f"⚠️  {wasm_marker} not found in template_studio.html — skipping WASM injection")
+    else:
+        wasm_b64 = load_wasm_base64()
+        # Inject as a const so the existing getWasmBlobUrl(ESSENTIA_WASM_BASE64)
+        # call in template_studio.html resolves without any other changes.
+        wasm_const = f'const ESSENTIA_WASM_BASE64 = `{wasm_b64}`;'
+        studio = studio.replace(wasm_marker, wasm_const)
 
     return studio
 
