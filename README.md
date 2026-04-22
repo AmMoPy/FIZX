@@ -24,26 +24,21 @@
 
 ## DAFUQ !
 
-A browser-based lyric visualizer with pre-analyzed, zero lag beat-synchronized animations, Built because every "free" AI animation tool gave me:
+Bring your text to life from any browser, with a tiny file that fits in a text message.
 
-- 5-second clips (useless)
-- Watermarks the size of my ego
-- Faces that melted into nightmares
-- "Subscribe for $29.99 to remove the dancing rat"
+**In English:** Drop your audio. Paste your text. Tap spacebar. Export. Record. Post and pretend you have a production budget.
 
-**In English:** Drop your audio file, see your lyrics animate in sync with the beat. No accounts, no watermarks, no subscriptions, no cloud, no npm install, no webpack, no opinions — just a portable html file you open in any browser.
+**In Technical:** Beat-sync engine using high-resolution clock with scheduled callbacks. Python onset extractor with native sample rate preservation. Zero-copy-paste automation handshake. Modular preset system for genre-aware themes and animations. Dual aspect ratio support for vertical/horizontal export and an Over-engineered UI
 
-**In Technical:** Beat-sync engine using high-resolution clock with scheduled callbacks. Python onset extractor with native sample rate preservation. Zero-copy-paste automation handshake. Modular preset system for genre-aware themes and animations. Dual aspect ratio support for vertical/horizontal export.
-
-**Perfect for:** Promoting your AI slop when you can't afford rent.
-
-**This project is ~50 - 70KB of HTML/CSS/JS; don't expect to go viral, your lyrics SUX anyways! ¯\\(ツ)/¯**
+**Perfect for:** Making content when you can't afford rent.
 
 ---
 
 ## Why This Exists
 
-I wanted to make a rap video bragging about my  broken [RAG](https://github.com/AmMoPy/DOX) system (don't ask). Every free animation tool failed me. So I did what any unemployed auditor would do. **I built my own.**
+I wanted to make a video bragging about my  broken [RAG](https://github.com/AmMoPy/DOX) system (don't ask). Every free animation tool failed me. Watermarks, time limits, low export quality....
+
+**So I built my own.**
 
 If this saved you from watermarks, give it a ⭐. It feeds the ego that started this whole thing.
 
@@ -56,9 +51,9 @@ If this saved you from watermarks, give it a ⭐. It feeds the ego that started 
 ### Prerequisites
 
 - A computer that turns on
-- Python 3.11+ (**only needed for auto mode**)
+- Python 3.11+ (**only needed if you are a pro**)
 - An audio file (MP3 or WAV)
-- Lyrics with timestamps (**manual extraction, for now...**)
+- Lyrics with timestamps (**Or just use the studio**)
 - Screen Recorder
 - Low expectations
 
@@ -66,73 +61,42 @@ If this saved you from watermarks, give it a ⭐. It feeds the ego that started 
 
 #### Peasants (Non-Developers)
 
-- Right click `fizx.html` > open with > Notepad > search for `LYRICS` and `BEAT_DATA`, They look like this:
+Open studio > drop audio > select mode > start session > tap spacebar > preview > export > screen record > post > go viral.
 
-```javascript
-/* @@LYRICS@@ */
-const LYRICS = [
-    { text: "Yeah...", start: 1.0, end: 1.48 },
-    { text: "They said I couldn't build it.", start: 1.48, end: 3.0 },
-];
-/* @@END_LYRICS@@ */
-
-/* @@BEATS@@ */
-const BEAT_DATA = {
-    beats: [ 1.022, 1.486, 1.718, ...],
-     bpm:   129,
-};
-/* @@END_BEATS@@ */
-
-```
-
-- Replace the example lyrics with your own. Timestamps in seconds.
-
-- (Optional) Replace BEAT_DATA if you extracted beats. Or don't. Mode B (lyric triggers) works fine.
- 
-- Save and close.
-
-- Note: you only get default 2 themes, if you are feeling fancy modify the values in `PRESETS`
+Note: you only get default 2 themes.
 
 #### Elites (Developers)
 
-- Edit `lyrics.js` → paste your timestamped lyrics
+- Edit `lyrics.js` > run compile OR just use the studio, I won't judge.
 
 ```bash
-# Minimalist — defaults only (rap + ethereal presets, all visualizers)
-python compile.py song.mp3 --out fizx.html 
+# Minimalist, defaults only (rap + ethereal presets, all visualizers)
+python compile.py path_to_audio --o fizx.html 
 
 # Single preset, single visualizer (smallest output)
-python compile.py song.mp3 --preset void --visualizer ring
+python compile.py path_to_audio --p void --v ring
 
 # Multiple presets, all visualizers
-python compile.py song.mp3 --preset rap,ethereal,void
+python compile.py path_to_audio --p rap,ethereal,void
 
 # Everything (maximum bloat, maximum flexibility)
-python compile.py song.mp3 --all
+python compile.py path_to_audio --all
 
-# Custom output name
-python compile.py song.mp3 --out tiktok_ready.html
+# Rebuild studio
+python compile.py path_to_audio --s
 
 ```
-
-#### Finally open `fizx.html` in any browser. Click PLAY, select your audio file, start screen recording
-
 ---
 
 ## Features
 
 > *"No subscriptions. No watermarks. No cloud. No bullshit.'"*
 
-- **Beat-Sync Engine** — `AudioContext` clock-anchored `setTimeout` callbacks. Not polling. Not `requestAnimationFrame` jitter. Actual precision scheduling. Absorbs browser audio latency automatically by capturing `t0` at `play()` resolution.
-
-- **Lyric Display** — Timestamp-driven lyric rendering with current/next line preview. `rAF` loop handles display only — animation triggers are fully decoupled.
-
-- **Dual Sync Modes**
-  - **Mode A** — Beat timestamps from `ex_beats.py` onset detection
-  - **Mode B** — Lyric start timestamps (one trigger per line)
-  - Switchable mid-playback, reschedules automatically
-
-- **Presets/visualizers** — several themes to match different genres, dont like any? Just add your own!
+- Portable: One file, double-click, works offline.
+- Extensible: Add your own presets/visualizers.
+- Efficient: Behaves around screen recorders.
+- Simple: Paste. Drop. Tap. Export.
+- Free: Just you and ~80KB of HTML.
 
 ### Controls
 
@@ -152,13 +116,14 @@ python compile.py song.mp3 --out tiktok_ready.html
 ```
 .
 ├── src/
-│   ├── ex_beats.py         # Python beat extractor
-│   ├── template.html       # Layout only
-│   ├── lyrics.js           # User lyrics with timestamps
-│   ├── visualizers.js      # BaseVisualizer + classes
-│   ├── presets.js          # Preset styles, cssVars, effects
-│   └── compile.py          # Injects presets/visualizers/lyrics/beats into template
-├── fizx.html               # Compiled output (default)
+│   ├── ex_beats.py        # Python beat extractor
+│   ├── template.html      # Core visualizer layout
+│   ├── template_studio.html # Studio layout
+│   ├── lyrics.js          # Your lyrics (editable)
+│   ├── presets.js         # Theme CSS vars, animation pools
+│   └── visualizers.js     # Canvas beat visualizers
+├── studio.html            # Centralized workflow UI
+├── compile.py             # Main compiler → builds final HTML
 └── README.md
 ```
 

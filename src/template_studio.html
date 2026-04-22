@@ -6,7 +6,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --accent: #00ff88;
+            --accent: #00ff88a1;
             --accent-dim: rgba(0,255,136,0.12);
             --accent-glow: rgba(0,255,136,0.35);
             --bg: #080808;
@@ -51,7 +51,7 @@
             letter-spacing: 0.12em;
             text-transform: uppercase;
         }
-        .header-sub { font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); letter-spacing: 0.1em; }
+        .header-sub { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); letter-spacing: 0.1em; }
         .header-line { flex: 1; height: 1px; background: linear-gradient(to right, var(--border-accent), transparent); }
 
         /* ── Panels ──────────────────────────────────────────────── */
@@ -67,14 +67,14 @@
             background: var(--accent-dim);
             text-align: center;
             font-family: var(--mono);
-            font-size: 0.8rem;
+            font-size: 1rem;
             color: var(--accent);
             letter-spacing: 0.08em;
             margin: 10px auto 20px;
             width: 30%;
             padding: 10px;
         }
-        #drop-zone .dz-hint { font-size: 0.65rem; color: var(--text-dim); margin-top: 8px; letter-spacing: 0.05em; }
+        #drop-zone .dz-hint { font-size: 0.75rem; color: var(--text-dim); margin-top: 8px; letter-spacing: 0.05em; }
         #drop-zone.hover, #drop-zone:hover { background: rgba(0,255,136,0.18); border-style: solid; border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
         #drop-zone.loaded { border-style: solid; border-color: var(--accent); background: rgba(0,255,136,0.06); }
 
@@ -92,7 +92,7 @@
 
         /* ── Mode Selector ───────────────────────────────────────── */
         /* 3-column for primary mode row; sub-engine row uses same class */
-        .mode-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+        .mode-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; text-align: center; }
         .mode-selector.three-col { grid-template-columns: 1fr 1fr 1fr; }
         .mode-option { position: relative; }
         .mode-option input[type="radio"] { position: absolute; opacity: 0; width: 0; }
@@ -105,8 +105,8 @@
         }
         .mode-option label:hover { border-color: var(--border-accent); }
         .mode-option input:checked + label { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 12px var(--accent-glow); }
-        .mode-title { font-family: var(--mono); font-size: 0.75rem; color: var(--accent); font-weight: 700; letter-spacing: 0.05em; }
-        .mode-desc { font-size: 0.72rem; color: var(--text-dim); line-height: 1.4; }
+        .mode-title { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); font-weight: 700; letter-spacing: 0.05em; }
+        .mode-desc { font-size: 0.8rem; color: var(--text-dim); line-height: 1.4; }
 
         /* Sub-engine selector — hidden until snap mode is chosen */
         #engine-row {
@@ -114,7 +114,7 @@
             margin-top: 10px;
         }
         #engine-row.visible { display: block; }
-        .engine-label { font-family: var(--mono); font-size: 0.6rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+        .engine-label { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
 
         /* ── Buttons ─────────────────────────────────────────────── */
         .btn {
@@ -126,10 +126,10 @@
         }
         .btn-primary { background: var(--accent); color: #000; }
         .btn-primary:hover:not(:disabled) { box-shadow: 0 0 20px var(--accent-glow); transform: translateY(-1px); }
-        .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--border-accent); }
+        .btn-ghost { background: transparent; color: #048147; border: 1px solid var(--border-accent); }
         .btn-ghost:hover:not(:disabled) { background: var(--accent-dim); }
-        .btn-white { background: #fff; color: #000; }
-        .btn-white:hover:not(:disabled) { box-shadow: 0 0 20px rgba(255,255,255,0.3); }
+        .btn-nav { background: transparent; color: #372e19; border: 1px solid #a16d0f; }
+        .btn-nav:hover:not(:disabled) { box-shadow: 0 0 20px rgba(255,255,255,0.3); }
         .btn-muted { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); }
         .btn-muted:hover:not(:disabled) { color: var(--text); border-color: var(--border-accent); }
         .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
@@ -148,7 +148,7 @@
         }
         #curr-line {
             font-family: var(--sans); font-weight: 500;
-            font-size: clamp(1.4rem, 4vw, 2rem); color: #fff;
+            font-size: clamp(1.4rem, 4vw, 2rem); color: #807b7b;
             text-shadow: 0 0 30px var(--accent-glow);
             min-height: 2.5rem; line-height: 1.3; letter-spacing: -0.01em;
         }
@@ -184,7 +184,7 @@
         .stats-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); }
         .stat-val { color: var(--accent); font-weight: 700; }
         .bpm-badge { background: var(--accent-dim); border: 1px solid var(--border-accent); padding: 3px 10px; border-radius: 4px; letter-spacing: 0.08em; }
-        .session-controls { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; }
+        .session-controls { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; }
 
         /* ── Preview iframe ──────────────────────────────────────── */
         /*
@@ -253,8 +253,93 @@
             box-shadow: 0 0 10px var(--accent-glow);
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        #analysis-spinner-wrap { display: none; }
-        #analysis-bar-wrap     { display: none; }
+        #analysis-spinner-wrap, #analysis-bar-wrap { display: none; }
+
+        /* ── Param panels ───────────────────────────────────────────
+           Rendered by renderParamPanel() from PARAM_SPECS declarative
+           config. Extensible: add one entry to PARAM_SPECS to add a row.
+           display:none default; toggled to visible by engine selection. */
+        .param-panel { display: none; margin-top: 12px; }
+        .param-panel.visible { display: block; }
+        .param-row {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            align-items: center;
+            gap: 8px 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .param-row:last-child { border-bottom: none; }
+        .param-label-wrap { display: flex; align-items: center; gap: 6px; position: relative; }
+        .param-label { font-family: var(--mono); font-size: 0.68rem; color: var(--text-dim); letter-spacing: 0.06em; }
+        /* Tooltip: pure CSS on ⓘ hover. absolute positioning keeps it
+           inside scroll flow without z-index fights with fixed elements. */
+        .param-hint-icon { font-size: 0.75rem; color: var(--text-dim); cursor: default; position: relative; }
+        .param-hint-icon:hover .param-tooltip { display: block; }
+        .param-tooltip {
+            display: none;
+            position: absolute;
+            left: 20px; top: -4px;
+            width: 220px;
+            background: var(--surface-2);
+            border: 1px solid var(--border-accent);
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-family: var(--sans);
+            font-size: 0.7rem;
+            color: var(--text);
+            line-height: 1.5;
+            z-index: 50;
+            pointer-events: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+        .param-slider {
+            -webkit-appearance: none; appearance: none;
+            width: 120px; height: 3px;
+            background: var(--surface-2); border-radius: 2px;
+            outline: none; cursor: pointer;
+        }
+        .param-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 6px var(--accent-glow);
+            cursor: pointer;
+        }
+        .param-slider::-moz-range-thumb {
+            width: 12px; height: 12px; border: none;
+            border-radius: 50%; background: var(--accent);
+        }
+        .param-value { font-family: var(--mono); font-size: 0.68rem; color: var(--accent); min-width: 36px; text-align: right; }
+        /* Essentia model radio pair */
+        .model-selector { display: flex; gap: 8px; margin-top: 4px; text-align: center;}
+        .model-option { position: relative; flex: 1; }
+        .model-option input[type="radio"] { position: absolute; opacity: 0; width: 0; }
+        .model-option label {
+            display: flex; flex-direction: column; gap: 3px;
+            padding: 10px 12px;
+            border: 1px solid var(--border); border-radius: 8px;
+            cursor: pointer; transition: all 0.15s ease; background: var(--surface-2);
+        }
+        .model-option label:hover { border-color: var(--border-accent); }
+        .model-option input:checked + label { border-color: var(--accent); background: var(--accent-dim); }
+        .model-name { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); font-weight: 700; }
+        .model-desc { font-size: 0.8rem; color: var(--text-dim); line-height: 1.3; }
+        /* Session params collapsible */
+        #session-params { margin-bottom: 12px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; display: none; }
+        #session-params.visible { display: block; }
+        #session-params-toggle {
+            width: 100%; display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 16px; background: var(--surface-2); border: none; cursor: pointer;
+            font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim);
+            letter-spacing: 0.12em; text-transform: uppercase; transition: color 0.15s ease;
+        }
+        #session-params-toggle:hover { color: var(--accent); }
+        #session-params-toggle .arrow { transition: transform 0.2s ease; display: inline-block; }
+        #session-params-toggle.open .arrow { transform: rotate(180deg); }
+        #session-params-body { display: none; padding: 12px 16px; background: var(--surface); }
+        #session-params-body.open { display: block; }
 
         /* ── Output view ─────────────────────────────────────────── */
         .output-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
@@ -290,7 +375,7 @@
     </div>
 
     <div id="setup-view">
-        <textarea id="lyrics-input" placeholder="Paste lyrics here, one line per entry.&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;Leave empty to tap beats only."></textarea>
+        <textarea id="lyrics-input" placeholder="Paste lyrics here (Optional), one line per entry.&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;Quick start: drop audio > select mode > start session > tap spacebar > preview > export"></textarea>
         
         <div id="drop-zone">
             DROP AUDIO FILE
@@ -298,20 +383,20 @@
         </div>
         <input type="file" id="file-input" style="display:none" accept="audio/*">
         
-        <div class="panel-label">Tapping Mode</div>
+        <div class="panel-label">Extraction Mode</div>
         <div class="mode-selector">
             <div class="mode-option">
                 <input type="radio" name="mode" id="mode-buffer" value="buffer" checked>
                 <label for="mode-buffer">
-                    <span class="mode-title">Manual</span>
-                    <span class="mode-desc">200ms latency compensation. Tap spacebar as each line hits. Fastest to start.</span>
+                    <span class="mode-title">Lyrics Only</span>
+                    <span class="mode-desc">Taps capture exact timing</span>
                 </label>
             </div>
             <div class="mode-option">
                 <input type="radio" name="mode" id="mode-snap" value="snap">
                 <label for="mode-snap">
-                    <span class="mode-title">Snap-to-Onset</span>
-                    <span class="mode-desc">Analyzes audio first. Each tap snaps to the nearest detected beat.</span>
+                    <span class="mode-title">Lyrics & Beats</span>
+                    <span class="mode-desc">Taps snaps lyrics to the nearest detected beat</span>
                 </label>
             </div>
         </div>
@@ -332,10 +417,15 @@
                     <input type="radio" name="engine" id="engine-essentia" value="essentia">
                     <label for="engine-essentia">
                         <span class="mode-title">Essentia WASM</span>
-                        <span class="mode-desc">Beat-grid based, experimental.</span>
+                        <span class="mode-desc">Beat-grid Based, Experimental</span>
                     </label>
                 </div>
             </div>
+            <!-- Param panels — one per engine, shown/hidden by updateParamVisibility().
+                 Rendered by renderParamPanel() from PARAM_SPECS at page load.
+                 Adding a new tunable: add one entry to PARAM_SPECS, no HTML changes needed. -->
+            <div id="params-radix" class="param-panel"></div>
+            <div id="params-essentia" class="param-panel"></div>
         </div>
 
         <div style="margin-top:16px; display:flex; justify-content:flex-end;">
@@ -365,14 +455,29 @@
                 <span id="bpm-display" class="bpm-badge">BPM —</span>
             </div>
         </div>
-        
+
+        <!-- Session params — mirrors setup engine params, visible when mode=snap.
+             Collapsible to keep the session screen uncluttered by default.
+             Changes here update PARAMS immediately; re-analyze applies them. -->
+        <div id="session-params">
+            <button id="session-params-toggle">
+                ANALYSIS PARAMS <span class="arrow">▾</span>
+            </button>
+            <div id="session-params-body">
+                <!-- Mirrors of setup param panels, rendered by renderParamPanel() -->
+                <div id="session-params-radix" class="param-panel"></div>
+                <div id="session-params-essentia" class="param-panel"></div>
+            </div>
+        </div>
+
         <div class="session-controls">
             <button id="preview-btn" class="btn btn-ghost">⊞ PREVIEW</button>
-            <button id="finish-btn" class="btn btn-white">FINISH & EXPORT</button>
+            <button id="reanalyze-btn" class="btn btn-ghost">↺ RE-ANALYZE</button>
+            <button id="finish-btn" class="btn btn-nav">FINISH & EXPORT</button>
             <button id="cancel-btn" class="btn btn-muted">CANCEL</button>
         </div>
 
-        <!-- Inline preview — rendered below controls, expands/collapses -->
+        <!-- Inline preview -->
         <div id="preview-wrap">
             <div id="preview-bar">
                 <span>PREVIEW</span>
@@ -391,7 +496,7 @@
                 <h2>EXPORT</h2>
                 <span class="output-summary" id="export-summary"></span>
             </div>
-            <button id="generate-fizx-btn" class="btn btn-white btn-full" style="height:52px; font-size:0.85rem;">✦ GENERATE FIZX.HTML</button>
+            <button id="generate-fizx-btn" class="btn btn-ghost btn-full" style="height:52px; font-size:0.85rem;">✦ GENERATE FIZX.HTML</button>
             <div class="divider"></div>
             <div class="export-grid">
                 <button id="download-beats-btn" class="btn btn-ghost">↓ beats.json</button>
@@ -399,22 +504,23 @@
                 <button id="copy-beats-btn" class="btn btn-muted">⎘ copy beats [ ]</button>
                 <button id="copy-lyrics-btn" class="btn btn-muted">⎘ copy lyrics [ ]</button>
             </div>
-            <div style="margin-top:16px; display:flex; justify-content:flex-end;">
-                <button id="new-session-btn" class="btn btn-muted">↩ NEW SESSION</button>
+            <div style="margin-top:16px; display:flex; justify-content:flex-end; gap: 5px;">
+                <button id="cnt-session-btn" class="btn btn-nav">↩ RESUME SESSION</button>
+                <button id="new-session-btn" class="btn btn-primary">↩ NEW SESSION</button>
             </div>
         </div>
     </div>
 
 </div>
 
-<!-- Analysis overlay — covers the page while Worker or Essentia is running -->
+<!-- Analysis overlay — covers the page during audio analysis -->
 <div id="analysis-overlay">
     <div class="analysis-label" id="analysis-label">ANALYZING AUDIO</div>
-    <!-- Bar: shown for Radix (real progress from Worker) -->
+    <!-- Bar: shown for real progress from Worker -->
     <div id="analysis-bar-wrap">
         <div class="analysis-bar-track"><div class="analysis-bar-fill" id="analysis-bar"></div></div>
     </div>
-    <!-- Spinner: shown for Essentia (synchronous/blocking, no progress ticks) -->
+    <!-- Spinner: shown for synchronous/blocking analysis, no progress ticks -->
     <div id="analysis-spinner-wrap">
         <div class="analysis-spinner"></div>
     </div>
@@ -563,7 +669,9 @@ function bpmFromAutocorrelation(env, sr, HOP) {
 }
 
 self.onmessage = function(e) {
-    const { samples, sr } = e.data;
+    // Params come from PARAMS config on main thread via postMessage payload.
+    // Defaults mirror ex_beats.py so bare postMessage({samples,sr}) still works.
+    const { samples, sr, delta = 0.07, wait = 8, minGap = 0.12 } = e.data;
     const HOP = 512, N = 2048, HALF = N / 2 + 1;
 
     // Hann window — precomputed once, reused every frame
@@ -602,12 +710,14 @@ self.onmessage = function(e) {
     for (let i = 0; i < numFrames; i++) if (envelope[i] > maxVal) maxVal = envelope[i];
     if (maxVal > 0) for (let i = 0; i < numFrames; i++) envelope[i] /= maxVal;
 
-    // Adaptive threshold: mean + delta (delta=0.07 matches ex_beats.py)
+    // Adaptive threshold: mean + delta. delta from PARAMS (default 0.07 = ex_beats.py).
+    // Lower delta → more sensitive (catches quieter hits, more false positives).
+    // Higher delta → less sensitive (only strong transients pass).
     let sum = 0;
     for (let i = 0; i < numFrames; i++) sum += envelope[i];
-    const threshold = (sum / numFrames) + 0.07;
+    const threshold = (sum / numFrames) + delta;
 
-    const WAIT = 8;  // ~85ms minimum gap between detections at 48kHz/512-hop
+    const WAIT = wait;  // min frames between peaks; from PARAMS (default 8 ≈ 85ms at 48kHz/512-hop)
     const rawOnsets = [];
     let lastPeak = -WAIT - 1;
 
@@ -627,11 +737,12 @@ self.onmessage = function(e) {
 
     self.postMessage({ type:'progress', pct:90, label:'DE-DUPLICATION' });
 
-    // Frames → seconds + 120ms de-dupe (MIN_GAP=0.12, matches ex_beats.py)
+    // Frames → seconds + de-dupe pass. minGap from PARAMS (default 0.12 = ex_beats.py MIN_GAP).
+    // Raise minGap to suppress double-triggers on long decaying hits.
     const onsets = [];
     for (const f of rawOnsets) {
         const t = parseFloat(((f * HOP) / sr).toFixed(3));
-        if (!onsets.length || (t - onsets[onsets.length-1]) >= 0.12) onsets.push(t);
+        if (!onsets.length || (t - onsets[onsets.length-1]) >= minGap) onsets.push(t);
     }
 
     self.postMessage({ type:'progress', pct:95, label:'BPM DETECTION' });
@@ -643,6 +754,216 @@ self.onmessage = function(e) {
     self.postMessage({ type:'done', onsets, bpm });
 };
 `;
+
+// ═══════════════════════════════════════════════════════════════════
+// PARAMS — single source of truth for all tunable analysis parameters.
+// Analysis engines read from here. Mutated directly by slider/select
+// inputs via renderParamPanel() event listeners.
+//
+// Extensibility: to add a new param, add one entry here and one entry
+// in PARAM_SPECS. No other code changes needed.
+// ═══════════════════════════════════════════════════════════════════
+const PARAMS = {
+    // Radix params (passed to Worker via postMessage)
+    delta:  0.07,   // onset strength threshold above local mean (ex_beats.py default)
+    wait:   8,      // min frames between detections (~85ms at 48kHz/512-hop)
+    minGap: 0.12,   // secondary de-dupe gap in seconds (ex_beats.py MIN_GAP)
+    // Essentia params
+    essentiaModel: 'multifeature',  // 'multifeature' | 'degara'
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// PARAM_SPECS — declarative config for UI rendering.
+// Each entry produces one row in the param panel via renderParamPanel().
+//
+// Adding a future param: add one object here. The UI renders automatically.
+// ═══════════════════════════════════════════════════════════════════
+const PARAM_SPECS = {
+    radix: [
+        {
+            id:      'delta',
+            label:   'Threshold (delta)',
+            type:    'slider', // range input
+            min:     0.01, max: 0.20, step: 0.01,
+            fmt:     v => v.toFixed(2),
+            hint:    'Onset strength must exceed the local mean by this amount to be detected. ' +
+                     'Lower → more onsets (catches quiet hits, more false positives). ' +
+                     'Higher → fewer onsets (only strong transients). ' +
+                     'default: 0.07',
+        },
+        {
+            id:      'wait',
+            label:   'Min gap (frames)',
+            type:    'slider',
+            min:     4, max: 20, step: 1,
+            fmt:     v => `${v} (≈${Math.round(v*512/480*10)/10}ms)`,
+            hint:    'Minimum number of FFT frames between two detected onsets. ' +
+                     'At 48kHz/512-hop, 1 frame ≈ 10.7ms. ' +
+                     'Increase to suppress double-triggers on long hits. ' +
+                     'default: 8 (≈85ms)',
+        },
+        {
+            id:      'minGap',
+            label:   'De-dupe gap (ms)',
+            type:    'slider',
+            min:     0.06, max: 0.30, step: 0.01,
+            fmt:     v => `${Math.round(v*1000)}ms`,
+            hint:    'Secondary de-duplication pass on final timestamps. ' +
+                     'Any onset closer than this to the previous one is dropped. ' +
+                     'Runs after the frame-based wait check, catching edge cases. ' +
+                     'MIN_GAP default: 120ms',
+        },
+    ],
+    essentia: [
+        {
+            id:      'essentiaModel',
+            label:   'Mehod',
+            type:    'model', // radio pair
+            // options array used only by type:'model' — extensible for future select types
+            options: [
+                {
+                    value: 'multifeature',
+                    name:  'Multi',
+                    desc:  'Slower, full analysis',
+                },
+                {
+                    value: 'degara',
+                    name:  'Degara',
+                    desc:  'Faster, partial analysis',
+                },
+            ],
+            hint: 'RhythmExtractor2013 algorithm supports two methods: "multifeature" is the default ' +
+                  '(accurate) and returns a BPM estimate. "degara" uses the BeatTrackerDegara ' +
+                  'algorithm (faster) but does not return BPM — autocorrelation is used as fallback.',
+        },
+    ],
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER PARAM PANEL
+// Builds param UI rows from PARAM_SPECS into a container element.
+// Called once at page load for each engine, for both setup and session
+// containers — 4 panels total, all sharing the same PARAMS object.
+//
+// container: DOM element to render into.
+// specs:     array from PARAM_SPECS[engine].
+// idSuffix:  appended to input IDs to keep them unique across panels
+//            (setup vs session share the same spec but need distinct IDs).
+// ═══════════════════════════════════════════════════════════════════
+function renderParamPanel(container, specs, idSuffix) {
+    specs.forEach(spec => {
+        const row = document.createElement('div');
+        row.className = 'param-row';
+
+        if (spec.type === 'slider') {
+            row.innerHTML = `
+                <div class="param-label-wrap">
+                    <span class="param-label">${spec.label}</span>
+                    <span class="param-hint-icon">ⓘ
+                        <span class="param-tooltip">${spec.hint}</span>
+                    </span>
+                </div>
+                <input class="param-slider"
+                    type="range"
+                    id="param-${spec.id}-${idSuffix}"
+                    min="${spec.min}" max="${spec.max}" step="${spec.step}"
+                    value="${PARAMS[spec.id]}">
+                <span class="param-value" id="param-val-${spec.id}-${idSuffix}">
+                    ${spec.fmt(PARAMS[spec.id])}
+                </span>`;
+
+            const slider = row.querySelector('input');
+            const valEl  = row.querySelector('.param-value');
+            slider.addEventListener('input', () => {
+                const v = parseFloat(slider.value);
+                PARAMS[spec.id] = v;
+                valEl.textContent = spec.fmt(v);
+                // Sync all other panels showing the same param
+                syncParam(spec.id, v, idSuffix);
+            });
+
+        } else if (spec.type === 'model') {
+            const optionsHtml = spec.options.map(opt => `
+                <div class="model-option">
+                    <input type="radio"
+                        name="essentiaModel-${idSuffix}"
+                        id="model-${opt.value}-${idSuffix}"
+                        value="${opt.value}"
+                        ${PARAMS.essentiaModel === opt.value ? 'checked' : ''}>
+                    <label for="model-${opt.value}-${idSuffix}">
+                        <span class="model-name">${opt.name}</span>
+                        <span class="model-desc">${opt.desc}</span>
+                    </label>
+                </div>`).join('');
+
+            row.innerHTML = `
+                <div class="param-label-wrap" style="grid-column:1/-1; margin-bottom:4px;">
+                    <span class="param-label">${spec.label}</span>
+                    <span class="param-hint-icon">ⓘ
+                        <span class="param-tooltip">${spec.hint}</span>
+                    </span>
+                </div>
+                <div class="model-selector" style="grid-column:1/-1">${optionsHtml}</div>`;
+
+            row.querySelectorAll('input[type="radio"]').forEach(radio => {
+                radio.addEventListener('change', () => {
+                    PARAMS.essentiaModel = radio.value;
+                    syncParam('essentiaModel', radio.value, idSuffix);
+                });
+            });
+        }
+
+        container.appendChild(row);
+    });
+}
+
+// Sync a changed param value to all other rendered panels so setup and
+// session panels stay consistent without a shared state lookup.
+// This keeps the pattern simple: each panel owns its own DOM but they
+// all write to and read from the single PARAMS object.
+function syncParam(paramId, value, changedSuffix) {
+    const suffixes = ['setup', 'session'];
+    suffixes.forEach(suffix => {
+        if (suffix === changedSuffix) return;
+        // Slider
+        const slider = document.getElementById(`param-${paramId}-${suffix}`);
+        if (slider) {
+            slider.value = value;
+            const valEl = document.getElementById(`param-val-${paramId}-${suffix}`);
+            if (valEl) {
+                // Find spec to get fmt function
+                const spec = [...PARAM_SPECS.radix, ...PARAM_SPECS.essentia]
+                    .find(s => s.id === paramId);
+                if (spec && spec.fmt) valEl.textContent = spec.fmt(parseFloat(value));
+            }
+        }
+        // Radio
+        const radio = document.querySelector(
+            `input[name="essentiaModel-${suffix}"][value="${value}"]`
+        );
+        if (radio) radio.checked = true;
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// UPDATE PARAM PANEL VISIBILITY
+// Shows the correct engine param panel, hides the other.
+// Called on engine radio change and on session entry.
+// Also syncs the session-params wrapper visibility with mode.
+// ═══════════════════════════════════════════════════════════════════
+function updateParamVisibility() {
+    const engine  = document.querySelector('input[name="engine"]:checked')?.value || 'radix';
+    const isSnap  = document.getElementById('mode-snap').checked;
+
+    ['radix', 'essentia'].forEach(e => {
+        const active = e === engine;
+        document.getElementById(`params-${e}`)?.classList.toggle('visible', active);
+        document.getElementById(`session-params-${e}`)?.classList.toggle('visible', active);
+    });
+
+    // Session params wrapper only makes sense in snap mode
+    document.getElementById('session-params')?.classList.toggle('visible', isSnap);
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // BPM VIA AUTOCORRELATION — shared by both engines (main thread copy)
@@ -746,14 +1067,24 @@ async function extractEssentia(audioFile) {
     // convert the JS float32 typed array into std::vector<float>
     const vector = essn.arrayToVector(samples);
     
-    // RhythmExtractor2013 algorithm supports two approaches via "method" param:  
-    // slower and more accurate multifeature (default) vs. faster degara, returns:
+    // RhythmExtractor2013 algorithm returns:
     // bpm: tempo estimation
     // ticks: estimated tick locations
     // confidence: detected beat confidence (ignored if using 'degara' method)
     // estimates: bpm estimates
     // bpmIntervals: list of beats interval
-    const result = essn.RhythmExtractor2013(vector); // faster algorithm BeatTrackerDegara - returns only ticks
+    // The algorithm supports two approaches via "method" param:
+    // multifeature (default): slower, more accurate.
+    // degara: returns ticks only, no bpm — faster, grid-based, suitable for 4/4 music.
+    // PARAMS.essentiaModel selects the approach at call time.
+    // BeatTrackerDegara is a separate Essentia algorithm that is exposed
+    // via RhythmExtractor2013's method param, keeping a single call path.
+    const result = PARAMS.essentiaModel === 'degara'
+        // The wrapper expects expects 4 separate arguments 
+        // as follows (signal, maxTempo, method, minTempo) 
+        // undefined triggers defaults
+        ? essn.RhythmExtractor2013(vector, undefined, 'degara')
+        : essn.RhythmExtractor2013(vector);
     // Convert the "Keyed Object" into a clean Float array
     // result.ticks returns as { "0": value, "1": value }
     // Using ticks as its common between algorithms
@@ -847,8 +1178,9 @@ function extractRadix(audioFile, onProgress) {
         };
         worker.onerror = (err) => { worker.terminate(); state.activeWorker = null; reject(new Error('Worker: ' + err.message)); };
 
-        // Transfer — zero-copy handoff, samples.buffer is detached after this call
-        worker.postMessage({ samples, sr }, [samples.buffer]);
+        // Transfer — zero-copy handoff, samples.buffer is detached after this call.
+        // delta/wait/minGap come from PARAMS (user-configured or defaults).
+        worker.postMessage({ samples, sr, delta: PARAMS.delta, wait: PARAMS.wait, minGap: PARAMS.minGap }, [samples.buffer]);
     });
 }
 
@@ -922,18 +1254,16 @@ function toast(msg) {
     _toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
 }
 
-// showOverlay(engine) — shows the overlay with the correct indicator.
-// Radix posts incremental progress → progress bar.
-// Essentia is synchronous after initializeEssentia (blocks main thread)
-// → spinner (indeterminate), no bar.
+// showOverlay(engine) — shows the overlay with the correct indicator
+// incremental progress → progress bar, else spinner (indeterminate)
 function showOverlay(engine) {
-    analysisBar.style.width            = '0%';
-    analysisLabel.textContent          = 'ANALYZING AUDIO';
-    analysisSub.textContent            = 'decoding…';
+    document.getElementById('analysis-bar').style.width = '0%';
+    document.getElementById('analysis-label').textContent = 'ANALYZING AUDIO';
+    document.getElementById('analysis-sub').textContent   = 'decoding…';
     const useBar = engine === 'radix';
-    analysisBarWrap.style.display      = useBar ? 'block' : 'none';
-    analysisSpinWrap.style.display     = useBar ? 'none'  : 'flex';
-    analysisOverlay.classList.add('visible');
+    document.getElementById('analysis-bar-wrap').style.display     = useBar ? 'block' : 'none';
+    document.getElementById('analysis-spinner-wrap').style.display  = useBar ? 'none'  : 'flex';
+    document.getElementById('analysis-overlay').classList.add('visible');
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -991,7 +1321,7 @@ pbPlay.addEventListener('click', () => {
         state.player.play();
         state.active = true;
         pbPlay.textContent = '⏸';
-        if (!state.rafId) startSeekLoop();
+        if (!state.rafId) startTimeLoop();
     } else {
         state.player.pause();
         state.active = false;
@@ -1016,6 +1346,38 @@ seekTrack.addEventListener('click', (e) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
+// PARAM PANEL INIT + ENGINE/MODE CHANGE LISTENERS
+// Panels are rendered once from PARAM_SPECS at load time.
+// Engine and mode changes update visibility without re-rendering.
+// ═══════════════════════════════════════════════════════════════════
+(function initParamPanels() {
+    // Render all panels in both setup and session
+    renderParamPanel(document.getElementById('params-radix'),          PARAM_SPECS.radix,    'setup');
+    renderParamPanel(document.getElementById('params-essentia'),       PARAM_SPECS.essentia, 'setup');
+    renderParamPanel(document.getElementById('session-params-radix'),  PARAM_SPECS.radix,    'session');
+    renderParamPanel(document.getElementById('session-params-essentia'),PARAM_SPECS.essentia,'session');
+    // Set initial visibility
+    updateParamVisibility();
+})();
+
+document.querySelectorAll('input[name="mode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+        engineRow.classList.toggle('visible', document.getElementById('mode-snap').checked);
+        updateParamVisibility();
+    });
+});
+
+document.querySelectorAll('input[name="engine"]').forEach(radio => {
+    radio.addEventListener('change', updateParamVisibility);
+});
+
+// Session params collapsible toggle
+document.getElementById('session-params-toggle').addEventListener('click', function() {
+    this.classList.toggle('open');
+    document.getElementById('session-params-body').classList.toggle('open');
+});
+
+// ═══════════════════════════════════════════════════════════════════
 // SNAP ENGINE VISIBILITY
 // Show the engine sub-row only when snap mode is selected.
 // Reduces cognitive load for users who just want manual tapping.
@@ -1029,6 +1391,11 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => {
 // ═══════════════════════════════════════════════════════════════════
 // START SESSION
 // ═══════════════════════════════════════════════════════════════════
+function onProgress(pct, label) {
+    document.getElementById('analysis-bar').style.width = pct + '%';
+    document.getElementById('analysis-sub').textContent = label; // sub-label, not the main label
+}
+
 startBtn.addEventListener('click', async () => {
     if (!state.audioFile) { toast('Drop an audio file first'); return; }
 
@@ -1041,11 +1408,6 @@ startBtn.addEventListener('click', async () => {
     try {
         if (state.mode === 'snap') {
             showOverlay(state.engine);
-
-            const onProgress = (pct, label) => {
-                analysisBar.style.width   = pct + '%';
-                analysisLabel.textContent = label; // sub-label, not the main label
-            };
 
             let result;
             if (state.engine === 'essentia') {
@@ -1080,6 +1442,7 @@ startBtn.addEventListener('click', async () => {
         sessionView.style.display = 'block';
         outputView.style.display  = 'none';
         pbPlay.textContent        = '⏸';
+        updateParamVisibility(); // syncs session-params panel visibility with current mode/engine
 
         await state.player.play();
         state.active = true;
@@ -1223,6 +1586,45 @@ cancelBtn.addEventListener('click', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
+// RE-ANALYZE
+// Re-runs beat extraction with the current PARAMS without resetting
+// taps, player position, or lyrics. state.beats and state.bpm are
+// updated in place. Preview picks up the new beats on next open
+// because buildFizxHtml() reads state.beats at call time, not at
+// session start.
+// ═══════════════════════════════════════════════════════════════════
+document.getElementById('reanalyze-btn').addEventListener('click', async () => {
+    if (!state.audioFile || state.mode !== 'snap') {
+        toast('Re-analyze not available in manual mode');
+        return;
+    }
+    const btn = document.getElementById('reanalyze-btn');
+    btn.disabled    = true;
+    btn.textContent = '↺ ANALYZING…';
+    // Read engine selection fresh — user may have changed it since session start
+    state.engine = document.querySelector('input[name="engine"]:checked')?.value || 'radix';
+
+    showOverlay(state.engine);
+
+    try {
+        const result = state.engine === 'essentia'
+            ? await extractEssentia(state.audioFile)
+            : await extractRadix(state.audioFile, onProgress);
+        state.beats = result.onsets;
+        state.bpm   = result.bpm;
+        bpmDisplay.textContent = state.bpm > 0 ? `${state.bpm} BPM` : 'BPM —';
+        toast(`↺ ${state.beats.length} onsets · ${state.bpm} BPM`);
+    } catch (err) {
+        console.error('Re-analyze failed:', err);
+        toast('Re-analyze failed: ' + (err.message || err));
+    } finally {
+        document.getElementById('analysis-overlay').classList.remove('visible');
+        btn.disabled    = false;
+        btn.textContent = '↺ RE-ANALYZE';
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════
 // EXPORT
 // ═══════════════════════════════════════════════════════════════════
 document.getElementById('generate-fizx-btn').addEventListener('click', () => {
@@ -1254,6 +1656,18 @@ document.getElementById('new-session-btn').addEventListener('click', () => {
     fileInput.value = '';  // Without it, re-selecting the same file fires no change event
     dropZone.classList.remove('loaded');
     state.audioFile = null; state.beats = []; state.lyrics = []; state.bpm = 0;
+});
+document.getElementById('cnt-session-btn').addEventListener('click', () => {
+    // Restore session view — player already exists, just resume UI state.
+    // Does not restart analysis or reset taps.
+    outputView.style.display = 'none';
+    sessionView.style.display = 'block'; 
+    // Restart seek loop (was stopped by finishBtn handler)
+    if (state.player && !state.rafId) startTimeLoop();
+    // Restore play button icon to match actual player state
+    pbPlay.textContent = state.player && !state.player.paused ? '⏸' : '▶';
+    // Re-sync session-params visibility in case engine changed in output view
+    updateParamVisibility();
 });
 
 // download() creates and immediately revokes the blob URL to avoid memory leaks
