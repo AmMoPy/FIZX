@@ -1,21 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FIZX STUDIO</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"> <!--d2b48ca1 -->
     <style>
         :root {
-            --accent: #00ff88a1;
-            --accent-dim: rgba(0,255,136,0.12);
-            --accent-glow: rgba(0,255,136,0.35);
-            --bg: #080808;
-            --surface: #0f0f0f;
-            --surface-2: #161616;
-            --border: rgba(255,255,255,0.07);
-            --border-accent: rgba(0,255,136,0.3);
-            --text: #e8e8e8;
-            --text-dim: #666;
+            --bg:           #1c1b19; 
+            --surface:      #1a1815;
+            --surface-2:    #24221f;
+            --text:         #e6ddd0; 
+            --text-dim:     #7a7062;
+            --accent:       #e0a96d; 
+            --accent-dim:   rgba(224, 169, 109, 0.12);
+            --accent-glow:  rgba(224, 169, 109, 0.25);
+            --border-accent:rgba(224, 169, 109, 0.35);
+            --border:       rgba(255, 255, 255, 0.04);
             --mono: 'Space Mono', monospace;
             --sans: 'DM Sans', sans-serif;
         }
@@ -45,18 +47,18 @@
         .header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 40px; }
         .header h1 {
             font-family: var(--mono);
-            font-size: 1.5rem;
+            font-size: 2rem;
             font-weight: 700;
             color: var(--accent);
             letter-spacing: 0.12em;
             text-transform: uppercase;
         }
-        .header-sub { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); letter-spacing: 0.1em; }
+        .header-sub { font-family: var(--mono); font-size: 0.9rem; color: var(--text-dim); letter-spacing: 0.1em; }
         .header-line { flex: 1; height: 1px; background: linear-gradient(to right, var(--border-accent), transparent); }
 
         /* ── Panels ──────────────────────────────────────────────── */
-        .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
-        .panel-label { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.18em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 14px; }
+        .panel { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+        .panel-label { font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.18em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 14px; }
 
         /* ── Drop Zone ───────────────────────────────────────────── */
         #drop-zone {
@@ -67,24 +69,26 @@
             background: var(--accent-dim);
             text-align: center;
             font-family: var(--mono);
-            font-size: 1rem;
+            font-size: 1.2rem;
             color: var(--accent);
-            letter-spacing: 0.08em;
             margin: 10px auto 20px;
             width: 30%;
             padding: 10px;
+            overflow-wrap: break-word; /* Allows breaking long filenames */
+            word-wrap: break-word;     /* Legacy support */
+            box-sizing: border-box;    /* Ensures padding doesn't push width past 30% */
         }
-        #drop-zone .dz-hint { font-size: 0.75rem; color: var(--text-dim); margin-top: 8px; letter-spacing: 0.05em; }
+        #drop-zone .dz-hint { font-size: 0.8rem; color: var(--text-dim); margin-top: 8px; letter-spacing: 0.05em; }
         #drop-zone.hover, #drop-zone:hover { background: rgba(0,255,136,0.18); border-style: solid; border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
         #drop-zone.loaded { border-style: solid; border-color: var(--accent); background: rgba(0,255,136,0.06); }
 
         /* ── Textarea ────────────────────────────────────────────── */
         textarea {
-            width: 100%; height: 200px;
+            width: 100%; height: 250px;
             background: var(--bg); color: var(--text);
             border: 1px solid var(--border); border-radius: 10px;
             padding: 14px 16px;
-            font-family: var(--mono); font-size: 0.78rem; line-height: 1.7;
+            font-family: var(--mono); font-size: 1rem; line-height: 1.7;
             resize: vertical; transition: border 0.2s ease;
         }
         textarea:focus { outline: none; border-color: var(--border-accent); box-shadow: 0 0 0 3px var(--accent-dim); }
@@ -105,8 +109,8 @@
         }
         .mode-option label:hover { border-color: var(--border-accent); }
         .mode-option input:checked + label { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 12px var(--accent-glow); }
-        .mode-title { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); font-weight: 700; letter-spacing: 0.05em; }
-        .mode-desc { font-size: 0.8rem; color: var(--text-dim); line-height: 1.4; }
+        .mode-title { font-family: var(--mono); font-size: 1.2rem; color: var(--accent); font-weight: 700; letter-spacing: 0.05em; }
+        .mode-desc { font-size: 0.9rem; color: var(--text-dim); line-height: 1.4; }
 
         /* Sub-engine selector — hidden until snap mode is chosen */
         #engine-row {
@@ -114,21 +118,21 @@
             margin-top: 10px;
         }
         #engine-row.visible { display: block; }
-        .engine-label { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+        .engine-label { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
 
         /* ── Buttons ─────────────────────────────────────────────── */
         .btn {
             display: inline-flex; align-items: center; justify-content: center; gap: 8px;
             border: none; padding: 11px 22px;
-            font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+            font-family: var(--mono); font-size: 1rem; font-weight: 700;
             letter-spacing: 0.1em; text-transform: uppercase;
             border-radius: 6px; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
         }
         .btn-primary { background: var(--accent); color: #000; }
-        .btn-primary:hover:not(:disabled) { box-shadow: 0 0 20px var(--accent-glow); transform: translateY(-1px); }
-        .btn-ghost { background: transparent; color: #048147; border: 1px solid var(--border-accent); }
+        .btn-primary:hover:not(:disabled) { box-shadow: 0 0 20px var(--accent-glow); transform: translateY(-1px); } /* #048147 */
+        .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--border-accent); }
         .btn-ghost:hover:not(:disabled) { background: var(--accent-dim); }
-        .btn-nav { background: transparent; color: #372e19; border: 1px solid #a16d0f; }
+        .btn-nav { background: transparent; color: #7d776b; border: 1px solid #a16d0f; }
         .btn-nav:hover:not(:disabled) { box-shadow: 0 0 20px rgba(255,255,255,0.3); }
         .btn-muted { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); }
         .btn-muted:hover:not(:disabled) { color: var(--text); border-color: var(--border-accent); }
@@ -137,7 +141,7 @@
 
         /* ── Stage (session) ─────────────────────────────────────── */
         .stage {
-            background: #000; border: 1px solid var(--border-accent); border-radius: 12px;
+            background: transparent; border: 1px solid var(--border-accent); border-radius: 12px;
             padding: 32px 32px 24px; text-align: center; margin-bottom: 16px;
             box-shadow: 0 0 40px rgba(0,255,136,0.06), inset 0 0 60px rgba(0,0,0,0.5);
             position: relative; overflow: hidden;
@@ -152,7 +156,7 @@
             text-shadow: 0 0 30px var(--accent-glow);
             min-height: 2.5rem; line-height: 1.3; letter-spacing: -0.01em;
         }
-        .tap-hint { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); margin-top: 16px; letter-spacing: 0.12em; }
+        .tap-hint { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); margin-top: 16px; letter-spacing: 0.12em; }
         .tap-hint kbd { background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; font-family: var(--mono); color: var(--accent); }
 
         /* ── Playback bar ────────────────────────────────────────── */
@@ -165,7 +169,7 @@
             background: none; border: 1px solid var(--border-accent);
             color: var(--accent); border-radius: 6px;
             width: 34px; height: 34px; cursor: pointer;
-            font-size: 0.85rem; display: flex; align-items: center; justify-content: center;
+            font-size: 1rem; display: flex; align-items: center; justify-content: center;
             transition: all 0.15s ease; flex-shrink: 0;
         }
         .pb-btn:hover { background: var(--accent-dim); }
@@ -175,59 +179,157 @@
             border-radius: 2px; position: relative; cursor: pointer;
         }
         .seek-fill { height: 100%; background: var(--accent); width: 0%; border-radius: 2px; box-shadow: 0 0 6px var(--accent); pointer-events: none; }
-        .pb-time { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); flex-shrink: 0; min-width: 70px; text-align: right; }
+        .pb-time { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); flex-shrink: 0; min-width: 70px; text-align: right; }
 
         /* ── Progress + stats (tap progress, separate from seek) ─── */
         .progress-track { width: 100%; height: 2px; background: var(--surface-2); border-radius: 1px; margin: 20px 0 12px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s ease; box-shadow: 0 0 8px var(--accent); }
 
-        .stats-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); }
+        .stats-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 0.9rem; color: var(--text-dim); }
         .stat-val { color: var(--accent); font-weight: 700; }
-        .bpm-badge { background: var(--accent-dim); border: 1px solid var(--border-accent); padding: 3px 10px; border-radius: 4px; letter-spacing: 0.08em; }
+        .bpm-badge { background: var(--accent-dim); border: 1px solid var(--border-accent); padding: 3px 10px; border-radius: 4px; letter-spacing: 0.08em; color: var(--accent); }
         .session-controls { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; }
 
-        /* ── Preview iframe ──────────────────────────────────────── */
-        /*
-         * The preview is an iframe rendered inline below the stage,
-         * rather than a new window. This avoids popup blockers and keeps
-         * the session context alive. The iframe is sandboxed with allow-scripts
-         * so the FIZX visualizer JS runs, but allow-same-origin is intentionally
-         * omitted — the iframe cannot reach parent state.
+        /* ── Floating preview ────────────────────────────────────────
          *
-         * Tradeoff: the sandboxed iframe will block Web Audio API in some
-         * browsers (Chrome ≥ 74 requires allow-same-origin for AudioContext
-         * inside a sandboxed iframe). Since FIZX uses AudioContext only for
-         * beat-sync playback and the preview is visual-only, this is acceptable.
+         * Implemented as position:fixed so it floats over session content
+         * without displacing layout. The user can drag it by the title bar
+         * and resize it by the bottom-right corner handle.
+         *
+         * Layout (top→bottom inside the float):
+         *   #preview-titlebar  — drag handle + controls (refresh, close)
+         *   #preview-editor    — scrollable timing editor (state.results rows)
+         *   #preview-frame     — sandboxed FIZX iframe (read-only, refreshed on demand)
+         *   #preview-resize    — invisible corner drag target for resize
+         *
+         * Why iframe.src=blob: not srcdoc:
+         *   The HTML parser terminates <script> blocks at the first </script>
+         *   found in an attribute value. The compiled FIZX template contains
+         *   </script> inside its own script block — srcdoc silently breaks it.
+         *   Blob URL bypasses this; browser fetches blob as standalone document.
+         *
+         * Why no live two-way sync with the iframe:
+         *   The iframe is sandboxed (no allow-same-origin) so it cannot reach
+         *   parent state. Editing happens in #preview-editor above the iframe;
+         *   the user clicks Refresh to re-render. This is intentional — it
+         *   prevents the iframe from modifying state accidentally.
          */
         #preview-wrap {
-            display: none; /* shown by showPreview() */
-            margin: 16px auto;
+            /* Floating panel — fixed so it doesn't scroll with page */
+            display: none;
+            position: fixed;
+            top: 60px; right: 24px;
+            width: 340px;
+            min-width: 260px; min-height: 300px;
+            background: var(--surface);
             border: 1px solid var(--border-accent);
-            border-radius: 12px; 
+            border-radius: 12px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,255,136,0.08);
+            z-index: 200;
+            /* flex column so editor and iframe share vertical space */
+            flex-direction: column;
             overflow: hidden;
-            box-shadow: 0 0 30px rgba(0,255,136,0.08);
-            max-width: min(100vw, calc(100vh * 9 / 16));
+            /* resize handle is a separate element; CSS resize disabled to
+               allow custom handle with better UX on touch */
+        }
+        #preview-wrap.visible { display: flex; }
 
-        }
-        #preview-wrap.visible { display: block; }
-        #preview-bar {
+        /* Drag handle — entire titlebar is draggable */
+        #preview-titlebar {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 10px 16px; background: var(--surface);
+            padding: 8px 12px;
+            background: var(--surface-2);
             border-bottom: 1px solid var(--border);
-            font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim);
-            letter-spacing: 0.1em;
+            cursor: grab; user-select: none;
+            flex-shrink: 0;
         }
-        #preview-bar span { color: var(--accent); }
-        #close-preview-btn { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 1rem; padding: 0 4px; }
-        #close-preview-btn:hover { color: var(--accent); }
+        #preview-titlebar:active { cursor: grabbing; }
+        #preview-title {
+            font-family: var(--mono); font-size: 0.65rem;
+            color: var(--accent); letter-spacing: 0.12em;
+        }
+        .preview-titlebar-btns { display: flex; gap: 6px; align-items: center; }
+        .ptb-btn {
+            background: none; border: 1px solid var(--border);
+            color: var(--text-dim); border-radius: 4px;
+            font-family: var(--mono); font-size: 0.6rem;
+            padding: 2px 7px; cursor: pointer; transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+        .ptb-btn:hover { border-color: var(--border-accent); color: var(--accent); }
+        .ptb-btn.accent { border-color: var(--border-accent); color: var(--accent); }
+
+        /* Timing editor — scrollable list of result rows.
+           Each row lets the user adjust text, start, and end timestamps.
+           Height is capped so the iframe gets meaningful space below. */
+        #preview-editor {
+            flex-shrink: 0;
+            max-height: 100px;
+            overflow-y: auto;
+            border-bottom: 1px solid var(--border);
+            /* custom scrollbar to match theme */
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-accent) transparent;
+        }
+        #preview-editor::-webkit-scrollbar { width: 4px; }
+        #preview-editor::-webkit-scrollbar-thumb { background: var(--border-accent); border-radius: 2px; }
+
+        /* Individual result row inside the editor */
+        .edit-row {
+            display: grid;
+            /* text takes most space; two time inputs are compact */
+            grid-template-columns: 1fr 72px 72px 20px;
+            gap: 4px; align-items: center;
+            padding: 5px 10px;
+            border-bottom: 1px solid var(--border);
+            font-family: var(--mono); font-size: 0.8rem;
+        }
+        .edit-row:last-child { border-bottom: none; }
+        .edit-row input[type="text"],
+        .edit-row input[type="number"] {
+            background: var(--bg); color: var(--text);
+            border: 1px solid var(--border); border-radius: 4px;
+            padding: 3px 5px; font-family: var(--mono); font-size: 0.8rem;
+            width: 100%;
+        }
+        .edit-row input:focus { outline: none; border-color: var(--border-accent); }
+        /* Delete button for a result row */
+        .edit-row-del {
+            background: none; border: none; color: var(--text-dim);
+            cursor: pointer; font-size: 0.75rem; padding: 0;
+            line-height: 1; transition: color 0.15s;
+        }
+        .edit-row-del:hover { color: #ff4d6a; }
+
+        /* Empty state shown when no results exist yet */
+        #preview-editor-empty {
+            padding: 12px; text-align: center;
+            font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim);
+        }
+
+        /* FIZX preview iframe — fills remaining vertical space */
         #preview-frame {
-            border: none; 
-            display: block;
-            /* 9:16 aspect ratio — matches default FIZX stage */
-            max-width: min(100vw, calc(100vh * 9 / 16)); 
-            aspect-ratio: 9 / 16;
-            /*max-height: 70vh;*/
+            border: none; display: block;
+            flex: 1;           /* take all remaining height after titlebar+editor */
+            min-height: 200px;
+            width: 100%;
             background: #000;
+        }
+
+        /* Resize handle — bottom-right corner drag target.
+           Kept small (16×16) so it doesn't obscure the iframe content.
+           cursor:nwse-resize signals resize intent to the user. */
+        #preview-resize {
+            position: absolute; bottom: 0; right: 0;
+            width: 16px; height: 16px; cursor: nwse-resize;
+            /* Subtle visual indicator — two diagonal lines */
+            background: linear-gradient(
+                135deg,
+                transparent 30%, var(--border-accent) 30%,
+                var(--border-accent) 40%, transparent 40%,
+                transparent 60%, var(--border-accent) 60%,
+                var(--border-accent) 70%, transparent 70%
+            );
         }
 
         /* ── Analysis overlay ────────────────────────────────────── */
@@ -237,12 +339,11 @@
             align-items: center; justify-content: center; flex-direction: column; gap: 20px;
         }
         #analysis-overlay.visible { display: flex; }
-        .analysis-label { font-family: var(--mono); font-size: 0.8rem; color: var(--accent); letter-spacing: 0.14em; }
+        .analysis-label { font-family: var(--mono); font-size: 1rem; color: var(--accent); letter-spacing: 0.14em; }
         .analysis-bar-track { width: 280px; height: 3px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
         .analysis-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.15s ease; box-shadow: 0 0 8px var(--accent); }
-        .analysis-sub { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.1em; }
-        /* Spinner — shown for Essentia (blocks main thread, no incremental progress).
-           Radix uses the progress bar instead (Worker posts real progress ticks).
+        .analysis-sub { font-family: var(--mono); font-size: 0.9rem; color: var(--text-dim); letter-spacing: 0.1em; }
+        /* Spinner — shown when no incremental progress.
            Visibility toggled by showOverlay(engine). */
         .analysis-spinner {
             width: 28px; height: 28px;
@@ -255,10 +356,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         #analysis-spinner-wrap, #analysis-bar-wrap { display: none; }
 
-        /* ── Param panels ───────────────────────────────────────────
-           Rendered by renderParamPanel() from PARAM_SPECS declarative
-           config. Extensible: add one entry to PARAM_SPECS to add a row.
-           display:none default; toggled to visible by engine selection. */
+        /* ── Param panels ─────────────────────────────────────────── */
         .param-panel { display: none; margin-top: 12px; }
         .param-panel.visible { display: block; }
         .param-row {
@@ -271,7 +369,7 @@
         }
         .param-row:last-child { border-bottom: none; }
         .param-label-wrap { display: flex; align-items: center; gap: 6px; position: relative; }
-        .param-label { font-family: var(--mono); font-size: 0.68rem; color: var(--text-dim); letter-spacing: 0.06em; }
+        .param-label { font-family: var(--mono); font-size: 0.9rem; color: var(--text-dim); letter-spacing: 0.06em; }
         /* Tooltip: pure CSS on ⓘ hover. absolute positioning keeps it
            inside scroll flow without z-index fights with fixed elements. */
         .param-hint-icon { font-size: 0.75rem; color: var(--text-dim); cursor: default; position: relative; }
@@ -311,8 +409,8 @@
             width: 12px; height: 12px; border: none;
             border-radius: 50%; background: var(--accent);
         }
-        .param-value { font-family: var(--mono); font-size: 0.68rem; color: var(--accent); min-width: 36px; text-align: right; }
-        /* Essentia model radio pair */
+        .param-value { font-family: var(--mono); font-size: 0.8rem; color: var(--accent); min-width: 36px; text-align: right; }
+        /* Selector for non-slider params */
         .model-selector { display: flex; gap: 8px; margin-top: 4px; text-align: center;}
         .model-option { position: relative; flex: 1; }
         .model-option input[type="radio"] { position: absolute; opacity: 0; width: 0; }
@@ -332,7 +430,7 @@
         #session-params-toggle {
             width: 100%; display: flex; align-items: center; justify-content: space-between;
             padding: 10px 16px; background: var(--surface-2); border: none; cursor: pointer;
-            font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim);
+            font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim);
             letter-spacing: 0.12em; text-transform: uppercase; transition: color 0.15s ease;
         }
         #session-params-toggle:hover { color: var(--accent); }
@@ -343,15 +441,15 @@
 
         /* ── Output view ─────────────────────────────────────────── */
         .output-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-        .output-header h2 { font-family: var(--mono); font-size: 0.9rem; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); }
-        .output-summary { font-size: 0.75rem; color: var(--text-dim); font-family: var(--mono); }
+        .output-header h2 { font-family: var(--mono); font-size: 1rem; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); }
+        .output-summary { font-size: 0.8rem; color: var(--text-dim); font-family: var(--mono); }
         .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
 
         /* ── Toast ───────────────────────────────────────────────── */
         #toast {
-            position: fixed; bottom: 24px; right: 24px;
+            position: fixed; top: 24px; right: 24px;
             background: var(--surface); border: 1px solid var(--border-accent);
-            color: var(--accent); font-family: var(--mono); font-size: 0.75rem;
+            color: var(--accent); font-family: var(--mono); font-size: 1.5rem;
             padding: 10px 16px; border-radius: 6px;
             opacity: 0; transform: translateY(6px); transition: all 0.2s ease;
             pointer-events: none; letter-spacing: 0.06em;
@@ -375,7 +473,7 @@
     </div>
 
     <div id="setup-view">
-        <textarea id="lyrics-input" placeholder="Paste lyrics here (Optional), one line per entry.&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;Quick start: drop audio > select mode > start session > tap spacebar > preview > export"></textarea>
+        <textarea id="lyrics-input" placeholder="Paste lyrics here (Optional), one line per entry.&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;QUICK START: drop audio > select mode > start session > tap spacebar > preview > export"></textarea>
         
         <div id="drop-zone">
             DROP AUDIO FILE
@@ -402,30 +500,15 @@
         </div>
 
         <!-- Engine sub-row — only relevant when snap mode is active.
-             Shown/hidden via JS to avoid layout noise in manual mode. -->
+             Shown/hidden via JS to avoid layout noise in manual mode -->
         <div id="engine-row">
             <div class="engine-label" style="margin-top:14px;">Analysis Engine</div>
-            <div class="mode-selector three-col">
-                <div class="mode-option">
-                    <input type="radio" name="engine" id="engine-radix" value="radix" checked>
-                    <label for="engine-radix">
-                        <span class="mode-title">Radix FFT</span>
-                        <span class="mode-desc">Balanced Speed & Accuracy</span>
-                    </label>
-                </div>
-                <div class="mode-option">
-                    <input type="radio" name="engine" id="engine-essentia" value="essentia">
-                    <label for="engine-essentia">
-                        <span class="mode-title">Essentia WASM</span>
-                        <span class="mode-desc">Beat-grid Based, Experimental</span>
-                    </label>
-                </div>
-            </div>
-            <!-- Param panels — one per engine, shown/hidden by updateParamVisibility().
-                 Rendered by renderParamPanel() from PARAM_SPECS at page load.
-                 Adding a new tunable: add one entry to PARAM_SPECS, no HTML changes needed. -->
-            <div id="params-radix" class="param-panel"></div>
-            <div id="params-essentia" class="param-panel"></div>
+        <!-- injected by initEngineSelector() from ENGINE_REGISTRY -->
+            <div id="engine-selector" class="mode-selector three-col"></div>
+            <!-- Param panels — one per engine, shown/hidden by updateParamVisibility()
+                 Rendered by renderParamPanel() and injected by initParamPanels() from ENGINE_REGISTRY
+                 Adding a new tunable: add one entry to ENGINE_REGISTRY, no HTML changes needed -->
+            <div id="engine-param-panels"></div>
         </div>
 
         <div style="margin-top:16px; display:flex; justify-content:flex-end;">
@@ -465,28 +548,51 @@
             </button>
             <div id="session-params-body">
                 <!-- Mirrors of setup param panels, rendered by renderParamPanel() -->
-                <div id="session-params-radix" class="param-panel"></div>
-                <div id="session-params-essentia" class="param-panel"></div>
+                <div id="session-param-panels"></div>
             </div>
         </div>
 
+        <!-- session-controls: 5 columns for 4 action buttons + cancel.
+             auto-assign is disabled until beats are available (set in startBtn handler). -->
         <div class="session-controls">
             <button id="preview-btn" class="btn btn-ghost">⊞ PREVIEW</button>
+            <button id="auto-assign-btn" class="btn btn-ghost" disabled title="Run beat extraction first">⚡ AUTO-ASSIGN</button>
             <button id="reanalyze-btn" class="btn btn-ghost">↺ RE-ANALYZE</button>
             <button id="finish-btn" class="btn btn-nav">FINISH & EXPORT</button>
             <button id="cancel-btn" class="btn btn-muted">CANCEL</button>
         </div>
 
-        <!-- Inline preview -->
+        <!-- Floating preview panel — position:fixed, draggable + resizable.
+             Structure: titlebar (drag handle) → editor (timing rows) → iframe.
+             Editing state.results happens in #preview-editor above the iframe;
+             Refresh re-renders the blob URL without closing the panel. -->
         <div id="preview-wrap">
-            <div id="preview-bar">
-                <span>PREVIEW</span>
-                <button id="close-preview-btn" title="Close preview">✕</button>
+
+            <!-- Titlebar doubles as drag handle (mousedown/touchstart) -->
+            <div id="preview-titlebar">
+                <span id="preview-title">PREVIEW</span>
+                <div class="preview-titlebar-btns">
+                    <!-- Refresh re-renders iframe with current state.results edits -->
+                    <button class="ptb-btn accent" id="preview-refresh-btn">↺ REFRESH</button>
+                    <!-- Add row: appends a blank result entry for manual timing -->
+                    <button class="ptb-btn" id="preview-add-btn">+ LINE</button>
+                    <button class="ptb-btn" id="close-preview-btn">✕</button>
+                </div>
             </div>
-            <!-- sandbox: allow-scripts enables FIZX JS; omitting allow-same-origin
-                 prevents the iframe from accessing parent localStorage/state.
-                 See CSS comment above for AudioContext tradeoff note. -->
+
+            <!-- Timing editor: renders one row per state.results entry.
+                 Changes update state.results in place immediately (no buffer).
+                 Refresh pushes the updated state into the iframe. -->
+            <div id="preview-editor">
+                <div id="preview-editor-empty">No lyrics tapped yet</div>
+            </div>
+
+            <!-- Sandboxed FIZX iframe: allow-scripts for visualizer JS,
+                 no allow-same-origin so iframe cannot reach parent state. -->
             <iframe id="preview-frame" sandbox="allow-scripts"></iframe>
+
+            <!-- Bottom-right resize drag target -->
+            <div id="preview-resize"></div>
         </div>
     </div>
 
@@ -496,7 +602,7 @@
                 <h2>EXPORT</h2>
                 <span class="output-summary" id="export-summary"></span>
             </div>
-            <button id="generate-fizx-btn" class="btn btn-ghost btn-full" style="height:52px; font-size:0.85rem;">✦ GENERATE FIZX.HTML</button>
+            <button id="generate-fizx-btn" class="btn btn-ghost btn-full" style="height:52px;">✦ GENERATE FIZX.HTML</button>
             <div class="divider"></div>
             <div class="export-grid">
                 <button id="download-beats-btn" class="btn btn-ghost">↓ beats.json</button>
@@ -529,23 +635,7 @@
 
 <div id="toast"></div>
 
-<!-- Essentia core Scripts -->
-<script src="./ext/essentia-wasm.web.js"></script>
-<script src="./ext/essentia.js-core.js"></script>
-
 <script>
-// ═══════════════════════════════════════════════════════════════════
-// INJECTED BY compile.py — do not edit this line.
-// Essentia WASM init pattern:
-//   - EssentiaWASM (the module loader) is provided by essentia-wasm.web.js
-//   - Essentia (the high-level API) is provided by essentia.js-core.js
-//   - The .wasm binary is loaded via a Base64 blob URL injected by compile.py
-//     (/* @@WASM_DATA@@ */ marker), bypassing CORS restrictions on file://
-//    
-// Tradeoff: bloated file but fully local and offline
-// ═══════════════════════════════════════════════════════════════════
-/* @@WASM_DATA@@ */
-
 // ═══════════════════════════════════════════════════════════════════
 // INJECTED BY compile.py — do not edit this line.
 // compile.py backtick-escapes the full compiled FIZX template and
@@ -558,7 +648,9 @@ const FIZX_TEMPLATE = `/* @@FIZX_TEMPLATE@@ */`;
 // ═══════════════════════════════════════════════════════════════════
 // WORKER SOURCE (inlined as Blob — no separate file needed)
 //
-// Algorithm mirrors ex_beats.py exactly:
+// Two engines share one Worker, selected by the 'engine' param:
+//
+// 'spectral' — Spectral Flux (default, mirrors ex_beats.py):
 //   - Radix-2 Cooley-Tukey FFT, O(N log N)
 //   - Hann window, N=2048, hop=512
 //   - Spectral flux envelope, aggregate = median per frame
@@ -566,8 +658,20 @@ const FIZX_TEMPLATE = `/* @@FIZX_TEMPLATE@@ */`;
 //   - Peak-pick: delta=0.07, wait=8 frames (~85ms at 48kHz/512-hop)
 //   - backtrack to nearest preceding local minimum (backtrack=True)
 //   - Secondary 120ms de-dupe pass (MIN_GAP=0.12)
+//   - Good for: timbral transients, rap, dense percussion
+//   - Weaker at: pure amplitude attacks where spectrum doesn't change
 //
-// Receives: { samples: Float32Array, sr: number }  (buffer is transferred)
+// 'energy' — Energy RMS (zero external deps, complementary to spectral):
+//   - Short-time RMS envelope, no FFT needed
+//   - Same peak-pick / backtrack / de-dupe pipeline as spectral
+//   - Good for: loud amplitude attacks, kick drums, spoken word
+//   - Weaker at: quiet timbral changes, hi-hats against loud pads
+//
+// Both use the same delta/wait/minGap params from PARAMS.
+// Tradeoff: one Worker blob for both keeps file size minimal.
+// Adding a third engine: add a branch in the onmessage switch below.
+//
+// Receives: { samples, sr, engine, delta, wait, minGap }
 // Posts:    { type:'progress', pct, label }
 //           { type:'done', onsets, bpm }
 //           { type:'error', message }
@@ -668,10 +772,31 @@ function bpmFromAutocorrelation(env, sr, HOP) {
     return bpm;
 }
 
+// ── Energy RMS onset detection ───────────────────────────────────
+// Complementary to spectral flux: operates on amplitude envelope rather
+// than spectral change. Catches loud attacks that don't shift the spectrum
+// (e.g. kick against a sustained synth pad). Shares the same peak-pick,
+// backtrack, and de-dupe pipeline as the spectral engine.
+//
+// frameSize: RMS window in samples (matches FFT N for consistent hop ratio)
+// hop: same as spectral so timestamps are directly comparable
+function buildEnergyEnvelope(samples, frameSize, hop) {
+    const numFrames = Math.floor((samples.length - frameSize) / hop) + 1;
+    const env = new Float64Array(numFrames);
+    for (let f = 0; f < numFrames; f++) {
+        const off = f * hop;
+        let sum = 0;
+        for (let i = 0; i < frameSize; i++) sum += samples[off + i] * samples[off + i];
+        env[f] = Math.sqrt(sum / frameSize);
+    }
+    return env;
+}
+
 self.onmessage = function(e) {
-    // Params come from PARAMS config on main thread via postMessage payload.
-    // Defaults mirror ex_beats.py so bare postMessage({samples,sr}) still works.
-    const { samples, sr, delta = 0.07, wait = 8, minGap = 0.12 } = e.data;
+    // engine: 'spectral' (default) | 'energy' come from PARAMS config 
+    // on main thread via postMessage payload.
+    // Defaults for delta/wait/minGap mirror ex_beats.py constants.
+    const { samples, sr, engine = 'spectral', delta = 0.07, wait = 8, minGap = 0.12 } = e.data;
     const HOP = 512, N = 2048, HALF = N / 2 + 1;
 
     // Hann window — precomputed once, reused every frame
@@ -687,7 +812,9 @@ self.onmessage = function(e) {
     const prevMag = new Float64Array(HALF);
     const curMag  = new Float64Array(HALF);
     const fluxBuf = new Float64Array(HALF);
-    const envelope = new Float64Array(numFrames);
+    // envelope is reassigned for energy engine — declared with let
+    let envelope = new Float64Array(numFrames);
+    if (engine === 'spectral') {
     const TICK = Math.max(1, Math.floor(numFrames / 50));
 
     for (let f = 0; f < numFrames; f++) {
@@ -702,26 +829,37 @@ self.onmessage = function(e) {
         prevMag.set(curMag);
         if (f % TICK === 0) self.postMessage({ type:'progress', pct: Math.round(f/numFrames*75), label:'BUILDING ENVELOPE' });
     }
+    } else {
+        // ── Energy RMS path ───────────────────────────────────────
+        // Build amplitude RMS envelope, then fall through to the shared
+        // peak-pick pipeline below. No FFT needed — O(N) per frame.
+        self.postMessage({ type:'progress', pct:40, label:'BUILDING ENERGY ENVELOPE' });
+        envelope = buildEnergyEnvelope(samples, N, HOP);
+    }
 
+    // ── Shared peak-pick pipeline (both engines) ─────────────
+    // Use envelope.length — energy path produces a different frame
+    // count than the spectral path's pre-allocated numFrames.
+    const envLen = envelope.length;
     self.postMessage({ type:'progress', pct:78, label:'PEAK PICKING' });
 
-    // Normalize envelope to [0,1] before peak picking and autocorrelation
+    // Normalize to [0,1] before peak picking and autocorrelation
     let maxVal = 0;
-    for (let i = 0; i < numFrames; i++) if (envelope[i] > maxVal) maxVal = envelope[i];
-    if (maxVal > 0) for (let i = 0; i < numFrames; i++) envelope[i] /= maxVal;
+    for (let i = 0; i < envLen; i++) if (envelope[i] > maxVal) maxVal = envelope[i];
+    if (maxVal > 0) for (let i = 0; i < envLen; i++) envelope[i] /= maxVal;
 
     // Adaptive threshold: mean + delta. delta from PARAMS (default 0.07 = ex_beats.py).
     // Lower delta → more sensitive (catches quieter hits, more false positives).
     // Higher delta → less sensitive (only strong transients pass).
     let sum = 0;
-    for (let i = 0; i < numFrames; i++) sum += envelope[i];
-    const threshold = (sum / numFrames) + delta;
+    for (let i = 0; i < envLen; i++) sum += envelope[i];
+    const threshold = (sum / envLen) + delta;
 
-    const WAIT = wait;  // min frames between peaks; from PARAMS (default 8 ≈ 85ms at 48kHz/512-hop)
+    const WAIT = wait;  // min frames between peaks; from PARAMS
     const rawOnsets = [];
     let lastPeak = -WAIT - 1;
 
-    for (let i = 1; i < numFrames-1; i++) {
+    for (let i = 1; i < envLen-1; i++) {
         const v = envelope[i];
         if (v > threshold && v >= envelope[i-1] && v >= envelope[i+1] && (i-lastPeak) >= WAIT) {
             // backtrack=True: snap to nearest preceding local minimum so the
@@ -756,87 +894,111 @@ self.onmessage = function(e) {
 `;
 
 // ═══════════════════════════════════════════════════════════════════
+// ENGINE_REGISTRY — single source of truth for all engines.
+// Adding a new engine: one entry here, one entry in PARAMS for
+// defaults and one entry in PARAM_SPECS for tunable config (optional).
+//
+// useBar: true  → progress bar in overlay (engine posts real progress ticks)
+//         false → spinner (engine is fast/synchronous, bar would flash)
+// ═══════════════════════════════════════════════════════════════════
+const ENGINE_REGISTRY = [
+    { id: 'spectral', label: 'Spectral Flux', useBar: true  },
+    { id: 'energy',   label: 'Energy RMS',    useBar: false },
+    // { id: 'myEngine', label: 'My Engine',     useBar: true },
+];
+
+// Derived lookup — avoids repeated .find() at runtime
+const ENGINE_MAP = Object.fromEntries(ENGINE_REGISTRY.map(e => [e.id, e]));
+
+// ═══════════════════════════════════════════════════════════════════
 // PARAMS — single source of truth for all tunable analysis parameters.
 // Analysis engines read from here. Mutated directly by slider/select
 // inputs via renderParamPanel() event listeners.
 //
-// Extensibility: to add a new param, add one entry here and one entry
-// in PARAM_SPECS. No other code changes needed.
+// Extensibility: to add a new param, add 
 // ═══════════════════════════════════════════════════════════════════
 const PARAMS = {
-    // Radix params (passed to Worker via postMessage)
+    // Shared params — passed to Worker via postMessage for both engines
     delta:  0.07,   // onset strength threshold above local mean (ex_beats.py default)
     wait:   8,      // min frames between detections (~85ms at 48kHz/512-hop)
     minGap: 0.12,   // secondary de-dupe gap in seconds (ex_beats.py MIN_GAP)
-    // Essentia params
-    essentiaModel: 'multifeature',  // 'multifeature' | 'degara'
+    // dummy: 'A', // esnure Key:value matches PARAM_SPECS[model][id]:PARAM_SPECS[model][options][value]
 };
 
 // ═══════════════════════════════════════════════════════════════════
 // PARAM_SPECS — declarative config for UI rendering.
-// Each entry produces one row in the param panel via renderParamPanel().
-//
-// Adding a future param: add one object here. The UI renders automatically.
+// Each entry produces one row in the param panel via renderParamPanel()
 // ═══════════════════════════════════════════════════════════════════
 const PARAM_SPECS = {
-    radix: [
-        {
-            id:      'delta',
-            label:   'Threshold (delta)',
-            type:    'slider', // range input
-            min:     0.01, max: 0.20, step: 0.01,
-            fmt:     v => v.toFixed(2),
-            hint:    'Onset strength must exceed the local mean by this amount to be detected. ' +
-                     'Lower → more onsets (catches quiet hits, more false positives). ' +
-                     'Higher → fewer onsets (only strong transients). ' +
-                     'default: 0.07',
-        },
-        {
-            id:      'wait',
-            label:   'Min gap (frames)',
-            type:    'slider',
-            min:     4, max: 20, step: 1,
-            fmt:     v => `${v} (≈${Math.round(v*512/480*10)/10}ms)`,
-            hint:    'Minimum number of FFT frames between two detected onsets. ' +
-                     'At 48kHz/512-hop, 1 frame ≈ 10.7ms. ' +
-                     'Increase to suppress double-triggers on long hits. ' +
-                     'default: 8 (≈85ms)',
-        },
-        {
-            id:      'minGap',
-            label:   'De-dupe gap (ms)',
-            type:    'slider',
-            min:     0.06, max: 0.30, step: 0.01,
-            fmt:     v => `${Math.round(v*1000)}ms`,
-            hint:    'Secondary de-duplication pass on final timestamps. ' +
-                     'Any onset closer than this to the previous one is dropped. ' +
-                     'Runs after the frame-based wait check, catching edge cases. ' +
-                     'MIN_GAP default: 120ms',
-        },
-    ],
-    essentia: [
-        {
-            id:      'essentiaModel',
-            label:   'Mehod',
-            type:    'model', // radio pair
-            // options array used only by type:'model' — extensible for future select types
-            options: [
-                {
-                    value: 'multifeature',
-                    name:  'Multi',
-                    desc:  'Slower, full analysis',
-                },
-                {
-                    value: 'degara',
-                    name:  'Degara',
-                    desc:  'Faster, partial analysis',
-                },
-            ],
-            hint: 'RhythmExtractor2013 algorithm supports two methods: "multifeature" is the default ' +
-                  '(accurate) and returns a BPM estimate. "degara" uses the BeatTrackerDegara ' +
-                  'algorithm (faster) but does not return BPM — autocorrelation is used as fallback.',
-        },
-    ],
+    spectral: {
+        desc: 'Best for rap, dense percussion, and layered music',
+        params: [
+            {
+                id:      'delta',
+                label:   'Threshold (delta)',
+                type:    'slider', // range input
+                min:     0.01, max: 0.20, step: 0.01,
+                fmt:     v => v.toFixed(2),
+                hint:    'Onset strength must exceed the local mean by this amount to be detected. ' +
+                         'Lower → more onsets (catches quiet hits, more false positives). ' +
+                         'Higher → fewer onsets (only strong transients). ' +
+                         'default: 0.07',
+            },
+            {
+                id:      'wait',
+                label:   'Min gap (frames)',
+                type:    'slider',
+                min:     4, max: 20, step: 1,
+                fmt:     v => `${v} (≈${Math.round(v*512/480*10)/10}ms)`,
+                hint:    'Minimum number of FFT frames between two detected onsets. ' +
+                         'At 48kHz/512-hop, 1 frame ≈ 10.7ms. ' +
+                         'Increase to suppress double-triggers on long hits. ' +
+                         'default: 8 (≈85ms)',
+            },
+            {
+                id:      'minGap',
+                label:   'De-dupe gap (ms)',
+                type:    'slider',
+                min:     0.06, max: 0.30, step: 0.01,
+                fmt:     v => `${Math.round(v*1000)}ms`,
+                hint:    'Secondary de-duplication pass on final timestamps. ' +
+                         'Any onset closer than this to the previous one is dropped. ' +
+                         'Runs after the frame-based wait check, catching edge cases. ' +
+                         'MIN_GAP default: 120ms',
+            },
+        ],
+    },
+    energy: {
+        desc: 'Best for loud attacks, kicks and spoken word',
+        inherits: 'spectral', // inherits all spectral sliders
+        params:   [],         // energy-specific additions go here (e.g. RMS frame size)
+    },
+
+    // // expected radio structure
+    // myEngine: { // MUST match id in ENGINE_REGISTRY
+    //     desc: 'engine_description',
+    //     params: [
+    //         {
+    //             id:      'dummy', // MUST match key in PARAMS
+    //             label:   'Mehod',
+    //             type:    'model', // radio pair
+    //             // options array used only by type:'model' — extensible for future select types
+    //             options: [
+    //                 {
+    //                     value: 'A', // MUST match value PARAMS[key]
+    //                     name:  'Multi',
+    //                     desc:  'description_A',
+    //                 },
+    //                 {
+    //                     value: 'B',
+    //                     name:  'Single',
+    //                     desc:  'description_B',
+    //                 },
+    //             ],
+    //             hint: 'tooltip',
+    //         },
+    //     ],
+    // },
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -850,6 +1012,21 @@ const PARAM_SPECS = {
 // idSuffix:  appended to input IDs to keep them unique across panels
 //            (setup vs session share the same spec but need distinct IDs).
 // ═══════════════════════════════════════════════════════════════════
+
+// Resolve a spec entry's params, following one level of inheritance.
+// 'energy' inheriting 'spectral' means energy users get all spectral
+// sliders — logical since both engines use the same delta/wait/minGap
+// pipeline. No deep inheritance chain needed; one level is sufficient.
+function resolveParams(engineId) {
+    const spec = PARAM_SPECS[engineId];
+    if (!spec) return [];
+    if (spec.inherits) {
+        const parent = PARAM_SPECS[spec.inherits]?.params ?? [];
+        return [...parent, ...(spec.params ?? [])];
+    }
+    return spec.params ?? [];
+}
+
 function renderParamPanel(container, specs, idSuffix) {
     specs.forEach(spec => {
         const row = document.createElement('div');
@@ -866,9 +1043,14 @@ function renderParamPanel(container, specs, idSuffix) {
                 <input class="param-slider"
                     type="range"
                     id="param-${spec.id}-${idSuffix}"
+                    data-param-id="${spec.id}"
                     min="${spec.min}" max="${spec.max}" step="${spec.step}"
                     value="${PARAMS[spec.id]}">
-                <span class="param-value" id="param-val-${spec.id}-${idSuffix}">
+                <span 
+                    class="param-value" 
+                    id="param-val-${spec.id}-${idSuffix}"
+                    data-val-for="${spec.id}"
+                    >
                     ${spec.fmt(PARAMS[spec.id])}
                 </span>`;
 
@@ -876,20 +1058,23 @@ function renderParamPanel(container, specs, idSuffix) {
             const valEl  = row.querySelector('.param-value');
             slider.addEventListener('input', () => {
                 const v = parseFloat(slider.value);
-                PARAMS[spec.id] = v;
-                valEl.textContent = spec.fmt(v);
-                // Sync all other panels showing the same param
-                syncParam(spec.id, v, idSuffix);
+                // PARAMS[spec.id] = v;
+                // valEl.textContent = spec.fmt(v);
+                // // Sync all other panels showing the same param
+                // syncParam(spec.id, v, idSuffix);
+
+                broadcastChange(spec.id, v, slider);
             });
 
         } else if (spec.type === 'model') {
             const optionsHtml = spec.options.map(opt => `
                 <div class="model-option">
                     <input type="radio"
-                        name="essentiaModel-${idSuffix}"
+                        name="${spec.id}-${idSuffix}"
                         id="model-${opt.value}-${idSuffix}"
+                        data-param-id="${spec.id}"
                         value="${opt.value}"
-                        ${PARAMS.essentiaModel === opt.value ? 'checked' : ''}>
+                        ${PARAMS[spec.id] === opt.value ? 'checked' : ''}>
                     <label for="model-${opt.value}-${idSuffix}">
                         <span class="model-name">${opt.name}</span>
                         <span class="model-desc">${opt.desc}</span>
@@ -907,8 +1092,10 @@ function renderParamPanel(container, specs, idSuffix) {
 
             row.querySelectorAll('input[type="radio"]').forEach(radio => {
                 radio.addEventListener('change', () => {
-                    PARAMS.essentiaModel = radio.value;
-                    syncParam('essentiaModel', radio.value, idSuffix);
+                    // PARAMS[spec.id] = radio.value;
+                    // syncParam(spec.id, radio.value, idSuffix);
+
+                    broadcastChange(spec.id, radio.value, radio);
                 });
             });
         }
@@ -917,33 +1104,55 @@ function renderParamPanel(container, specs, idSuffix) {
     });
 }
 
-// Sync a changed param value to all other rendered panels so setup and
-// session panels stay consistent without a shared state lookup.
-// This keeps the pattern simple: each panel owns its own DOM but they
-// all write to and read from the single PARAMS object.
-function syncParam(paramId, value, changedSuffix) {
-    const suffixes = ['setup', 'session'];
-    suffixes.forEach(suffix => {
-        if (suffix === changedSuffix) return;
-        // Slider
-        const slider = document.getElementById(`param-${paramId}-${suffix}`);
-        if (slider) {
-            slider.value = value;
-            const valEl = document.getElementById(`param-val-${paramId}-${suffix}`);
-            if (valEl) {
-                // Find spec to get fmt function
-                const spec = [...PARAM_SPECS.radix, ...PARAM_SPECS.essentia]
-                    .find(s => s.id === paramId);
-                if (spec && spec.fmt) valEl.textContent = spec.fmt(parseFloat(value));
-            }
-        }
-        // Radio
-        const radio = document.querySelector(
-            `input[name="essentiaModel-${suffix}"][value="${value}"]`
-        );
-        if (radio) radio.checked = true;
-    });
+// Substituting syncParam witb event delegation
+function broadcastChange(paramId, value, originEl) {
+    PARAMS[paramId] = value;
+    window.dispatchEvent(new CustomEvent('paramSync', { 
+        detail: { id: paramId, value: value, origin: originEl } 
+    }));
 }
+
+// // Sync a changed param value to all other rendered panels so setup and
+// // session panels stay consistent without a shared state lookup.
+// // This keeps the pattern simple: each panel owns its own DOM but they
+// // all write to and read from the single PARAMS object.
+// function syncParam(paramId, value, changedSuffix) {
+//     // Flat lookup across all spec arrays — engine-agnostic
+//     // PARAM_SPECS values are arrays; flatten once to search by id
+//     // and is already global so looking it up inside syncParam 
+//     // This means syncParam stays a pure (paramId, value, changedSuffix) 
+//     // call regardless of what type or engine the param belongs to
+//     const allSpecs = Object.values(PARAM_SPECS).flatMap(e => e.params || []); // snapshot runs on every user interaction.
+//     const spec     = allSpecs.find(s => s.id === paramId);
+
+//     if (!spec) return;
+
+//     // Build all suffixes from registry — covers every rendered panel
+//     const allSuffixes = ENGINE_REGISTRY.flatMap(e => [
+//         `${e.id}-setup`,
+//         `${e.id}-session`,
+//     ]);
+
+//     allSuffixes.forEach(suffix => {
+//         if (suffix === changedSuffix) return;
+
+//         if (spec.type === 'slider') {
+//             const slider = document.getElementById(`param-${paramId}-${suffix}`);
+//             const valEl  = document.getElementById(`param-val-${paramId}-${suffix}`);
+//             if (slider) slider.value = value;
+//             if (valEl && spec.fmt) valEl.textContent = spec.fmt(parseFloat(value));
+
+//         } else if (spec.type === 'model') {
+//             // Radio name must follow the same convention as renderParamPanel:
+//             // name="${spec.id}-${idSuffix}"
+//             const radio = document.querySelector(
+//                 `input[name="${paramId}-${suffix}"][value="${value}"]`
+//             );
+//             if (radio) radio.checked = true;
+//         }
+//         // Future types: add an else if branch here. No changes to callers needed.
+//     });
+// }
 
 // ═══════════════════════════════════════════════════════════════════
 // UPDATE PARAM PANEL VISIBILITY
@@ -952,13 +1161,13 @@ function syncParam(paramId, value, changedSuffix) {
 // Also syncs the session-params wrapper visibility with mode.
 // ═══════════════════════════════════════════════════════════════════
 function updateParamVisibility() {
-    const engine  = document.querySelector('input[name="engine"]:checked')?.value || 'radix';
+    const engine  = document.querySelector('input[name="engine"]:checked')?.value || ENGINE_REGISTRY[0].id;
     const isSnap  = document.getElementById('mode-snap').checked;
 
-    ['radix', 'essentia'].forEach(e => {
-        const active = e === engine;
-        document.getElementById(`params-${e}`)?.classList.toggle('visible', active);
-        document.getElementById(`session-params-${e}`)?.classList.toggle('visible', active);
+    ENGINE_REGISTRY.forEach(e => {
+        const active = e.id === engine;
+        document.getElementById(`params-${e.id}`)?.classList.toggle('visible', active);
+        document.getElementById(`session-params-${e.id}`)?.classList.toggle('visible', active);
     });
 
     // Session params wrapper only makes sense in snap mode
@@ -1006,134 +1215,15 @@ function bpmFromAutocorrelation(env, sr, HOP) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ESSENTIA EXTRACTION
-// Falls back to beat-grid based
-// Tradeoff vs Radix: faster, but designed for steady 4/4 tempo — will
-// quantize to a grid and can miss syncopated onsets. Use Radix
-// when onset accuracy matters over speed.
-// ═══════════════════════════════════════════════════════════════════
-let essn = null; // Initialized only once
-
-// Convert Base64 to Blob URL
-function getWasmBlobUrl(base64) {
-    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-    return URL.createObjectURL(new Blob([bytes], { type: 'application/wasm' }));
-}
-
-// Initialize Essentia
-async function initializeEssentia() {
-    // ESSENTIA_WASM_BASE64 must be available globally (injected by compile.py).
-    // check here rather than at page load so the error is surfaced at the
-    // moment the user actually tries to use this engine, not on startup.
-    if (typeof ESSENTIA_WASM_BASE64 === 'undefined') {
-        throw new Error('Essentia WASM not loaded — run compile.py --studio to inject it');
-    }
-
-    console.log("Initializing Essentia WASM...");
-    // Decode inlined Base64 WASM
-    const wasmUrl = getWasmBlobUrl(ESSENTIA_WASM_BASE64);
-    // Resolve the WASM Module Factory, EssentiaWASM is a
-    // Function that returns a Promise for the Emscripten module 
-    const wasmModule = await EssentiaWASM({ locateFile: () => wasmUrl });
-    // Instantiate the High-Level API, pass the resolved 
-    // 'wasmModule' (not the factory function) to Essentia
-    essn = new Essentia(wasmModule);
-    console.log("Essentia ready!");
-}
-
-// Run Essentia beat detection
-async function extractEssentia(audioFile) {
-    const arrayBuffer = await audioFile.arrayBuffer();
-    const tmpCtx = new AudioContext();
-    let audioBuffer;
-    try {
-        audioBuffer = await tmpCtx.decodeAudioData(arrayBuffer);
-    } catch(err) {
-        await tmpCtx.close();
-        throw new Error('Audio decode failed: ' + err.message);
-    }
-    // const sr = audioBuffer.sampleRate;
-    const samples = audioBuffer.getChannelData(0);
-    await tmpCtx.close();
-
-    if (!essn) {
-        try {
-            await initializeEssentia();
-        } catch (err) {
-            throw new Error('Essentia Initialization error: ' + err.message);
-        }
-    }
-    
-    // convert the JS float32 typed array into std::vector<float>
-    const vector = essn.arrayToVector(samples);
-    
-    // RhythmExtractor2013 algorithm returns:
-    // bpm: tempo estimation
-    // ticks: estimated tick locations
-    // confidence: detected beat confidence (ignored if using 'degara' method)
-    // estimates: bpm estimates
-    // bpmIntervals: list of beats interval
-    // The algorithm supports two approaches via "method" param:
-    // multifeature (default): slower, more accurate.
-    // degara: returns ticks only, no bpm — faster, grid-based, suitable for 4/4 music.
-    // PARAMS.essentiaModel selects the approach at call time.
-    // BeatTrackerDegara is a separate Essentia algorithm that is exposed
-    // via RhythmExtractor2013's method param, keeping a single call path.
-    const result = PARAMS.essentiaModel === 'degara'
-        // The wrapper expects expects 4 separate arguments 
-        // as follows (signal, maxTempo, method, minTempo) 
-        // undefined triggers defaults
-        ? essn.RhythmExtractor2013(vector, undefined, 'degara')
-        : essn.RhythmExtractor2013(vector);
-    // Convert the "Keyed Object" into a clean Float array
-    // result.ticks returns as { "0": value, "1": value }
-    // Using ticks as its common between algorithms
-    const beats  = Array.from(
-        essn.vectorToArray(result.ticks)
-        ).map(t => parseFloat(
-            t.toFixed(3))
-        ).sort((a, b) => a - b); // Sorting is a safety measure
-    
-    // Calculate BPM - prefer result.bpm if available
-    let bpm = 0;
-    if (beats.length > 1) {
-        if (typeof result.bpm === 'number' && result.bpm > 0) { // not all algorithms return bpm
-            bpm = Math.round(result.bpm);
-        } else {
-            // Build a sparse onset envelope from beat timestamps:
-            // map each beat to its nearest frame index, set env[frame]=1.
-            // This gives autocorrelation a clean periodic signal to work with.
-            const HOP_FAKE = 512, SR_FAKE = 44100; // nominal values — only the ratio matters
-            const frameRate = SR_FAKE / HOP_FAKE;
-            const lastFrame = Math.ceil(beats[beats.length - 1] * frameRate) + 1;
-            const env = new Float32Array(lastFrame);
-            for (const t of beats) {
-                const f = Math.round(t * frameRate);
-                if (f < lastFrame) env[f] = 1;
-            }
-            bpm = bpmFromAutocorrelation(env, SR_FAKE, HOP_FAKE);
-        }
-        console.log(`[Essentia] beats:${beats.length} bpm:${bpm}`);
-    } else {
-        console.warn('[Essentia] no beats detected');
-    }
-
-    // Free WASM heap allocation — Essentia vectors are malloc'd on the
-    // WASM heap and not GC'd; explicit delete is required to avoid leaks.
-    vector.delete();
-    
-    return { onsets: beats, bpm };
-}
-
-// ═══════════════════════════════════════════════════════════════════
 // RADIX EXTRACTION (Worker wrapper)
-// Main thread: decode → transfer Float32Array → Worker runs FFT pipeline.
+// Main thread: decode → transfer Float32Array → Worker runs pipeline.
 // Zero-copy transfer via Transferable — samples.buffer is detached after
 // postMessage, preventing accidental re-use on main thread.
 // ═══════════════════════════════════════════════════════════════════
 
 // Worker Blob URL — created once, reused across sessions
 let _radixWorkerUrl = null;
+
 function getRadixWorkerUrl() {
     // Blob URL created once and reused — creating per-call would leak
     if (!_radixWorkerUrl) _radixWorkerUrl = URL.createObjectURL(new Blob([RADIX_WORKER_SRC], { type: 'text/javascript' }));
@@ -1180,7 +1270,7 @@ function extractRadix(audioFile, onProgress) {
 
         // Transfer — zero-copy handoff, samples.buffer is detached after this call.
         // delta/wait/minGap come from PARAMS (user-configured or defaults).
-        worker.postMessage({ samples, sr, delta: PARAMS.delta, wait: PARAMS.wait, minGap: PARAMS.minGap }, [samples.buffer]);
+        worker.postMessage({ samples, sr, engine: state.engine, delta: PARAMS.delta, wait: PARAMS.wait, minGap: PARAMS.minGap }, [samples.buffer]);
     });
 }
 
@@ -1198,7 +1288,7 @@ const state = {
     index:        0,   // current lyrics line index
     active:       false,
     mode:         'buffer',  // 'buffer' | 'snap'
-    engine:       'radix',   // 'radix' | 'essentia'
+    engine:       'spectral',   // 'spectral' | 'energy'
     player:       null,
     playerUrl:    null,   // stored separately — player.src becomes a resolved URL after assignment
     rafId:        null,   // rAF handle for seek bar loop; cancelled on cleanup
@@ -1241,6 +1331,9 @@ const pbPlay          = document.getElementById('pb-play');
 const pbStop          = document.getElementById('pb-stop');
 const seekTrack       = document.getElementById('seek-track');
 const seekFill        = document.getElementById('seek-fill');
+const eSelector       = document.getElementById('engine-selector');
+const setupParent     = document.getElementById('engine-param-panels');
+const sessionParent   = document.getElementById('session-param-panels');
 
 // ═══════════════════════════════════════════════════════════════════
 // TOAST AND OVERLAY
@@ -1257,13 +1350,13 @@ function toast(msg) {
 // showOverlay(engine) — shows the overlay with the correct indicator
 // incremental progress → progress bar, else spinner (indeterminate)
 function showOverlay(engine) {
-    document.getElementById('analysis-bar').style.width = '0%';
-    document.getElementById('analysis-label').textContent = 'ANALYZING AUDIO';
-    document.getElementById('analysis-sub').textContent   = 'decoding…';
-    const useBar = engine === 'radix';
-    document.getElementById('analysis-bar-wrap').style.display     = useBar ? 'block' : 'none';
-    document.getElementById('analysis-spinner-wrap').style.display  = useBar ? 'none'  : 'flex';
-    document.getElementById('analysis-overlay').classList.add('visible');
+    analysisBar.style.width = '0%';
+    analysisLabel.textContent = 'ANALYZING AUDIO';
+    analysisSub.textContent   = 'decoding…';
+    const useBar = ENGINE_MAP[engine]?.useBar ?? true;
+    analysisBarWrap.style.display     = useBar ? 'block' : 'none';
+    analysisSpinWrap.style.display  = useBar ? 'none'  : 'flex';
+    analysisOverlay.classList.add('visible');
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1346,20 +1439,93 @@ seekTrack.addEventListener('click', (e) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// PARAM PANEL INIT + ENGINE/MODE CHANGE LISTENERS
-// Panels are rendered once from PARAM_SPECS at load time.
+// ENGINE AND PARAM PANEL INIT + MODE CHANGE LISTENERS
+// Rendered once from ENGINE_REGISTRY at load time.
 // Engine and mode changes update visibility without re-rendering.
 // ═══════════════════════════════════════════════════════════════════
+
+// Immediately Invoked Function Expression (IIFE)
+// ( ... )();
+// Defines and immediately executes the function 
+// in one step when the script loads. It's a 
+// self-contained initialization block that doesn't 
+// pollute the global scope with temporary variables.
+// Although it is named but not usable elsewhere.
+// Also works (arrow function)
+// (() => { ... })();
+// Also works (no name)
+// (function() { ... })();
+(function initEngineSelector() {
+    eSelector.innerHTML = ENGINE_REGISTRY.map((e, i) => `
+        <div class="mode-option">
+            <input type="radio" name="engine"
+                id="engine-${e.id}" value="${e.id}"
+                ${i === 0 ? 'checked' : ''}>
+            <label for="engine-${e.id}">
+                <span class="mode-title">${e.label}</span>
+                <span class="mode-desc">${PARAM_SPECS[e.id]?.desc ?? ''}</span>
+            </label>
+        </div>`).join('');
+
+    // Re-attach change listeners after innerHTML replacement
+    eSelector.querySelectorAll('input[type="radio"]').forEach(r =>
+        r.addEventListener('change', updateParamVisibility)
+    );
+})();
+
 (function initParamPanels() {
     // Render all panels in both setup and session
-    renderParamPanel(document.getElementById('params-radix'),          PARAM_SPECS.radix,    'setup');
-    renderParamPanel(document.getElementById('params-essentia'),       PARAM_SPECS.essentia, 'setup');
-    renderParamPanel(document.getElementById('session-params-radix'),  PARAM_SPECS.radix,    'session');
-    renderParamPanel(document.getElementById('session-params-essentia'),PARAM_SPECS.essentia,'session');
+    // driven by registry, generates all containers dynamically 
+    // So HTML containers don't need to exist in advance
+    ENGINE_REGISTRY.forEach(e => {
+        const specs = resolveParams(e.id);
+
+        // Setup panel
+        const setupEl = document.createElement('div');
+        setupEl.id        = `params-${e.id}`;
+        setupEl.className = 'param-panel';
+        setupParent.appendChild(setupEl);
+        renderParamPanel(setupEl, specs, `${e.id}-setup`);
+
+        // Session panel
+        const sessionEl = document.createElement('div');
+        sessionEl.id        = `session-params-${e.id}`;
+        sessionEl.className = 'param-panel';
+        sessionParent.appendChild(sessionEl);
+        renderParamPanel(sessionEl, specs, `${e.id}-session`);
+    });
     // Set initial visibility
     updateParamVisibility();
 })();
 
+// update all matching PARAM elements at once
+window.addEventListener('paramSync', (e) => {
+    const { id, value, origin } = e.detail;
+
+    // Find everything linked to this paramId
+    document.querySelectorAll(`[data-param-id="${id}"]`).forEach(el => { // UI elements decoupled, they just need to know their own data-param-id
+        if (el === origin) return; // Don't fight the user's current input
+
+        if (el.type === 'range') {
+            el.value = value;
+        } else if (el.type === 'radio') {
+            if (el.value === value) el.checked = true;
+        }
+    });
+
+    // Sync all text value labels (param-value spans)
+    // find the format function from the first spec we find in PARAM_SPECS
+    const spec = Object.values(PARAM_SPECS).flatMap(p => p.params || []).find(s => s.id === id);
+    if (spec && spec.fmt) {
+        document.querySelectorAll(`[data-val-for="${id}"]`).forEach(valEl => {
+            valEl.textContent = spec.fmt(parseFloat(value));
+        });
+    }
+});
+
+// SNAP ENGINE VISIBILITY
+// Show the engine sub-row only when snap mode is selected.
+// Reduces cognitive load for users who just want manual tapping.
 document.querySelectorAll('input[name="mode"]').forEach(radio => {
     radio.addEventListener('change', () => {
         engineRow.classList.toggle('visible', document.getElementById('mode-snap').checked);
@@ -1367,6 +1533,7 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => {
     });
 });
 
+// Engine toggle
 document.querySelectorAll('input[name="engine"]').forEach(radio => {
     radio.addEventListener('change', updateParamVisibility);
 });
@@ -1377,23 +1544,13 @@ document.getElementById('session-params-toggle').addEventListener('click', funct
     document.getElementById('session-params-body').classList.toggle('open');
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// SNAP ENGINE VISIBILITY
-// Show the engine sub-row only when snap mode is selected.
-// Reduces cognitive load for users who just want manual tapping.
-// ═══════════════════════════════════════════════════════════════════
-document.querySelectorAll('input[name="mode"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-        engineRow.classList.toggle('visible', document.getElementById('mode-snap').checked);
-    });
-});
 
 // ═══════════════════════════════════════════════════════════════════
 // START SESSION
 // ═══════════════════════════════════════════════════════════════════
 function onProgress(pct, label) {
-    document.getElementById('analysis-bar').style.width = pct + '%';
-    document.getElementById('analysis-sub').textContent = label; // sub-label, not the main label
+    analysisBar.style.width = pct + '%';
+    analysisSub.textContent = label; // sub-label, not the main label
 }
 
 startBtn.addEventListener('click', async () => {
@@ -1401,7 +1558,7 @@ startBtn.addEventListener('click', async () => {
 
     state.lyrics = lyricsInput.value.split('\n').filter(l => l.trim());
     state.mode   = document.querySelector('input[name="mode"]:checked').value;
-    state.engine = document.querySelector('input[name="engine"]:checked')?.value || 'radix';
+    state.engine = document.querySelector('input[name="engine"]:checked')?.value || 'spectral';
     startBtn.textContent = '⏳ STARTING…';
     startBtn.disabled    = true;
 
@@ -1409,12 +1566,10 @@ startBtn.addEventListener('click', async () => {
         if (state.mode === 'snap') {
             showOverlay(state.engine);
 
-            let result;
-            if (state.engine === 'essentia') {
-                result = await extractEssentia(state.audioFile);
-            } else {
-                result = await extractRadix(state.audioFile, onProgress);
-            }
+            // engine is now passed inside the 
+            // Worker payload, no main-thread dispatch needed
+            const result = await extractRadix(state.audioFile, onProgress);
+            
             state.beats = result.onsets;
             state.bpm   = result.bpm;
             analysisOverlay.classList.remove('visible');
@@ -1434,9 +1589,11 @@ startBtn.addEventListener('click', async () => {
         totalLinesSpan.textContent  = state.lyrics.length || '∞';
         lineCounterSpan.textContent = '0';
         bpmDisplay.textContent      = state.bpm > 0 ? `${state.bpm} BPM` : 'BPM —';
+        // Enable auto-assign now that beats are available
+        document.getElementById('auto-assign-btn').disabled = false;
         currLine.textContent        = state.lyrics.length > 0
             ? state.lyrics[0]
-            : '⌁ NO LYRICS — TAP SPACEBAR TO MARK BEATS';
+            : '⌁ NO LYRICS — TAPS MARK BEATS';
 
         setupView.style.display   = 'none';
         sessionView.style.display = 'block';
@@ -1482,8 +1639,10 @@ window.addEventListener('keydown', (e) => {
     lineCounterSpan.textContent = state.index;
     updateProgress();
 
-    if (state.lyrics.length > 0 && state.index >= state.lyrics.length) {
-        currLine.textContent = '✓ ALL LINES TAPPED — PRESS FINISH';
+    const overflow = (state.index - state.lyrics.length) + 1;
+
+    if (overflow > 0) {
+        currLine.textContent = `✓ ALL LYRICS + ${overflow} BEATS MARKED`;
         // Keep player running so user can review timing before finishing
     } else {
         currLine.textContent = state.lyrics.length > 0
@@ -1493,7 +1652,58 @@ window.addEventListener('keydown', (e) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// PREVIEW
+// AUTO-ASSIGN
+// Maps state.lyrics[i] directly to state.beats[i] without tapping.
+// End timestamp uses beats[i+1] when available; falls back to
+// start + median inter-beat interval so the last line isn't zero-length.
+//
+// Works best with the Energy engine on vocal-prominent tracks where
+// amplitude attacks align with lyric delivery. On dense mixes the
+// mapping degrades gracefully — wrong assignments are correctable in
+// the preview editor without re-tapping the whole session.
+//
+// Overwrites state.results entirely — previous taps are discarded.
+// Re-tapping remains available at any point after.
+// ═══════════════════════════════════════════════════════════════════
+function autoAssignLyrics() {
+    if (!state.beats.length)  { toast('Run beat extraction first'); return; }
+    if (!state.lyrics.length) { toast('No lyrics to assign'); return; }
+
+    // Median inter-beat interval as fallback end-time for the last line.
+    // Median beats mean so a single long outro gap doesn't inflate the estimate.
+    const intervals = [];
+    for (let i = 1; i < state.beats.length; i++)
+        intervals.push(state.beats[i] - state.beats[i - 1]);
+    const sorted = [...intervals].sort((a, b) => a - b);
+    const medianInterval = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 1.0;
+
+    state.results = state.lyrics.map((text, i) => {
+        const start = parseFloat((state.beats[i] ?? state.beats[state.beats.length - 1]).toFixed(3));
+        const end   = parseFloat((state.beats[i + 1] ?? start + medianInterval).toFixed(3));
+        return { text, start, end };
+    });
+
+    state.index = state.results.length;
+    lineCounterSpan.textContent = state.index;
+    updateProgress();
+
+    // When there are more lyrics than beats the overflow lines 
+    // share the last onset with a visible warning in the toast 
+    // and the stage display
+    const overflow = state.lyrics.length - state.beats.length;
+    const note     = overflow > 0 ? ` (${overflow} lines share last beat — trim in editor)` : '';
+    currLine.textContent = `⚡ AUTO-ASSIGNED ${state.results.length} LINES${note ? ' ⚠' : ''}`;
+    toast(`⚡ ${state.results.length} lines assigned${note}`);
+
+    // Sync editor and refresh iframe if preview is already open
+    renderPreviewEditor();
+    if (previewWrap.classList.contains('visible')) refreshPreviewIframe();
+}
+
+document.getElementById('auto-assign-btn').addEventListener('click', autoAssignLyrics);
+
+// ═══════════════════════════════════════════════════════════════════
+// PREVIEW — floating panel, draggable + resizable
 // Builds a fizx_compiled.html string from current tap state and injects
 // it into the sandboxed iframe. Works with zero spacebar taps (renders
 // the visualizer without any lyrics).
@@ -1524,25 +1734,163 @@ function buildFizxHtml() {
         .replace(/\[\[BPM_DATA\]\]/g,    String(state.bpm || 0));
 }
 
-function showPreview() {
-    // Revoke previous blob URL before creating a new one
+// Revokes stale blob URL, creates new one, sets src.
+function refreshPreviewIframe() {
+    // Always revoke before creating — accumulating blob URLs leaks memory
     if (state.previewBlobUrl) {
         URL.revokeObjectURL(state.previewBlobUrl);
         state.previewBlobUrl = null;
     }
-    const html = buildFizxHtml();
-    state.previewBlobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    state.previewBlobUrl = URL.createObjectURL(new Blob([buildFizxHtml()], { type: 'text/html' }));
     previewFrame.src = state.previewBlobUrl;
+}
+
+// Preview editor, rebuilds timing rows from state.results.
+// Full re-render on every structural change (add/delete).
+// Acceptable for expected sizes (<300 lines); avoids index-offset bugs
+// that event delegation on a mutable list would introduce.
+function renderPreviewEditor() {
+    const editor = document.getElementById('preview-editor');
+    const empty  = document.getElementById('preview-editor-empty');
+    editor.querySelectorAll('.edit-row').forEach(r => r.remove());
+
+    if (!state.results.length) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+
+    state.results.forEach((result, i) => {
+        const row = document.createElement('div');
+        row.className = 'edit-row';
+        row.innerHTML = `
+            <input type="text"   class="edit-text"  value="${result.text.replace(/"/g, '&quot;')}" title="Lyric text">
+            <input type="number" class="edit-start" value="${result.start}" step="0.001" min="0" title="Start (s)">
+            <input type="number" class="edit-end"   value="${result.end}"   step="0.001" min="0" title="End (s)">
+            <button class="edit-row-del" title="Delete">×</button>`;
+
+        // Inputs write directly to state.results[i] — Refresh picks up changes
+        row.querySelector('.edit-text').addEventListener('input',  e => { state.results[i].text  = e.target.value; });
+        row.querySelector('.edit-start').addEventListener('input', e => { state.results[i].start = parseFloat(parseFloat(e.target.value).toFixed(3)) || 0; });
+        row.querySelector('.edit-end').addEventListener('input',   e => { state.results[i].end   = parseFloat(parseFloat(e.target.value).toFixed(3)) || 0; });
+
+        // Delete: splice + full re-render to fix closure indices
+        row.querySelector('.edit-row-del').addEventListener('click', () => {
+            state.results.splice(i, 1);
+            state.index = Math.min(state.index, state.results.length);
+            lineCounterSpan.textContent = state.index;
+            renderPreviewEditor();
+        });
+
+        editor.appendChild(row);
+    });
+}
+
+// Add blank line at current playback position for missed taps
+document.getElementById('preview-add-btn').addEventListener('click', () => {
+    const t = state.player ? parseFloat(state.player.currentTime.toFixed(3)) : 0;
+    state.results.push({ text: '', start: t, end: parseFloat((t + 1).toFixed(3)) });
+    state.index = state.results.length;
+    lineCounterSpan.textContent = state.index;
+    renderPreviewEditor();
+    const editor = document.getElementById('preview-editor');
+    editor.scrollTop = editor.scrollHeight;
+});
+
+// Show / refresh / close
+function showPreview() {
+    renderPreviewEditor();
+    refreshPreviewIframe();
     previewWrap.classList.add('visible');
-    previewWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 document.getElementById('preview-btn').addEventListener('click', showPreview);
+
+// Deliberate choice not to auto-refresh the iframe on every keystroke. 
+// The iframe navigation itself has a small cost and more importantly 
+// would reset the FIZX animation state mid-edit. The user clicks Refresh
+// when they want to see the result. This also makes it clear that the
+// iframe is a render of the saved state, not a live binding.
+document.getElementById('preview-refresh-btn').addEventListener('click', () => {
+    refreshPreviewIframe();
+    toast('Preview refreshed');
+});
+
 document.getElementById('close-preview-btn').addEventListener('click', () => {
-    previewFrame.src = 'about:blank'; // stops iframe JS execution immediately
+    previewFrame.src = 'about:blank'; // halts iframe JS immediately
     if (state.previewBlobUrl) { URL.revokeObjectURL(state.previewBlobUrl); state.previewBlobUrl = null; }
     previewWrap.classList.remove('visible');
 });
+
+// Drag (titlebar)
+// Pointer offset from panel corner tracked at drag-start so the panel
+// doesn't jump to cursor. Listeners on document catch fast moves that
+// leave the titlebar during drag.
+;(function initPreviewDrag() {
+    const titlebar = document.getElementById('preview-titlebar');
+    let dragging = false, ox = 0, oy = 0;
+
+    function startDrag(cx, cy) {
+        dragging = true;
+        const r = previewWrap.getBoundingClientRect();
+        ox = cx - r.left; oy = cy - r.top;
+        document.addEventListener('mousemove', onMouse);
+        document.addEventListener('mouseup', stop);
+        document.addEventListener('touchmove', onTouch, { passive: true });
+        document.addEventListener('touchend', stop);
+    }
+    function onMouse(e) { if (dragging) move(e.clientX, e.clientY); }
+    function onTouch(e) { if (dragging) move(e.touches[0].clientX, e.touches[0].clientY); }
+    function move(cx, cy) {
+        const w = previewWrap.offsetWidth, h = previewWrap.offsetHeight;
+        const x = Math.max(0, Math.min(window.innerWidth  - w, cx - ox));
+        const y = Math.max(0, Math.min(window.innerHeight - h, cy - oy));
+        previewWrap.style.left  = x + 'px';
+        previewWrap.style.top   = y + 'px';
+        previewWrap.style.right = 'auto'; // clear initial CSS right:24px
+    }
+    function stop() {
+        dragging = false;
+        document.removeEventListener('mousemove', onMouse);
+        document.removeEventListener('mouseup', stop);
+        document.removeEventListener('touchmove', onTouch);
+        document.removeEventListener('touchend', stop);
+    }
+
+    titlebar.addEventListener('mousedown',  e => startDrag(e.clientX, e.clientY));
+    titlebar.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+})();
+
+// Resize (corner handle)
+// Tracks delta from resize-start dimensions. Min size enforced to keep
+// editor and iframe usable (260×300).
+;(function initPreviewResize() {
+    const handle = document.getElementById('preview-resize');
+    let resizing = false, sx = 0, sy = 0, sw = 0, sh = 0;
+
+    function startResize(cx, cy) {
+        resizing = true;
+        sx = cx; sy = cy;
+        sw = previewWrap.offsetWidth; sh = previewWrap.offsetHeight;
+        document.addEventListener('mousemove', onMouse);
+        document.addEventListener('mouseup', stop);
+        document.addEventListener('touchmove', onTouch, { passive: true });
+        document.addEventListener('touchend', stop);
+    }
+    function onMouse(e) { if (resizing) resize(e.clientX, e.clientY); }
+    function onTouch(e) { if (resizing) resize(e.touches[0].clientX, e.touches[0].clientY); }
+    function resize(cx, cy) {
+        previewWrap.style.width  = Math.max(260, sw + cx - sx) + 'px';
+        previewWrap.style.height = Math.max(300, sh + cy - sy) + 'px';
+    }
+    function stop() {
+        resizing = false;
+        document.removeEventListener('mousemove', onMouse);
+        document.removeEventListener('mouseup', stop);
+        document.removeEventListener('touchmove', onTouch);
+        document.removeEventListener('touchend', stop);
+    }
+
+    handle.addEventListener('mousedown',  e => startResize(e.clientX, e.clientY));
+    handle.addEventListener('touchstart', e => startResize(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+})();
 
 // ═══════════════════════════════════════════════════════════════════
 // FINISH
@@ -1566,10 +1914,6 @@ finishBtn.addEventListener('click', () => {
 
     sessionView.style.display = 'none';
     outputView.style.display  = 'block';
-    // use these methods only if not planning on re-using Essentia again.
-    // essn.shutdown(); // call internal essentia::shutdown C++ method
-    // essn.delete(); // delete EssentiaJS instance, free JS memory
-    // essn = null;
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1602,14 +1946,12 @@ document.getElementById('reanalyze-btn').addEventListener('click', async () => {
     btn.disabled    = true;
     btn.textContent = '↺ ANALYZING…';
     // Read engine selection fresh — user may have changed it since session start
-    state.engine = document.querySelector('input[name="engine"]:checked')?.value || 'radix';
+    state.engine = document.querySelector('input[name="engine"]:checked')?.value || 'spectral';
 
     showOverlay(state.engine);
 
     try {
-        const result = state.engine === 'essentia'
-            ? await extractEssentia(state.audioFile)
-            : await extractRadix(state.audioFile, onProgress);
+        const result = await extractRadix(state.audioFile, onProgress);
         state.beats = result.onsets;
         state.bpm   = result.bpm;
         bpmDisplay.textContent = state.bpm > 0 ? `${state.bpm} BPM` : 'BPM —';
@@ -1618,7 +1960,7 @@ document.getElementById('reanalyze-btn').addEventListener('click', async () => {
         console.error('Re-analyze failed:', err);
         toast('Re-analyze failed: ' + (err.message || err));
     } finally {
-        document.getElementById('analysis-overlay').classList.remove('visible');
+        analysisOverlay.classList.remove('visible');
         btn.disabled    = false;
         btn.textContent = '↺ RE-ANALYZE';
     }
@@ -1668,6 +2010,8 @@ document.getElementById('cnt-session-btn').addEventListener('click', () => {
     pbPlay.textContent = state.player && !state.player.paused ? '⏸' : '▶';
     // Re-sync session-params visibility in case engine changed in output view
     updateParamVisibility();
+    // Restore active flag if there are lyrics remaining to tap
+    if (state.player && state.index < state.lyrics.length) state.active = true;
 });
 
 // download() creates and immediately revokes the blob URL to avoid memory leaks
