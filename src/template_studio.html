@@ -4,8 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FIZX STUDIO</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"> <!--d2b48ca1 -->
+    <!-- Self-hosted subsetted fonts — no network request, works fully offline.
+         Base64 strings injected by compile.py from generated .b64 files in assets/fonts/.
+         Subsetting via pyftsubset keeps size reasonable (~20KB per variant).
+         format('woff2') has 96%+ browser support; no woff fallback needed for modern targets. -->
+    <style>
+        /* @@FONTS@@ */
+    </style>
     <style>
         :root {
             --bg:           #1c1b19; 
@@ -18,8 +23,8 @@
             --accent-glow:  rgba(224, 169, 109, 0.25);
             --border-accent:rgba(224, 169, 109, 0.35);
             --border:       rgba(255, 255, 255, 0.04);
-            --mono: 'Space Mono', monospace;
-            --sans: 'DM Sans', sans-serif;
+            --prim:         'merri', 'Consolas', monospace;
+            --scnd:         'deja', 'Segoe UI', system-ui, -apple-system, sans-serif; /* DejaVuSans for Arabic */
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -27,7 +32,7 @@
         body {
             background: var(--bg);
             color: var(--text);
-            font-family: var(--sans);
+            font-family: var(--scnd);
             font-weight: 300;
             min-height: 100vh;
             display: flex;
@@ -41,24 +46,29 @@
             );
         }
 
+        svg {
+            vertical-align: middle; /* SVGs often sit slightly "higher" than text */
+            margin-bottom: 0.125em; /* Fine-tune to align with your font baseline */
+        }
+
         .container { max-width: 780px; width: 100%; }
 
         /* ── Header ──────────────────────────────────────────────── */
         .header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 40px; }
         .header h1 {
-            font-family: var(--mono);
+            font-family: var(--prim);
             font-size: 2rem;
             font-weight: 700;
             color: var(--accent);
             letter-spacing: 0.12em;
             text-transform: uppercase;
         }
-        .header-sub { font-family: var(--mono); font-size: 0.9rem; color: var(--text-dim); letter-spacing: 0.1em; }
+        .header-sub { font-family: var(--prim); font-size: 0.9rem; color: var(--text-dim); letter-spacing: 0.1em; }
         .header-line { flex: 1; height: 1px; background: linear-gradient(to right, var(--border-accent), transparent); }
 
         /* ── Panels ──────────────────────────────────────────────── */
         .panel { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
-        .panel-label { font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.18em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 14px; }
+        .panel-label { font-family: var(--prim); font-size: 0.8rem; letter-spacing: 0.18em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 14px; }
 
         /* ── Drop Zone ───────────────────────────────────────────── */
         #drop-zone {
@@ -68,7 +78,7 @@
             transition: all 0.25s ease;
             background: var(--accent-dim);
             text-align: center;
-            font-family: var(--mono);
+            font-family: var(--prim);
             font-size: 1.2rem;
             color: var(--accent);
             margin: 10px auto 20px;
@@ -88,14 +98,13 @@
             background: var(--bg); color: var(--text);
             border: 1px solid var(--border); border-radius: 10px;
             padding: 14px 16px;
-            font-family: var(--mono); font-size: 1rem; line-height: 1.7;
+            font-family: var(--scnd); font-size: 1rem; line-height: 1.7;
             resize: vertical; transition: border 0.2s ease;
         }
         textarea:focus { outline: none; border-color: var(--border-accent); box-shadow: 0 0 0 3px var(--accent-dim); }
         textarea::placeholder { color: var(--text-dim); }
 
         /* ── Mode Selector ───────────────────────────────────────── */
-        /* 3-column for primary mode row; sub-engine row uses same class */
         .mode-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; text-align: center; }
         .mode-selector.three-col { grid-template-columns: 1fr 1fr 1fr; }
         .mode-option { position: relative; }
@@ -109,27 +118,27 @@
         }
         .mode-option label:hover { border-color: var(--border-accent); }
         .mode-option input:checked + label { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 12px var(--accent-glow); }
-        .mode-title { font-family: var(--mono); font-size: 1.2rem; color: var(--accent); font-weight: 700; letter-spacing: 0.05em; }
+        .mode-title { font-family: var(--prim); font-size: 1.2rem; color: var(--accent); font-weight: 700; letter-spacing: 0.05em; }
         .mode-desc { font-size: 0.9rem; color: var(--text-dim); line-height: 1.4; }
 
-        /* Sub-engine selector — hidden until snap mode is chosen */
+        /* Sub-engine selector */
         #engine-row {
             display: none; /* toggled by JS when snap is selected */
             margin-top: 10px;
         }
         #engine-row.visible { display: block; }
-        .engine-label { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+        .engine-label { font-family: var(--prim); font-size: 0.8rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; margin: 14px auto; }
 
         /* ── Buttons ─────────────────────────────────────────────── */
         .btn {
             display: inline-flex; align-items: center; justify-content: center; gap: 8px;
             border: none; padding: 11px 22px;
-            font-family: var(--mono); font-size: 1rem; font-weight: 700;
+            font-family: var(--prim); font-size: 1rem; font-weight: 700;
             letter-spacing: 0.1em; text-transform: uppercase;
             border-radius: 6px; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
         }
         .btn-primary { background: var(--accent); color: #000; }
-        .btn-primary:hover:not(:disabled) { box-shadow: 0 0 20px var(--accent-glow); transform: translateY(-1px); } /* #048147 */
+        .btn-primary:hover:not(:disabled) { box-shadow: 0 0 20px var(--accent-glow); transform: translateY(-1px); }
         .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--border-accent); }
         .btn-ghost:hover:not(:disabled) { background: var(--accent-dim); }
         .btn-nav { background: transparent; color: #7d776b; border: 1px solid #a16d0f; }
@@ -151,13 +160,13 @@
             background: linear-gradient(to right, transparent, var(--accent), transparent); opacity: 0.6;
         }
         #curr-line {
-            font-family: var(--sans); font-weight: 500;
+            font-family: var(--scnd); font-weight: 500;
             font-size: clamp(1.4rem, 4vw, 2rem); color: #807b7b;
             text-shadow: 0 0 30px var(--accent-glow);
             min-height: 2.5rem; line-height: 1.3; letter-spacing: -0.01em;
         }
-        .tap-hint { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); margin-top: 16px; letter-spacing: 0.12em; }
-        .tap-hint kbd { background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; font-family: var(--mono); color: var(--accent); }
+        .tap-hint { font-family: var(--prim); font-size: 0.8rem; color: var(--text-dim); margin-top: 16px; letter-spacing: 0.12em; }
+        .tap-hint kbd { background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; font-family: var(--prim); color: var(--accent); }
 
         /* ── Playback bar ────────────────────────────────────────── */
         .playback-bar {
@@ -179,13 +188,13 @@
             border-radius: 2px; position: relative; cursor: pointer;
         }
         .seek-fill { height: 100%; background: var(--accent); width: 0%; border-radius: 2px; box-shadow: 0 0 6px var(--accent); pointer-events: none; }
-        .pb-time { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); flex-shrink: 0; min-width: 70px; text-align: right; }
+        .pb-time { font-family: var(--prim); font-size: 0.8rem; color: var(--text-dim); flex-shrink: 0; min-width: 70px; text-align: right; }
 
         /* ── Progress + stats (tap progress, separate from seek) ─── */
         .progress-track { width: 100%; height: 2px; background: var(--surface-2); border-radius: 1px; margin: 20px 0 12px; overflow: hidden; }
         .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s ease; box-shadow: 0 0 8px var(--accent); }
 
-        .stats-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 0.9rem; color: var(--text-dim); }
+        .stats-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--prim); font-size: 0.9rem; color: var(--text-dim); }
         .stat-val { color: var(--accent); font-weight: 700; }
         .bpm-badge { background: var(--accent-dim); border: 1px solid var(--border-accent); padding: 3px 10px; border-radius: 4px; letter-spacing: 0.08em; color: var(--accent); }
         .session-controls { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; }
@@ -195,39 +204,19 @@
          * Implemented as position:fixed so it floats over session content
          * without displacing layout. The user can drag it by the title bar
          * and resize it by the bottom-right corner handle.
-         *
-         * Layout (top→bottom inside the float):
-         *   #preview-titlebar  — drag handle + controls (refresh, close)
-         *   #preview-editor    — scrollable timing editor (state.results rows)
-         *   #preview-frame     — sandboxed FIZX iframe (read-only, refreshed on demand)
-         *   #preview-resize    — invisible corner drag target for resize
-         *
-         * Why iframe.src=blob: not srcdoc:
-         *   The HTML parser terminates <script> blocks at the first </script>
-         *   found in an attribute value. The compiled FIZX template contains
-         *   </script> inside its own script block — srcdoc silently breaks it.
-         *   Blob URL bypasses this; browser fetches blob as standalone document.
-         *
-         * Why no live two-way sync with the iframe:
-         *   The iframe is sandboxed (no allow-same-origin) so it cannot reach
-         *   parent state. Editing happens in #preview-editor above the iframe;
-         *   the user clicks Refresh to re-render. This is intentional — it
-         *   prevents the iframe from modifying state accidentally.
          */
         #preview-wrap {
-            /* Floating panel — fixed so it doesn't scroll with page */
             display: none;
-            position: fixed;
+            position: fixed; /* fixed so it doesn't scroll with page */
             top: 60px; right: 24px;
-            width: 340px;
-            min-width: 260px; min-height: 300px;
+            width: 400px;
+            min-width: 300px; min-height: 300px;
             background: var(--surface);
             border: 1px solid var(--border-accent);
             border-radius: 12px;
             box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,255,136,0.08);
             z-index: 200;
-            /* flex column so editor and iframe share vertical space */
-            flex-direction: column;
+            flex-direction: column; /* flex column so editor and preview share vertical space */
             overflow: hidden;
             /* resize handle is a separate element; CSS resize disabled to
                allow custom handle with better UX on touch */
@@ -240,31 +229,32 @@
             padding: 8px 12px;
             background: var(--surface-2);
             border-bottom: 1px solid var(--border);
-            cursor: grab; user-select: none;
+            cursor: grab; user-select: none; touch-action: none;
             flex-shrink: 0;
         }
         #preview-titlebar:active { cursor: grabbing; }
         #preview-title {
-            font-family: var(--mono); font-size: 0.65rem;
+            font-family: var(--prim); font-size: 0.8rem;
             color: var(--accent); letter-spacing: 0.12em;
         }
         .preview-titlebar-btns { display: flex; gap: 6px; align-items: center; }
         .ptb-btn {
             background: none; border: 1px solid var(--border);
             color: var(--text-dim); border-radius: 4px;
-            font-family: var(--mono); font-size: 0.6rem;
+            font-family: var(--prim); font-size: 0.8rem;
             padding: 2px 7px; cursor: pointer; transition: all 0.15s ease;
             white-space: nowrap;
         }
         .ptb-btn:hover { border-color: var(--border-accent); color: var(--accent); }
         .ptb-btn.accent { border-color: var(--border-accent); color: var(--accent); }
+        .ptb-btn.btn-active { background: var(--accent-dim); color: var(--accent); border-color: var(--border-accent); }
 
         /* Timing editor — scrollable list of result rows.
-           Each row lets the user adjust text, start, and end timestamps.
-           Height is capped so the iframe gets meaningful space below. */
+           Each row lets the user adjust text and timestamps.
+           Height is capped so the preview gets meaningful space below. */
         #preview-editor {
             flex-shrink: 0;
-            max-height: 100px;
+            max-height: 220px;
             overflow-y: auto;
             border-bottom: 1px solid var(--border);
             /* custom scrollbar to match theme */
@@ -277,20 +267,20 @@
         /* Individual result row inside the editor */
         .edit-row {
             display: grid;
-            /* text takes most space; two time inputs are compact */
-            grid-template-columns: 1fr 72px 72px 20px;
-            gap: 4px; align-items: center;
+            grid-template-columns: 20px 1fr 70px 20px;
+            grid-template-rows: auto auto;
+            gap: 5px 6px; align-items: center;
             padding: 5px 10px;
             border-bottom: 1px solid var(--border);
-            font-family: var(--mono); font-size: 0.8rem;
+            font-family: var(--prim);
         }
         .edit-row:last-child { border-bottom: none; }
         .edit-row input[type="text"],
         .edit-row input[type="number"] {
             background: var(--bg); color: var(--text);
             border: 1px solid var(--border); border-radius: 4px;
-            padding: 3px 5px; font-family: var(--mono); font-size: 0.8rem;
-            width: 100%;
+            padding: 3px 5px; font-family: var(--scnd); 
+            font-size: 0.9rem; width: 100%;
         }
         .edit-row input:focus { outline: none; border-color: var(--border-accent); }
         /* Delete button for a result row */
@@ -301,27 +291,39 @@
         }
         .edit-row-del:hover { color: #ff4d6a; }
 
+        .edit-row.row-active  { background: var(--accent-dim); }
+        .edit-row.row-dimmed  { opacity: 0.25; }
+        .edit-num { font-family: var(--prim); font-size: 0.8rem; color: var(--text-dim); text-align:center; }
+        .edit-row.row-active .edit-num { color: var(--accent); font-weight: 700; }
+        .edit-timeline {
+            -webkit-appearance: none; appearance: none;
+            grid-column: 1 / -1; width: 100%; height: 3px;
+            background: var(--surface-2); border-radius: 2px;
+            outline: none; cursor: pointer; accent-color: var(--accent); margin-top:1px;
+        }
+        .edit-timeline::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
+            background: var(--accent); box-shadow: 0 0 4px var(--accent-glow); cursor: grab;
+        }
+        .edit-timeline:active::-webkit-slider-thumb { cursor: grabbing; }
+        .edit-timeline::-moz-range-thumb {
+            width: 12px; height: 12px; border: none; border-radius: 50%; background: var(--accent);
+        }
+
         /* Empty state shown when no results exist yet */
         #preview-editor-empty {
             padding: 12px; text-align: center;
-            font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim);
+            font-family: var(--prim); font-size: 0.8rem; color: var(--text-dim);
         }
 
-        /* FIZX preview iframe — fills remaining vertical space */
-        #preview-frame {
-            border: none; display: block;
-            flex: 1;           /* take all remaining height after titlebar+editor */
-            min-height: 200px;
-            width: 100%;
-            background: #000;
-        }
+        #preview-canvas { width:100%; display:block; background:#000; flex:1; min-height:200px; cursor:crosshair; }
 
         /* Resize handle — bottom-right corner drag target.
-           Kept small (16×16) so it doesn't obscure the iframe content.
+           Kept small (16×16) so it doesn't obscure the frame content.
            cursor:nwse-resize signals resize intent to the user. */
         #preview-resize {
             position: absolute; bottom: 0; right: 0;
-            width: 16px; height: 16px; cursor: nwse-resize;
+            width: 16px; height: 16px; cursor: nwse-resize; touch-action: none;
             /* Subtle visual indicator — two diagonal lines */
             background: linear-gradient(
                 135deg,
@@ -339,10 +341,10 @@
             align-items: center; justify-content: center; flex-direction: column; gap: 20px;
         }
         #analysis-overlay.visible { display: flex; }
-        .analysis-label { font-family: var(--mono); font-size: 1rem; color: var(--accent); letter-spacing: 0.14em; }
+        .analysis-label { font-family: var(--prim); font-size: 1rem; color: var(--accent); letter-spacing: 0.14em; }
         .analysis-bar-track { width: 280px; height: 3px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
         .analysis-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.15s ease; box-shadow: 0 0 8px var(--accent); }
-        .analysis-sub { font-family: var(--mono); font-size: 0.9rem; color: var(--text-dim); letter-spacing: 0.1em; }
+        .analysis-sub { font-family: var(--prim); font-size: 0.9rem; color: var(--text-dim); letter-spacing: 0.1em; }
         /* Spinner — shown when no incremental progress.
            Visibility toggled by showOverlay(engine). */
         .analysis-spinner {
@@ -369,7 +371,7 @@
         }
         .param-row:last-child { border-bottom: none; }
         .param-label-wrap { display: flex; align-items: center; gap: 6px; position: relative; }
-        .param-label { font-family: var(--mono); font-size: 0.9rem; color: var(--text-dim); letter-spacing: 0.06em; }
+        .param-label { font-family: var(--prim); font-size: 0.9rem; color: var(--text-dim); letter-spacing: 0.06em; }
         /* Tooltip: pure CSS on ⓘ hover. absolute positioning keeps it
            inside scroll flow without z-index fights with fixed elements. */
         .param-hint-icon { font-size: 0.75rem; color: var(--text-dim); cursor: default; position: relative; }
@@ -377,14 +379,14 @@
         .param-tooltip {
             display: none;
             position: absolute;
-            left: 20px; top: -4px;
+            left: 20px; top: -100px;
             width: 220px;
             background: var(--surface-2);
             border: 1px solid var(--border-accent);
             border-radius: 6px;
             padding: 8px 10px;
-            font-family: var(--sans);
-            font-size: 0.7rem;
+            font-family: var(--scnd);
+            font-size: 0.8rem;
             color: var(--text);
             line-height: 1.5;
             z-index: 50;
@@ -409,7 +411,8 @@
             width: 12px; height: 12px; border: none;
             border-radius: 50%; background: var(--accent);
         }
-        .param-value { font-family: var(--mono); font-size: 0.8rem; color: var(--accent); min-width: 36px; text-align: right; }
+        .param-value { font-family: var(--prim); font-size: 0.8rem; color: var(--accent); min-width: 36px; text-align: right; }
+        .toggle-switch { grid-column: span 2; justify-self:end; }
         /* Selector for non-slider params */
         .model-selector { display: flex; gap: 8px; margin-top: 4px; text-align: center;}
         .model-option { position: relative; flex: 1; }
@@ -422,7 +425,7 @@
         }
         .model-option label:hover { border-color: var(--border-accent); }
         .model-option input:checked + label { border-color: var(--accent); background: var(--accent-dim); }
-        .model-name { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); font-weight: 700; }
+        .model-name { font-family: var(--prim); font-size: 0.9rem; color: var(--accent); font-weight: 700; }
         .model-desc { font-size: 0.8rem; color: var(--text-dim); line-height: 1.3; }
         /* Session params collapsible */
         #session-params { margin-bottom: 12px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; display: none; }
@@ -430,7 +433,7 @@
         #session-params-toggle {
             width: 100%; display: flex; align-items: center; justify-content: space-between;
             padding: 10px 16px; background: var(--surface-2); border: none; cursor: pointer;
-            font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim);
+            font-family: var(--prim); font-size: 0.8rem; color: var(--text-dim);
             letter-spacing: 0.12em; text-transform: uppercase; transition: color 0.15s ease;
         }
         #session-params-toggle:hover { color: var(--accent); }
@@ -439,17 +442,40 @@
         #session-params-body { display: none; padding: 12px 16px; background: var(--surface); }
         #session-params-body.open { display: block; }
 
+        .toggle-switch { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+        .toggle-switch input { position: absolute; opacity: 0; width: 0; }
+        .toggle-track {
+            width: 36px; height: 20px;
+            background: var(--surface-2); border: 1px solid var(--border);
+            border-radius: 10px; transition: all 0.2s ease; position: relative;
+        }
+        .toggle-track::after {
+            content: ''; position: absolute;
+            top: 3px; left: 3px;
+            width: 12px; height: 12px;
+            border-radius: 50%; background: var(--text-dim);
+            transition: all 0.2s ease;
+        }
+        .toggle-switch input:checked + .toggle-track {
+            background: var(--accent-dim); border-color: var(--border-accent);
+        }
+        .toggle-switch input:checked + .toggle-track::after {
+            transform: translateX(16px); background: var(--accent);
+            box-shadow: 0 0 6px var(--accent-glow);
+        }
+
         /* ── Output view ─────────────────────────────────────────── */
-        .output-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-        .output-header h2 { font-family: var(--mono); font-size: 1rem; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); }
-        .output-summary { font-size: 0.8rem; color: var(--text-dim); font-family: var(--mono); }
+        .output-header { display: grid; align-items: center; gap: 12px; margin-bottom: 20px; text-align:center; }
+        .output-header h2 { font-family: var(--prim); font-size: 1.3rem; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); }
+        .output-summary { font-size: 0.9rem; color: var(--text-dim); font-family: var(--prim); }
         .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+        .export-controls {margin:16px auto; display:grid; gap: 10px;}
 
         /* ── Toast ───────────────────────────────────────────────── */
         #toast {
             position: fixed; top: 24px; right: 24px;
             background: var(--surface); border: 1px solid var(--border-accent);
-            color: var(--accent); font-family: var(--mono); font-size: 1.5rem;
+            color: var(--accent); font-family: var(--prim); font-size: 1.5rem;
             padding: 10px 16px; border-radius: 6px;
             opacity: 0; transform: translateY(6px); transition: all 0.2s ease;
             pointer-events: none; letter-spacing: 0.06em;
@@ -458,8 +484,40 @@
 
         .divider { height: 1px; background: var(--border); margin: 20px 0; }
 
+        /* ── Mobile layout ─────────────────────────────────────────────── */
         @media (max-width: 600px) {
-            .mode-selector, .mode-selector.three-col, .export-grid, .session-controls { grid-template-columns: 1fr; }
+            .mode-selector, .mode-selector.three-col,
+            .export-grid, .export-controls { grid-template-columns: 1fr; }
+
+            #preview-wrap {
+                width: 350px;
+                min-height: 250px;
+            }
+            
+            /* session buttons */
+            .session-controls { grid-template-columns: 1fr; gap: 8px; }
+
+            /* Full-width drop zone on mobile */
+            #drop-zone { width: 80%; padding: 20px; }
+
+            /* Shorter sliders to fit narrow viewport */
+            .param-slider { width: 70px; }
+
+            /* Larger tap target for the stage */
+            .stage { padding: 24px 16px; cursor: pointer; user-select: none; }
+
+            /* Hide keyboard hint, show touch hint */
+            .tap-hint .kb-hint   { display: none; }
+            .tap-hint .touch-hint { display: inline; }
+
+            /* Session params panel: full width labels */
+            .param-row { grid-template-columns: 1fr auto; }
+            .param-value { min-width: 28px; }
+        }
+
+        @media (min-width: 601px) {
+            .tap-hint .touch-hint { display: none; }
+            .tap-hint .kb-hint    { display: inline; }
         }
     </style>
 </head>
@@ -473,7 +531,7 @@
     </div>
 
     <div id="setup-view">
-        <textarea id="lyrics-input" placeholder="Paste lyrics here (Optional), one line per entry.&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;QUICK START: drop audio > select mode > start session > tap spacebar > preview > export"></textarea>
+        <textarea id="lyrics-input" placeholder="Paste lyrics here (Optional), one line per entry:&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;QUICK START: drop audio > select mode > start session > tap spacebar > preview > export"></textarea>
         
         <div id="drop-zone">
             DROP AUDIO FILE
@@ -487,28 +545,32 @@
                 <input type="radio" name="mode" id="mode-buffer" value="buffer" checked>
                 <label for="mode-buffer">
                     <span class="mode-title">Lyrics Only</span>
-                    <span class="mode-desc">Taps capture exact timing</span>
+                    <span class="mode-desc">Manually capture lyrics timing</span>
                 </label>
             </div>
             <div class="mode-option">
                 <input type="radio" name="mode" id="mode-snap" value="snap">
                 <label for="mode-snap">
                     <span class="mode-title">Lyrics & Beats</span>
-                    <span class="mode-desc">Taps snaps lyrics to the nearest detected beat</span>
+                    <span class="mode-desc">Snap lyrics to the nearest detected beat</span>
                 </label>
             </div>
         </div>
 
-        <!-- Engine sub-row — only relevant when snap mode is active.
-             Shown/hidden via JS to avoid layout noise in manual mode -->
+        <!-- Engine sub-row — only relevant when snap mode is active -->
         <div id="engine-row">
-            <div class="engine-label" style="margin-top:14px;">Analysis Engine</div>
-        <!-- injected by initEngineSelector() from ENGINE_REGISTRY -->
+            <div class="divider"></div>
+            <div class="engine-label">Analysis Engine</div>
+            <!-- injected by initEngineSelector() from ENGINE_REGISTRY -->
             <div id="engine-selector" class="mode-selector three-col"></div>
             <!-- Param panels — one per engine, shown/hidden by updateParamVisibility()
-                 Rendered by renderParamPanel() and injected by initParamPanels() from ENGINE_REGISTRY
+                 Rendered by renderParamPanel() and initialized by initParamPanels() from ENGINE_REGISTRY
                  Adding a new tunable: add one entry to ENGINE_REGISTRY, no HTML changes needed -->
             <div id="engine-param-panels"></div>
+            <div class="divider"></div>
+            <!-- Vocal stem proxy params -->
+            <div class="engine-label" id="vocal-params-label" style="display:none;">VOCAL ANALYSIS PARAMS</div>
+            <div class="param-panel" id="params-vocal"></div>
         </div>
 
         <div style="margin-top:16px; display:flex; justify-content:flex-end;">
@@ -519,12 +581,16 @@
     <div id="session-view" style="display:none">     
         <div class="stage">
             <div id="curr-line">READY — PRESS SPACEBAR</div>
-            <div class="tap-hint">TAP <kbd>SPACE</kbd> ON EACH LYRIC · <kbd>FINISH</kbd> WHEN DONE</div>
+            <div class="tap-hint">
+                <span class="kb-hint">TAP <kbd>SPACE</kbd></span>
+                <span class="touch-hint">TAP <kbd>SCREEN</kbd></span>
+                ON EACH LYRIC · <kbd>FINISH</kbd> WHEN DONE
+            </div>
 
             <!-- Playback bar: play/pause toggles, stop resets position to 0 -->
             <div class="playback-bar">
-                <button class="pb-btn" id="pb-play" title="Play / Pause">▶</button>
-                <button class="pb-btn" id="pb-stop" title="Stop">■</button>
+                <button class="pb-btn" id="pb-play" title="Play / Pause"></button>
+                <button class="pb-btn" id="pb-stop" title="Stop"></button>
                 <div class="seek-track" id="seek-track">
                     <div class="seek-fill" id="seek-fill"></div>
                 </div>
@@ -535,61 +601,60 @@
             <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
             <div class="stats-row">
                 <span><span class="stat-val" id="line-counter">0</span> / <span id="total-lines">—</span> tapped</span>
+                <button class="btn btn-muted" id="reset-tap-btn" title="Reset lyrics timing"></button>
                 <span id="bpm-display" class="bpm-badge">BPM —</span>
             </div>
         </div>
 
         <!-- Session params — mirrors setup engine params, visible when mode=snap.
-             Collapsible to keep the session screen uncluttered by default.
-             Changes here update PARAMS immediately; re-analyze applies them. -->
+             Collapsible to keep the session screen uncluttered by default -->
         <div id="session-params">
             <button id="session-params-toggle">
                 ANALYSIS PARAMS <span class="arrow">▾</span>
             </button>
             <div id="session-params-body">
-                <!-- Mirrors of setup param panels, rendered by renderParamPanel() -->
+                <div class="engine-label">Analysis Engine</div>
+                <!-- Mirrors of setup param panels -->
                 <div id="session-param-panels"></div>
+                <div class="divider"></div>
+                <!-- Vocal params always visible in session when snap mode active -->
+                <div id="session-params-vocal" class="param-panel visible"></div>
             </div>
         </div>
 
-        <!-- session-controls: 5 columns for 4 action buttons + cancel.
-             auto-assign is disabled until beats are available (set in startBtn handler). -->
+        <!-- session-controls auto-assign is disabled until beats are available (set in startBtn handler). -->
         <div class="session-controls">
-            <button id="preview-btn" class="btn btn-ghost">⊞ PREVIEW</button>
-            <button id="auto-assign-btn" class="btn btn-ghost" disabled title="Run beat extraction first">⚡ AUTO-ASSIGN</button>
-            <button id="reanalyze-btn" class="btn btn-ghost">↺ RE-ANALYZE</button>
+            <button id="preview-btn" class="btn btn-ghost"></button>
+            <button id="auto-assign-btn" class="btn btn-ghost" disabled title="Approximate lyrics timing for manual adjustment"></button>
+            <button id="reanalyze-btn" class="btn btn-ghost"></button>
             <button id="finish-btn" class="btn btn-nav">FINISH & EXPORT</button>
             <button id="cancel-btn" class="btn btn-muted">CANCEL</button>
         </div>
 
-        <!-- Floating preview panel — position:fixed, draggable + resizable.
-             Structure: titlebar (drag handle) → editor (timing rows) → iframe.
-             Editing state.results happens in #preview-editor above the iframe;
-             Refresh re-renders the blob URL without closing the panel. -->
+        <!-- Floating preview panel -->
         <div id="preview-wrap">
 
             <!-- Titlebar doubles as drag handle (mousedown/touchstart) -->
-            <div id="preview-titlebar">
+            <div id="preview-titlebar" title="LYRICS SYNC EDITOR">
                 <span id="preview-title">PREVIEW</span>
                 <div class="preview-titlebar-btns">
-                    <!-- Refresh re-renders iframe with current state.results edits -->
-                    <button class="ptb-btn accent" id="preview-refresh-btn">↺ REFRESH</button>
-                    <!-- Add row: appends a blank result entry for manual timing -->
-                    <button class="ptb-btn" id="preview-add-btn">+ LINE</button>
-                    <button class="ptb-btn" id="close-preview-btn">✕</button>
+                    <button class="ptb-btn accent" id="preview-refresh-btn" title="Apply Lyrics Timing"></button>
+                    <button class="ptb-btn" id="preview-add-btn" title="Insert New Lyrics Line">+</button>
+                    <button class="ptb-btn" id="toggle-onsets-btn" title="Show/hide onset dots"></button>
+                    <button class="ptb-btn" id="zoom-reset-btn" title="Reset zoom (or double-click canvas)">1:1</button>
+                    <button class="ptb-btn" id="close-preview-btn" title="Exit">x</button>
                 </div>
             </div>
 
+            <!-- Single canvas: lyric text (top) + waveform/onsets/lines (bottom).
+                 All interaction (drag lyric lines, click to seek) handled in JS. -->
+            <canvas id="preview-canvas"></canvas>
+
             <!-- Timing editor: renders one row per state.results entry.
-                 Changes update state.results in place immediately (no buffer).
-                 Refresh pushes the updated state into the iframe. -->
+                 Changes update state.results in place immediately (no buffer). -->
             <div id="preview-editor">
                 <div id="preview-editor-empty">No lyrics tapped yet</div>
             </div>
-
-            <!-- Sandboxed FIZX iframe: allow-scripts for visualizer JS,
-                 no allow-same-origin so iframe cannot reach parent state. -->
-            <iframe id="preview-frame" sandbox="allow-scripts"></iframe>
 
             <!-- Bottom-right resize drag target -->
             <div id="preview-resize"></div>
@@ -602,21 +667,21 @@
                 <h2>EXPORT</h2>
                 <span class="output-summary" id="export-summary"></span>
             </div>
-            <button id="generate-fizx-btn" class="btn btn-ghost btn-full" style="height:52px;">✦ GENERATE FIZX.HTML</button>
+            <button id="generate-fizx-btn" class="btn btn-ghost btn-full" style="height:52px;">GENERATE FIZIX.HTML</button>
             <div class="divider"></div>
             <div class="export-grid">
-                <button id="download-beats-btn" class="btn btn-ghost">↓ beats.json</button>
-                <button id="download-lyrics-btn" class="btn btn-ghost">↓ lyrics.js</button>
-                <button id="copy-beats-btn" class="btn btn-muted">⎘ copy beats [ ]</button>
-                <button id="copy-lyrics-btn" class="btn btn-muted">⎘ copy lyrics [ ]</button>
+                <button id="download-beats-btn" class="btn btn-ghost"></button>
+                <button id="download-lyrics-btn" class="btn btn-ghost"></button>
+                <button id="copy-beats-btn" class="btn btn-muted"></button>
+                <button id="copy-lyrics-btn" class="btn btn-muted"></button>
             </div>
-            <div style="margin-top:16px; display:flex; justify-content:flex-end; gap: 5px;">
-                <button id="cnt-session-btn" class="btn btn-nav">↩ RESUME SESSION</button>
-                <button id="new-session-btn" class="btn btn-primary">↩ NEW SESSION</button>
+            <div class="divider"></div>
+            <div class="export-controls">
+                <button id="cnt-session-btn" class="btn btn-nav"></button>
+                <button id="new-session-btn" class="btn btn-primary"></button>
             </div>
         </div>
     </div>
-
 </div>
 
 <!-- Analysis overlay — covers the page during audio analysis -->
@@ -637,13 +702,11 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
-// INJECTED BY compile.py — do not edit this line.
-// compile.py backtick-escapes the full compiled FIZX template and
-// replaces the marker inside the backtick string below.
+// INJECTED BY compile.py — do not edit this line. 
 // The template still contains [[BEATS_DATA]], [[LYRICS_DATA]],
 // [[BPM_DATA]] as placeholders; those are substituted at export time.
 // ═══════════════════════════════════════════════════════════════════
-const FIZX_TEMPLATE = `/* @@FIZX_TEMPLATE@@ */`;
+const FIZX_TEMPLATE = decodeURIComponent("/* @@FIZX_TEMPLATE@@ */");
 
 // ═══════════════════════════════════════════════════════════════════
 // WORKER SOURCE (inlined as Blob — no separate file needed)
@@ -679,12 +742,33 @@ const FIZX_TEMPLATE = `/* @@FIZX_TEMPLATE@@ */`;
 const RADIX_WORKER_SRC = `
 'use strict';
 
+// ── Twiddle factor table ──────────────────────────────────────────
+// Precomputed once for N=2048. The butterfly loop reads wRe[len] and
+// wIm[len] instead of calling Math.cos/Math.sin per pass.
+// Keys are len values (2, 4, 8, ..., 2048).
+// Same table is reused across all frames (N=2048 is fixed).
+// Saves ~numFrames × log2(2048) × 2 trig evaluations ≈ 120K calls
+// on a 3-minute track.
+
+// FFT size N=2048: not parameterized, adding a path for power-of-2
+// validation adds code complexity with negligible real benefit.
+const FFT_N = 2048;
+const twRe = new Float64Array(FFT_N + 1);
+const twIm = new Float64Array(FFT_N + 1);
+for (let len = 2; len <= FFT_N; len <<= 1) {
+    const theta  = -2 * Math.PI / len;
+    twRe[len]    = Math.cos(theta);
+    twIm[len]    = Math.sin(theta);
+}
+
 // ── Radix-2 Cooley-Tukey in-place FFT ────────────────────────────
-// re, im: Float64Arrays of length N (power of 2).
-// Uses iterative butterfly, no recursion — avoids stack depth limits
-// on large N.
+// re, im: Float64Arrays of length N (must be FFT_N = 2048).
+// Iterative butterfly — no recursion, no stack depth risk.
+// Reads twiddle factors from precomputed table instead of computing
+// Math.cos/Math.sin per butterfly pass.
 function fft(re, im) {
     const N = re.length;
+    // Bit-reversal permutation
     let j = 0;
     for (let i = 1; i < N; i++) {
         let bit = N >> 1;
@@ -695,36 +779,83 @@ function fft(re, im) {
                 t = im[i]; im[i] = im[j]; im[j] = t;
         }
     }
+    // Butterfly passes — twiddle factors from table
     for (let len = 2; len <= N; len <<= 1) {
-        const half  = len >> 1;
-        const theta = -2 * Math.PI / len;
-        const wRe = Math.cos(theta), wIm = Math.sin(theta);
+        const half = len >> 1;
+        const wRe  = twRe[len];
+        const wIm  = twIm[len];
         for (let i = 0; i < N; i += len) {
             let curRe = 1, curIm = 0;
             for (let k = 0; k < half; k++) {
-                const uRe = re[i+k], uIm = im[i+k];
+                const uRe = re[i+k],      uIm = im[i+k];
                 const vRe = re[i+k+half], vIm = im[i+k+half];
-                const tRe = curRe*vRe - curIm*vIm, tIm = curRe*vIm + curIm*vRe;
-                re[i+k] = uRe+tRe; im[i+k] = uIm+tIm;
+                const tRe = curRe*vRe - curIm*vIm;
+                const tIm = curRe*vIm + curIm*vRe;
+                re[i+k]      = uRe+tRe; im[i+k]      = uIm+tIm;
                 re[i+k+half] = uRe-tRe; im[i+k+half] = uIm-tIm;
                 const nr = curRe*wRe - curIm*wIm;
-                curIm = curRe*wIm + curIm*wRe; curRe = nr;
+                curIm = curRe*wIm + curIm*wRe;
+                curRe = nr;
             }
         }
     }
 }
 
-// Median — sorts a copy, O(n log n). Float64Array for typed sort.
-function median(arr) {
-    const s = Float64Array.from(arr).sort();
-    const m = s.length >> 1;
-    return (s.length & 1) ? s[m] : (s[m-1] + s[m]) * 0.5;
+// ── Quickselect median O(n) ───────────────────────────────────────
+// Replaces Float64Array.from(arr).sort() which is O(n log n) and
+// allocates a new typed array on every call (GC pressure in hot loop).
+//
+// Strategy: in-place Quickselect on a reusable scratch buffer.
+//   - scratch is pre-allocated once before the frame loop and passed in.
+//   - We copy arr → scratch (unavoidable to preserve original fluxBuf),
+//     then partition in-place until the median index is found.
+//   - Average O(n), worst-case O(n²) — but the median-of-three pivot
+//     selection below makes worst-case extremely unlikely in practice.
+//
+// arr:     source Float64Array (read-only)
+// scratch: pre-allocated Float64Array of same length (mutated in-place)
+function medianQ(arr, scratch) {
+    const n = arr.length;
+    scratch.set(arr);
+
+    // Median-of-three pivot: avoids O(n²) on sorted/reverse-sorted input.
+    // The spectral flux envelope is not random — this matters.
+    function pivotOf3(a, lo, hi) {
+        const mid = (lo + hi) >> 1;
+        if (scratch[a = lo] > scratch[mid]) { let t = scratch[lo]; scratch[lo] = scratch[mid]; scratch[mid] = t; }
+        if (scratch[lo]     > scratch[hi])  { let t = scratch[lo]; scratch[lo] = scratch[hi];  scratch[hi]  = t; }
+        if (scratch[mid]    > scratch[hi])  { let t = scratch[mid];scratch[mid]= scratch[hi];  scratch[hi]  = t; }
+        return scratch[mid];
+    }
+
+    function partition(lo, hi) {
+        const pivot = pivotOf3(lo, lo, hi);
+        let   i = lo - 1, j = hi + 1;
+        while (true) {
+            do { i++; } while (scratch[i] < pivot);
+            do { j--; } while (scratch[j] > pivot);
+            if (i >= j) return j;
+            const t = scratch[i]; scratch[i] = scratch[j]; scratch[j] = t;
+        }
+    }
+
+    const target = n >> 1;
+    let lo = 0, hi = n - 1;
+    while (lo < hi) {
+        const p = partition(lo, hi);
+        if (p < target)  lo = p + 1;
+        else             hi = p;
+    }
+
+    return (n & 1)
+        ? scratch[target]
+        : (scratch[target - 1] + scratch[target]) * 0.5;
 }
 
 // ── BPM via autocorrelation of the onset envelope ─────────────────
-// Rationale: runs autocorrelation on the onset
-// strength  signal to find the dominant periodicity,
-// then resolves octave ambiguity via a log-BPM prior:
+// Rationale: runs autocorrelation on the normalised onset envelope
+// to find the dominant periodicity, then resolves octave ambiguity 
+// via a log-BPM prior:
 //   1. Compute autocorrelation of the normalized envelope.
 //   2. Convert the lag with the highest correlation to BPM.
 //   3. Apply octave correction: if a sub-harmonic lag (×2) has
@@ -732,6 +863,8 @@ function median(arr) {
 // env: Float64Array of normalized onset strengths.
 // sr, HOP: sample rate and hop size, used to convert lag → BPM.
 // BPM range 40–240 constrains the lag search window.
+// Optimization note: O(N²) over lagMax-lagMin range ≈ 280 lags
+// × envLen ≈ 5600 = 1.6M multiplies. Fast enough; no change needed.
 function bpmFromAutocorrelation(env, sr, HOP) {
     const frameRate = sr / HOP;  // frames per second (~93.75 at 48kHz/512)
 
@@ -780,6 +913,9 @@ function bpmFromAutocorrelation(env, sr, HOP) {
 //
 // frameSize: RMS window in samples (matches FFT N for consistent hop ratio)
 // hop: same as spectral so timestamps are directly comparable
+//
+// Optimization note: Math.sqrt kept as envelope linearity matters for 
+// BPM autocorrelation even though peak-pick only needs relative order.
 function buildEnergyEnvelope(samples, frameSize, hop) {
     const numFrames = Math.floor((samples.length - frameSize) / hop) + 1;
     const env = new Float64Array(numFrames);
@@ -792,43 +928,173 @@ function buildEnergyEnvelope(samples, frameSize, hop) {
     return env;
 }
 
+// ── peakPick: reusable so the grid search can call it cheaply ─────
+// Accepts a pre-computed, pre-normalised envelope (Float64Array).
+// Returns onset timestamps in seconds.
+// Factored out of the main path so the grid search can call it ~150
+// times over the same pre-computed envelope without re-running FFT/RMS.
+// backtrack mirrors librosa backtrack=True: snaps detected peak back
+// to the nearest preceding local minimum (attack, not peak).
+function peakPick(envelope, envLen, delta, wait, minGap, sr, HOP) {
+    // Adaptive threshold: mean + delta. delta from PARAMS (default 0.07 = ex_beats.py).
+    // Lower delta → more sensitive (catches quieter hits, more false positives).
+    // Higher delta → less sensitive (only strong transients pass).
+    let sum = 0;
+    for (let i = 0; i < envLen; i++) sum += envelope[i];
+    const threshold = (sum / envLen) + delta;
+
+    const rawOnsets = [];
+    let lastPeak    = -wait - 1;
+
+    for (let i = 1; i < envLen - 1; i++) {
+        const v = envelope[i];
+        if (v > threshold && v >= envelope[i-1] && v >= envelope[i+1] && (i - lastPeak) >= wait) {
+            let snap = i;
+            for (let j = i-1; j >= Math.max(0, i-wait); j--) {
+                if (envelope[j] <= envelope[j+1]) snap = j; else break;
+            }
+            rawOnsets.push(snap);
+            lastPeak = i;
+        }
+    }
+
+    // Frames → seconds + de-dupe pass. minGap from PARAMS (default 0.12 = ex_beats.py MIN_GAP).
+    // Raise minGap to suppress double-triggers on long decaying hits.
+    const onsets = [];
+    for (const f of rawOnsets) {
+        const t = parseFloat(((f * HOP) / sr).toFixed(3));
+        if (!onsets.length || (t - onsets[onsets.length - 1]) >= minGap) onsets.push(t);
+    }
+    return onsets;
+}
+
+// ── scoreOnsets: unsupervised proxy quality score ────────
+// Measures structural correctness of an onset array given a target count.
+//
+// The proxy objectives are imperfect. The count score is the strongest signal, 
+// the gap and coverage scores prevent degenerate solutions (e.g. a config that 
+// produces exactly 33 onsets all within the first 5 seconds scores high on count 
+// but low on coverage, getting regularized down). In practice this should find params 
+// that produce the right count with reasonable temporal spread, getting user within 200–500ms 
+// of correct for most lines. The remaining error is what the preview sliders handle.
+// The fundamental ceiling doesn't change — without ground truth (actual lyrics timing) this is 
+// just an optimization for structural correctness (correct onset count/distribution), 
+// not semantic correctness (distinguish a drum hit from a vocal onset at the same time).
+//
+// Three components (weighted):
+//
+//   countScore (0.6): Gaussian penalty for deviation from targetCount.
+//     Score = 1.0 at exact match, decays symmetrically. The primary
+//     objective — we know how many lyrics we have.
+//
+//   coverScore (0.2): Penalises uneven gap distribution.
+//     Low variance in inter-onset gaps = evenly spaced = good.
+//     Prevents degenerate solutions where N correct-count onsets are
+//     all clustered in the first 10% of the track.
+//
+//   gapScore (0.2): Fraction of gaps in the "speech phrase" range
+//     0.4s–5.0s. Penalises syllable noise (< 0.4s) and missed lines
+//     (> 5s). Genre-agnostic — even fast delivery rarely exceeds 5s/line.
+//
+// Returns a scalar in [0, 1]. Higher = better.
+function scoreOnsets(onsets, targetCount) {
+    if (!onsets.length || targetCount <= 0) return 0;
+
+    // Count score
+    const ratio      = onsets.length / targetCount;
+    const countScore = Math.exp(-Math.pow(ratio - 1, 2) / 0.2);
+
+    if (onsets.length < 2) return countScore * 0.6;
+
+    // Gap distribution
+    const gaps = [];
+    for (let i = 1; i < onsets.length; i++) gaps.push(onsets[i] - onsets[i-1]);
+    const meanGap  = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const spread   = onsets[onsets.length-1] - onsets[0];
+    const idealGap = spread / Math.max(onsets.length - 1, 1);
+    const variance = gaps.reduce((a, b) => a + Math.pow(b - meanGap, 2), 0) / gaps.length;
+
+    // coverScore: normalise variance against ideal gap squared.
+    // Perfect even spacing → variance=0 → coverScore=1.
+    const coverScore = 1 / (1 + variance / Math.pow(idealGap + 0.001, 2));
+
+    // Gap sanity: fraction of gaps in speech-phrase range
+    const saneGaps = gaps.filter(g => g >= 0.4 && g <= 5.0).length;
+    const gapScore = saneGaps / gaps.length;
+
+    return (countScore * 0.6) + (coverScore * 0.2) + (gapScore * 0.2);
+}
+
+// ── Main onmessage ────────────────────────────────────────────────
 self.onmessage = function(e) {
     // engine: 'spectral' (default) | 'energy' come from PARAMS config 
     // on main thread via postMessage payload.
     // Defaults for delta/wait/minGap mirror ex_beats.py constants.
-    const { samples, sr, engine = 'spectral', delta = 0.07, wait = 8, minGap = 0.12 } = e.data;
-    const HOP = 512, N = 2048, HALF = N / 2 + 1;
+    const {
+        samples, sr,
+        engine    = 'spectral',
+        delta     = 0.07,
+        wait      = 8,
+        minGap    = 0.12,
+        autoTune  = false,  // when true, runs grid search after main peak-pick
+        targetCount = 0,    // expected onset count — lyric line count from main thread
+        target    = 'beats', 
+    } = e.data;
+    // // Full-Mix takes a "snapshot" of the music every 10ms.
+    // // Vocal-Mix takes a "snapshot" every 2ms or 5ms.
+    // const HOP = (target === 'beats') ? 512 : 256, N = FFT_N, HALF = N / 2 + 1;
+
+    const HOP = 512, N = FFT_N, HALF = N / 2 + 1;
 
     // Hann window — precomputed once, reused every frame
     const win = new Float64Array(N);
     for (let i = 0; i < N; i++) win[i] = 0.5 * (1 - Math.cos(2*Math.PI*i/(N-1)));
 
-    const numFrames = Math.floor((samples.length - N) / HOP) + 1;
+    // envelope is reassigned for energy engine
+    let envelope;
 
-    // Single allocation for all per-frame working buffers.
-    // No per-frame allocation means no GC pressure in the hot loop.
-    const reArr   = new Float64Array(N);
-    const imArr   = new Float64Array(N);
-    const prevMag = new Float64Array(HALF);
-    const curMag  = new Float64Array(HALF);
-    const fluxBuf = new Float64Array(HALF);
-    // envelope is reassigned for energy engine — declared with let
-    let envelope = new Float64Array(numFrames);
     if (engine === 'spectral') {
-    const TICK = Math.max(1, Math.floor(numFrames / 50));
+        const numFrames = Math.floor((samples.length - N) / HOP) + 1;
+        envelope = new Float64Array(numFrames);
 
-    for (let f = 0; f < numFrames; f++) {
-        const off = f * HOP;
-        for (let i = 0; i < N; i++) { reArr[i] = samples[off+i] * win[i]; imArr[i] = 0; }
-        fft(reArr, imArr);
-        for (let k = 0; k < HALF; k++) curMag[k] = Math.sqrt(reArr[k]*reArr[k] + imArr[k]*imArr[k]);
-        // Half-wave rectified spectral flux (only positive increases pass through)
-        for (let k = 0; k < HALF; k++) { const d = curMag[k]-prevMag[k]; fluxBuf[k] = d > 0 ? d : 0; }
-        // Median across bins — matches librosa aggregate=np.median, suppresses noise
-        envelope[f] = median(fluxBuf);
-        prevMag.set(curMag);
-        if (f % TICK === 0) self.postMessage({ type:'progress', pct: Math.round(f/numFrames*75), label:'BUILDING ENVELOPE' });
-    }
+        // Single allocation for all per-frame working buffers.
+        // No per-frame allocation means no GC pressure in the hot loop.
+        const reArr   = new Float64Array(N);
+        const imArr   = new Float64Array(N);
+        // Two magnitude buffers; swap references instead of copying.
+        // prevMag.set(curMag) each frame = 1025 float64 writes × numFrames.
+        // Swap is 2 variable assignments — saves ~5.7M writes on 3-min track.
+        let   magA    = new Float64Array(HALF);  // current frame magnitude
+        let   magB    = new Float64Array(HALF);  // previous frame magnitude
+        const fluxBuf = new Float64Array(HALF);
+        // Reusable scratch for Quickselect — one allocation, reused every frame.
+        const medScratch = new Float64Array(HALF);
+
+        const TICK = Math.max(1, Math.floor(numFrames / 50));
+
+        for (let f = 0; f < numFrames; f++) {
+            const off = f * HOP;
+            // Load frame into FFT buffers with Hann window applied
+            for (let i = 0; i < N; i++) { reArr[i] = samples[off+i] * win[i]; imArr[i] = 0; }
+            fft(reArr, imArr);
+
+            // Magnitude spectrum — first HALF bins only
+            for (let k = 0; k < HALF; k++) magA[k] = Math.sqrt(reArr[k]*reArr[k] + imArr[k]*imArr[k]);
+            
+            // Half-wave rectified spectral flux (only positive increases pass through)
+            for (let k = 0; k < HALF; k++) { const d = magA[k]-magB[k]; fluxBuf[k] = d > 0 ? d : 0; }
+
+            // Aggregate = median across bins (librosa aggregate=np.median).
+            // Quickselect O(n) with reused scratch — no allocation in hot loop.
+            envelope[f] = medianQ(fluxBuf, medScratch);
+
+            // Swap buffer references — O(1) vs O(n) copy
+            const tmp = magA; magA = magB; magB = tmp;
+
+            if (f % TICK === 0) {
+                self.postMessage({ type: 'progress', pct: Math.round(f / numFrames * 75), label: 'BUILDING ENVELOPE' });
+            }
+        }
     } else {
         // ── Energy RMS path ───────────────────────────────────────
         // Build amplitude RMS envelope, then fall through to the shared
@@ -848,47 +1114,87 @@ self.onmessage = function(e) {
     for (let i = 0; i < envLen; i++) if (envelope[i] > maxVal) maxVal = envelope[i];
     if (maxVal > 0) for (let i = 0; i < envLen; i++) envelope[i] /= maxVal;
 
-    // Adaptive threshold: mean + delta. delta from PARAMS (default 0.07 = ex_beats.py).
-    // Lower delta → more sensitive (catches quieter hits, more false positives).
-    // Higher delta → less sensitive (only strong transients pass).
-    let sum = 0;
-    for (let i = 0; i < envLen; i++) sum += envelope[i];
-    const threshold = (sum / envLen) + delta;
+    // ── Call peakPick with current params for the main result ─────────
+    let onsets = peakPick(envelope, envLen, delta, wait, minGap, sr, HOP);
 
-    const WAIT = wait;  // min frames between peaks; from PARAMS
-    const rawOnsets = [];
-    let lastPeak = -WAIT - 1;
+    // ── Grid search auto-tune (only when requested) ───────────────────
+    // Runs AFTER the main result so the baseline is always available.
+    // The envelope is already computed — only peakPick reruns (~1ms each).
+    // 5×5×6 = 150 combinations; total search time < 200ms.
+    //
+    // Search space is intentionally biased toward vocal phrase detection:
+    //   - delta range: 0.02–0.10 (vocal energy is subtle)
+    //   - wait range:  16–48 frames (170ms–510ms, phrase-level debounce)
+    //   - minGap range: 0.4s–2.0s (phrase-level, not syllable-level)
+    //
+    // The discovered params are sent back to the main thread via a separate
+    // 'autotune' message so the UI sliders can update to reflect them,
+    // giving the user a transparent starting point to adjust from.
+    if (autoTune && targetCount > 0) {
+        self.postMessage({ type: 'progress', pct: 95, label: 'AUTO-TUNING PARAMS' });
 
-    for (let i = 1; i < envLen-1; i++) {
-        const v = envelope[i];
-        if (v > threshold && v >= envelope[i-1] && v >= envelope[i+1] && (i-lastPeak) >= WAIT) {
-            // backtrack=True: snap to nearest preceding local minimum so the
-            // timestamp lands on the attack transient, not the peak
-            let snap = i;
-            for (let j = i-1; j >= Math.max(0, i-WAIT); j--) {
-                if (envelope[j] <= envelope[j+1]) snap = j; else break;
+        const deltaVals  = [0.02, 0.04, 0.06, 0.08, 0.10];
+        const waitVals   = [16, 24, 32, 40, 48];
+        const minGapVals = [0.4, 0.6, 0.8, 1.0, 1.5, 2.0];
+
+        let bestScore  = scoreOnsets(onsets, targetCount); // baseline
+        let bestParams = { delta, wait, minGap };
+        let bestOnsets = onsets;
+
+        for (const d of deltaVals) {
+            for (const w of waitVals) {
+                for (const mg of minGapVals) {
+                    const candidate = peakPick(envelope, envLen, d, w, mg, sr, HOP);
+                    const score     = scoreOnsets(candidate, targetCount);
+                    if (score > bestScore) {
+                        bestScore  = score;
+                        bestParams = { delta: d, wait: w, minGap: mg };
+                        bestOnsets = candidate;
+                    }
+                }
             }
-            rawOnsets.push(snap);
-            lastPeak = i;
+        }
+
+        // Send discovered params back to main thread for UI sync
+        if (bestScore > scoreOnsets(onsets, targetCount)) {
+            self.postMessage({ type: 'autotune', params: bestParams, score: bestScore });
+            onsets = bestOnsets;
         }
     }
 
-    self.postMessage({ type:'progress', pct:90, label:'DE-DUPLICATION' });
-
-    // Frames → seconds + de-dupe pass. minGap from PARAMS (default 0.12 = ex_beats.py MIN_GAP).
-    // Raise minGap to suppress double-triggers on long decaying hits.
-    const onsets = [];
-    for (const f of rawOnsets) {
-        const t = parseFloat(((f * HOP) / sr).toFixed(3));
-        if (!onsets.length || (t - onsets[onsets.length-1]) >= minGap) onsets.push(t);
-    }
-
-    self.postMessage({ type:'progress', pct:95, label:'BPM DETECTION' });
+    self.postMessage({ type: 'progress', pct: 98, label: 'BPM DETECTION' });
 
     // Autocorrelation BPM — see bpmFromAutocorrelation() header comment
     const bpm = bpmFromAutocorrelation(envelope, sr, HOP);
 
     self.postMessage({ type:'progress', pct:100, label:'DONE' });
+
+    // ── Waveform downsampling ─────────────────────────────────────
+    // Downsample envelope to WAVEFORM_COLS columns for display.
+    // The envelope is already computed and normalised — reuse it directly.
+    // WAVEFORM_COLS is small (400 max) so this is negligible cost.
+    // Sent as a separate message so the main thread can store it independently
+    // from the onset/bpm result and reuse across re-analyses.
+    // Only post waveform for full-mix beats extraction,
+    // the vocal-filtered signal would look wrong as a waveform overview.
+    if (target === 'beats') {
+        const WAVEFORM_COLS = 400;
+        const waveform = new Float32Array(WAVEFORM_COLS);
+        const step = envLen / WAVEFORM_COLS;
+        for (let c = 0; c < WAVEFORM_COLS; c++) {
+            const from = Math.floor(c * step);
+            const to   = Math.min(Math.floor((c + 1) * step), envLen);
+            let max    = 0;
+            // Peak (not RMS) per column — peaks read better visually as waveform bars
+            for (let i = from; i < to; i++) {
+                if (envelope[i] > max) max = envelope[i];
+            }
+            waveform[c] = max;
+        }
+        // Transfer ownership — zero-copy, waveform.buffer detaches after this
+        self.postMessage({ type: 'waveform', data: waveform }, [waveform.buffer]);
+    }
+
     self.postMessage({ type:'done', onsets, bpm });
 };
 `;
@@ -914,15 +1220,34 @@ const ENGINE_MAP = Object.fromEntries(ENGINE_REGISTRY.map(e => [e.id, e]));
 // PARAMS — single source of truth for all tunable analysis parameters.
 // Analysis engines read from here. Mutated directly by slider/select
 // inputs via renderParamPanel() event listeners.
-//
-// Extensibility: to add a new param, add 
 // ═══════════════════════════════════════════════════════════════════
 const PARAMS = {
-    // Shared params — passed to Worker via postMessage for both engines
-    delta:  0.07,   // onset strength threshold above local mean (ex_beats.py default)
-    wait:   8,      // min frames between detections (~85ms at 48kHz/512-hop)
-    minGap: 0.12,   // secondary de-dupe gap in seconds (ex_beats.py MIN_GAP)
-    // dummy: 'A', // esnure Key:value matches PARAM_SPECS[model][id]:PARAM_SPECS[model][options][value]
+    // Full mix params — passed to Worker via postMessage
+    delta:  0.07,   // SENSITIVITY: Higher makes it "picky" (only loud beats); lower catches quiet taps.
+    wait:   8,      // SPEED LIMIT: How many frames to "sleep" after a beat so we don't double-trigger. (~85ms at 48kHz/512-hop)
+    minGap: 0.12,   // CLEANUP: If two beats are within 120ms, merge them into one.
+    stem:   false,  // Use vocal onsets to populate lyrics editor, triggers separate analysis
+    // dummy: 'A',  // Radio model example, esnure Key:value matches PARAM_SPECS[model][id]:PARAM_SPECS[model][options][value]
+
+    // Vocal stem proxy params — separate config as vocal stem is sparser than the full mix (no drums)
+    vocalDelta:  0.06,     // Increase for Flux. Prevents "background sizzle" 
+                           // and instrumental hum from being called a "vocal."
+    vocalWait:   32,       // 320ms prevents double-triggers on sustained vowels
+                           // 1500ms debounce at 48kHz/512-hop ≈ 16 frames
+                           // Captures the "stutter" or fast syllables. If this is too high, 
+                           // we miss the second word in a fast "Go! Go! Go!" sequence.
+                           // decrease to capture short vocal phrases
+    vocalMinGap: 1.0,      // 1.0  ≈ 1000ms phrase-level grouping (auto-tune refines this)
+                           // 0.15 ≈ 150ms avoid syllable-level splits
+                           // 150ms is the human limit for fast speech.
+    vocalOffset: -0.08,    // seconds (range: -0.2 to 0.0). Shift detected onsets earlier to 
+                           // land on the vocal attack rather than the consonant peak,
+                           // negative = earlier.
+                           // Spectral Flux "sees" a word starting before the volume peaks. 
+                           // Adjust toward zero (less negative) for Flux as we don't need to look as
+                           // far back as we do with the Energy engine (more negative).
+    vocalAutoTune: false,  // run grid search to find optimal params for lyric count
+                           // discovered params are written back to sliders after analysis
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -931,7 +1256,7 @@ const PARAMS = {
 // ═══════════════════════════════════════════════════════════════════
 const PARAM_SPECS = {
     spectral: {
-        desc: 'Best for rap, dense percussion, and layered music',
+        desc: 'Best for dense and layered music',
         params: [
             {
                 id:      'delta',
@@ -966,12 +1291,84 @@ const PARAM_SPECS = {
                          'Runs after the frame-based wait check, catching edge cases. ' +
                          'MIN_GAP default: 120ms',
             },
+            {
+                id:    'stem',
+                label: 'Vocal Stem',
+                type:  'toggle',
+                hint:  'Use vocal onsets to seeds the lyrics preview editor with ' +
+                       'beat-anchored placeholder times. Aligns more closely with lyric ' +
+                       'delivery than using full-mix.',
+            },
         ],
     },
     energy: {
         desc: 'Best for loud attacks, kicks and spoken word',
         inherits: 'spectral', // inherits all spectral sliders
         params:   [],         // energy-specific additions go here (e.g. RMS frame size)
+    },
+
+    // ── Vocal stem proxy params ───────────────────────────────────
+    // Separate spec from full-mix engines so vocal tuning doesn't
+    // bleed into beat extraction config. Shown only in the vocal
+    // analysis section of the setup panel.
+    vocal: {
+        desc: 'Vocal stem onset detection for lyric snapping',
+        params: [
+            {
+                id:    'vocalDelta',
+                label: 'Vocal threshold',
+                type:  'slider',
+                min:   0.01, max: 0.15, step: 0.01,
+                fmt:   v => v.toFixed(2),
+                hint:  'Onset strength threshold for vocal stem detection. ' +
+                       'Lower than full-mix default because vocal energy is subtler. ' +
+                       'Default: 0.06',
+            },
+            {
+                id:    'vocalWait',
+                label: 'Debounce (frames)',
+                type:  'slider',
+                min:   8, max: 64, step: 1,  // extended max to allow phrase-level debounce
+                fmt:   v => `${v} (~${Math.round(v*512/48000*1000)}ms)`,
+                hint:  'Minimum frames between vocal onsets. At 48kHz/512-hop, ' +
+                       '40 frames ≈ 430ms — prevents syllable clusters from ' +
+                       'registering as separate lyric lines. ' +
+                       'Default: 32',
+            },
+            {
+                id:    'vocalMinGap',
+                label: 'Min gap (s)',
+                type:  'slider',
+                min:   0.10, max: 2.0, step: 0.05, // extended max for phrase-level
+                fmt:   v => `${Math.round(v*1000)}ms`,
+                hint:  'Secondary de-dupe pass on vocal timestamps. ' +
+                       '800ms groups syllable-level attacks into phrase-level onsets, ' +
+                       'matching one onset per lyric line on rap verses. ' +
+                       'Lower for dense sections, higher for slow delivery. ' +
+                       'Default: 1000ms.',
+            },
+            {
+                id:    'vocalOffset',
+                label: 'Onset offset (s)',
+                type:  'slider',
+                min:   -0.3, max: 0.1, step: 0.01,
+                fmt:   v => `${v >= 0 ? '+' : ''}${(v * 1000).toFixed(0)}ms`,
+                hint:  'Shifts all detected vocal onsets earlier or later. ' +
+                       'Negative values compensate for the bandpass detecting the ' +
+                       'consonant transient slightly before the vocal phrase starts. ' +
+                       'Default: -80ms.',
+            },
+            {
+                id:    'vocalAutoTune',
+                label: 'Auto-tune params',
+                type:  'toggle',
+                hint:  'Automatically search for delta/wait/minGap values that produce ' +
+                       'an onset count closest to your lyric line count. ' +
+                       'Runs a 150-combination grid search after vocal analysis (~200ms). ' +
+                       'Discovered params are written back to the sliders so you can ' +
+                       'see and adjust from the found values.',
+            },
+        ],
     },
 
     // // expected radio structure
@@ -1005,12 +1402,7 @@ const PARAM_SPECS = {
 // RENDER PARAM PANEL
 // Builds param UI rows from PARAM_SPECS into a container element.
 // Called once at page load for each engine, for both setup and session
-// containers — 4 panels total, all sharing the same PARAMS object.
-//
-// container: DOM element to render into.
-// specs:     array from PARAM_SPECS[engine].
-// idSuffix:  appended to input IDs to keep them unique across panels
-//            (setup vs session share the same spec but need distinct IDs).
+// containers, all panels share the same PARAMS object.
 // ═══════════════════════════════════════════════════════════════════
 
 // Resolve a spec entry's params, following one level of inheritance.
@@ -1027,6 +1419,10 @@ function resolveParams(engineId) {
     return spec.params ?? [];
 }
 
+// container: DOM element to render into.
+// specs:     array from PARAM_SPECS[engine].
+// idSuffix:  appended to input IDs to keep them unique across panels
+//            (setup vs session share the same spec but need distinct IDs).
 function renderParamPanel(container, specs, idSuffix) {
     specs.forEach(spec => {
         const row = document.createElement('div');
@@ -1036,7 +1432,7 @@ function renderParamPanel(container, specs, idSuffix) {
             row.innerHTML = `
                 <div class="param-label-wrap">
                     <span class="param-label">${spec.label}</span>
-                    <span class="param-hint-icon">ⓘ
+                    <span class="param-hint-icon">${icon('info')}
                         <span class="param-tooltip">${spec.hint}</span>
                     </span>
                 </div>
@@ -1055,14 +1451,8 @@ function renderParamPanel(container, specs, idSuffix) {
                 </span>`;
 
             const slider = row.querySelector('input');
-            const valEl  = row.querySelector('.param-value');
             slider.addEventListener('input', () => {
                 const v = parseFloat(slider.value);
-                // PARAMS[spec.id] = v;
-                // valEl.textContent = spec.fmt(v);
-                // // Sync all other panels showing the same param
-                // syncParam(spec.id, v, idSuffix);
-
                 broadcastChange(spec.id, v, slider);
             });
 
@@ -1084,7 +1474,7 @@ function renderParamPanel(container, specs, idSuffix) {
             row.innerHTML = `
                 <div class="param-label-wrap" style="grid-column:1/-1; margin-bottom:4px;">
                     <span class="param-label">${spec.label}</span>
-                    <span class="param-hint-icon">ⓘ
+                    <span class="param-hint-icon">${icon('info')}
                         <span class="param-tooltip">${spec.hint}</span>
                     </span>
                 </div>
@@ -1092,11 +1482,27 @@ function renderParamPanel(container, specs, idSuffix) {
 
             row.querySelectorAll('input[type="radio"]').forEach(radio => {
                 radio.addEventListener('change', () => {
-                    // PARAMS[spec.id] = radio.value;
-                    // syncParam(spec.id, radio.value, idSuffix);
-
                     broadcastChange(spec.id, radio.value, radio);
                 });
+            });
+        } else if (spec.type === 'toggle') {
+            row.innerHTML = `
+                <div class="param-label-wrap">
+                    <span class="param-label">${spec.label}</span>
+                    <span class="param-hint-icon">${icon('info')}
+                        <span class="param-tooltip">${spec.hint}</span>
+                    </span>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox"
+                        id="param-${spec.id}-${idSuffix}"
+                        data-param-id="${spec.id}"
+                        ${PARAMS[spec.id] ? 'checked' : ''}>
+                    <span class="toggle-track"></span>
+                </label>`;
+
+            row.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+                broadcastChange(spec.id, e.target.checked, e.target);
             });
         }
 
@@ -1104,55 +1510,13 @@ function renderParamPanel(container, specs, idSuffix) {
     });
 }
 
-// Substituting syncParam witb event delegation
+// Sync with event delegation
 function broadcastChange(paramId, value, originEl) {
-    PARAMS[paramId] = value;
+    PARAMS[paramId] = value; // Update state first, otherwise, the UI will always be one step behind
     window.dispatchEvent(new CustomEvent('paramSync', { 
         detail: { id: paramId, value: value, origin: originEl } 
     }));
 }
-
-// // Sync a changed param value to all other rendered panels so setup and
-// // session panels stay consistent without a shared state lookup.
-// // This keeps the pattern simple: each panel owns its own DOM but they
-// // all write to and read from the single PARAMS object.
-// function syncParam(paramId, value, changedSuffix) {
-//     // Flat lookup across all spec arrays — engine-agnostic
-//     // PARAM_SPECS values are arrays; flatten once to search by id
-//     // and is already global so looking it up inside syncParam 
-//     // This means syncParam stays a pure (paramId, value, changedSuffix) 
-//     // call regardless of what type or engine the param belongs to
-//     const allSpecs = Object.values(PARAM_SPECS).flatMap(e => e.params || []); // snapshot runs on every user interaction.
-//     const spec     = allSpecs.find(s => s.id === paramId);
-
-//     if (!spec) return;
-
-//     // Build all suffixes from registry — covers every rendered panel
-//     const allSuffixes = ENGINE_REGISTRY.flatMap(e => [
-//         `${e.id}-setup`,
-//         `${e.id}-session`,
-//     ]);
-
-//     allSuffixes.forEach(suffix => {
-//         if (suffix === changedSuffix) return;
-
-//         if (spec.type === 'slider') {
-//             const slider = document.getElementById(`param-${paramId}-${suffix}`);
-//             const valEl  = document.getElementById(`param-val-${paramId}-${suffix}`);
-//             if (slider) slider.value = value;
-//             if (valEl && spec.fmt) valEl.textContent = spec.fmt(parseFloat(value));
-
-//         } else if (spec.type === 'model') {
-//             // Radio name must follow the same convention as renderParamPanel:
-//             // name="${spec.id}-${idSuffix}"
-//             const radio = document.querySelector(
-//                 `input[name="${paramId}-${suffix}"][value="${value}"]`
-//             );
-//             if (radio) radio.checked = true;
-//         }
-//         // Future types: add an else if branch here. No changes to callers needed.
-//     });
-// }
 
 // ═══════════════════════════════════════════════════════════════════
 // UPDATE PARAM PANEL VISIBILITY
@@ -1162,8 +1526,9 @@ function broadcastChange(paramId, value, originEl) {
 // ═══════════════════════════════════════════════════════════════════
 function updateParamVisibility() {
     const engine  = document.querySelector('input[name="engine"]:checked')?.value || ENGINE_REGISTRY[0].id;
-    const isSnap  = document.getElementById('mode-snap').checked;
-
+    const isSnap  = document.getElementById('mode-snap').checked ?? false;
+    
+    // Engines
     ENGINE_REGISTRY.forEach(e => {
         const active = e.id === engine;
         document.getElementById(`params-${e.id}`)?.classList.toggle('visible', active);
@@ -1174,45 +1539,58 @@ function updateParamVisibility() {
     document.getElementById('session-params')?.classList.toggle('visible', isSnap);
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// BPM VIA AUTOCORRELATION — shared by both engines (main thread copy)
-//
-// This is a copy of the same function inside RADIX_WORKER_SRC.
-// It cannot be shared directly because the worker runs in a separate
-// global scope with no access to main-thread variables.
-//
-// Used by extractEssentia as a fallback. Essentia's result.bpm is 
-// preferred when available and > 0; this runs only when it isn't 
-// (e.g. degara method omits it).
-//
-// env: normalized Float32/64 Array of onset strengths (values 0–1).
-// sr, HOP: sample rate and hop size used to convert lag → BPM.
-// Search window: 40–240 BPM. Octave correction prefers higher tempo
-// when the half-lag correlation is ≥ 93% of the peak (see worker
-// header for full rationale).
-// ═══════════════════════════════════════════════════════════════════
-function bpmFromAutocorrelation(env, sr, HOP) {
-    const frameRate = sr / HOP;
-    const lagMin = Math.floor(frameRate * 60 / 240);
-    const lagMax = Math.ceil(frameRate * 60 / 40);
-    const N = env.length;
-    let bestLag = lagMin, bestCorr = -Infinity;
-    for (let lag = lagMin; lag <= Math.min(lagMax, N - 1); lag++) {
-        let corr = 0;
-        for (let i = 0; i < N - lag; i++) corr += env[i] * env[i + lag];
-        corr /= (N - lag);
-        if (corr > bestCorr) { bestCorr = corr; bestLag = lag; }
+// When out of tokens but you still wanna code
+function updateToggles() {
+    // Reset state.vocalBeats when deactivated
+    // So autoassBtn uses beats instead
+    if (!PARAMS.stem) {
+        state.vocalBeats = [];
     }
-    let bpm = Math.round(frameRate * 60 / bestLag);
-    const halfLag = Math.round(bestLag / 2);
-    if (halfLag >= lagMin) {
-        let corrHalf = 0;
-        for (let i = 0; i < N - halfLag; i++) corrHalf += env[i] * env[i + halfLag];
-        corrHalf /= (N - halfLag);
-        if (corrHalf >= bestCorr * 0.93) bpm = Math.round(frameRate * 60 / halfLag);
-    }
-    return bpm;
+
+    // Vocal stem proxy params independent of which analysis engine is selected
+    const vocalLabel = document.getElementById('vocal-params-label');
+    if (vocalLabel) vocalLabel.style.display = PARAMS.stem ? 'block' : 'none';
+    
+    Object.entries(vocalPanels).forEach(([label, id]) => {
+        id?.classList.toggle('visible', PARAMS.stem);
+    });
 }
+
+// // ═══════════════════════════════════════════════════════════════════
+// // BPM VIA AUTOCORRELATION — shared by both engines (main thread copy)
+// // To be used by engines that do not support BPM extraction.
+// //
+// // This is a copy of the same function inside RADIX_WORKER_SRC.
+// // It cannot be shared directly because the worker runs in a separate
+// // global scope with no access to main-thread variables.
+// //
+// // env: normalized Float32/64 Array of onset strengths (values 0–1).
+// // sr, HOP: sample rate and hop size used to convert lag → BPM.
+// // Search window: 40–240 BPM. Octave correction prefers higher tempo
+// // when the half-lag correlation is ≥ 93% of the peak.
+// // ═══════════════════════════════════════════════════════════════════
+// function bpmFromAutocorrelation(env, sr, HOP) {
+//     const frameRate = sr / HOP;
+//     const lagMin = Math.floor(frameRate * 60 / 240);
+//     const lagMax = Math.ceil(frameRate * 60 / 40);
+//     const N = env.length;
+//     let bestLag = lagMin, bestCorr = -Infinity;
+//     for (let lag = lagMin; lag <= Math.min(lagMax, N - 1); lag++) {
+//         let corr = 0;
+//         for (let i = 0; i < N - lag; i++) corr += env[i] * env[i + lag];
+//         corr /= (N - lag);
+//         if (corr > bestCorr) { bestCorr = corr; bestLag = lag; }
+//     }
+//     let bpm = Math.round(frameRate * 60 / bestLag);
+//     const halfLag = Math.round(bestLag / 2);
+//     if (halfLag >= lagMin) {
+//         let corrHalf = 0;
+//         for (let i = 0; i < N - halfLag; i++) corrHalf += env[i] * env[i + halfLag];
+//         corrHalf /= (N - halfLag);
+//         if (corrHalf >= bestCorr * 0.93) bpm = Math.round(frameRate * 60 / halfLag);
+//     }
+//     return bpm;
+// }
 
 // ═══════════════════════════════════════════════════════════════════
 // RADIX EXTRACTION (Worker wrapper)
@@ -1221,11 +1599,11 @@ function bpmFromAutocorrelation(env, sr, HOP) {
 // postMessage, preventing accidental re-use on main thread.
 // ═══════════════════════════════════════════════════════════════════
 
-// Worker Blob URL — created once, reused across sessions
+// Worker Blob URL
 let _radixWorkerUrl = null;
 
 function getRadixWorkerUrl() {
-    // Blob URL created once and reused — creating per-call would leak
+    // Blob URL created once and reused across sessions — creating per-call would leak
     if (!_radixWorkerUrl) _radixWorkerUrl = URL.createObjectURL(new Blob([RADIX_WORKER_SRC], { type: 'text/javascript' }));
     return _radixWorkerUrl;
 }
@@ -1258,6 +1636,12 @@ function extractRadix(audioFile, onProgress) {
         worker.onmessage = (e) => {
             const msg = e.data;
             if (msg.type === 'progress') { onProgress(msg.pct, msg.label); return; }
+            if (msg.type === 'waveform') {
+                // Store for preview canvas — cached so re-analysis updates it.
+                // Float32Array from worker message data (plain array, convert back).
+                state.waveformData = new Float32Array(msg.data);
+                return;
+            }
             if (msg.type === 'done') {
                 worker.terminate(); state.activeWorker = null;
                 console.log(`[Radix] onsets:${msg.onsets.length} bpm:${msg.bpm} sr:${sr} dur:${dur.toFixed(2)}s`);
@@ -1270,7 +1654,231 @@ function extractRadix(audioFile, onProgress) {
 
         // Transfer — zero-copy handoff, samples.buffer is detached after this call.
         // delta/wait/minGap come from PARAMS (user-configured or defaults).
-        worker.postMessage({ samples, sr, engine: state.engine, delta: PARAMS.delta, wait: PARAMS.wait, minGap: PARAMS.minGap }, [samples.buffer]);
+        worker.postMessage(
+            { samples, sr, engine: state.engine, 
+              delta: PARAMS.delta, 
+              wait: PARAMS.wait, 
+              minGap: PARAMS.minGap,
+              target: 'beats'
+            }, 
+            [samples.buffer]
+        );
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VOCAL STEM PROXY
+//
+// Goal: produce a cleaner onset map for lyric snapping by isolating
+// vocal energy.
+//
+// Two modes, selected by state.vocalEngine:
+//
+// 'dsp' (default, fully offline):
+//   Mono downmix followed by a bandpass filter targeting the vocal
+//   frequency range. Works on any browser with no downloads.
+//   Rationale: L-R cancels center-panned content including vocals themselves
+//   on tracks with vocal widening/reverb, and fails to cancel center-panned
+//   drums (kick/snare are also mono). The bandpass + aggressive debounce
+//   achieves better phrase-level isolation without the cancellation risk.
+//   The mono downmix + bandpass approach is more general than L-R 
+//   subtraction — it makes no assumption about stereo imaging.
+//
+// 'onnx' (stub — requires network on first load):
+//   Intended to use a quantized ONNX models, cached via Cache API for 
+//   offline reuse after first load.
+//   Not yet implemented — stub records the intended architecture so the
+//   path is clear for online processing.
+//
+// What the current pipeline looks like:
+//   - Full mix -> mono downmix
+//   - Bandpass 500–8000Hz + 3kHz peaking EQ (+6dB)
+//   - Spectral Flux in Worker (engine:'spectral', vocal params)
+//   - Auto-tune grid search
+//   - state.vocalBeats
+//
+// After extraction, the vocal stem is run through the same beat extraction
+// pipeline, but with vocal-specific params
+// (vocalDelta, vocalWait, vocalMinGap) to handle the sparser signal.
+//
+// The resulting onset array is stored in state.vocalBeats.
+// recordTap() and populateEditor() snap to vocalBeats when available,
+// falling back to state.beats otherwise.
+// ═══════════════════════════════════════════════════════════════════
+
+async function extractVocalProxy(audioFile, onProgress) {
+    onProgress(5, 'decoding audio for vocal analysis…');
+
+    let arrayBuffer;
+    try { arrayBuffer = await audioFile.arrayBuffer(); }
+    catch (err) { throw new Error('File read failed: ' + err.message); }
+
+    // Decode at native SR — same reason as full-mix extraction (sr=None in librosa)
+    const tmpCtx = new AudioContext();
+    let audioBuffer;
+    try { audioBuffer = await tmpCtx.decodeAudioData(arrayBuffer); }
+    catch (err) { await tmpCtx.close(); throw new Error('Decode failed: ' + err.message); }
+
+    const sr       = audioBuffer.sampleRate;
+    const nCh      = audioBuffer.numberOfChannels;
+    const duration = audioBuffer.duration;
+    await tmpCtx.close();
+
+    onProgress(20, 'isolating vocal frequencies…');
+
+    let vocalSamples;
+
+    if (state.vocalEngine === 'onnx') {
+        // ── ONNX stub ─────────────────────────────────────────────
+        // Intended flow (not yet implemented):
+        //   1. Check Cache API for cached model blob.
+        //   2. If missing and online: fetch from Hugging Face,
+        //      store in Cache API under a versioned key.
+        //   3. Load ONNX Runtime Web (ort), run inference on audio chunks.
+        //   4. Return the vocal stem Float32Array.
+        //
+        // Cache API pattern:
+        //   const cache  = await caches.open('fizx-models-v1');
+        //   const cached = await cache.match(MODEL_URL);
+        //   if (!cached) { const res = await fetch(MODEL_URL); await cache.put(MODEL_URL, res.clone()); }
+        //   const blob   = await (cached || await fetch(MODEL_URL)).blob();
+        //   // ... load into ort.InferenceSession
+        //
+        // Falls through to DSP for now.
+        console.warn('ONNX not implemented — falling back to DSP');
+        state.vocalEngine = 'dsp';
+    }
+
+    // ── DSP mode: mono downmix + bandpass ─────────────────────────
+    // Mono downmix: average all channels to preserve full vocal amplitude.
+    // the combination of mono downmix + tighter bandpass + debounce + offset knob 
+    // should place lyrics within 100–200ms of the manual times, which the preview 
+    // editor sliders then handle for the remaining per-line correction.
+    vocalSamples = new Float32Array(audioBuffer.getChannelData(0).length);
+    for (let ch = 0; ch < nCh; ch++) {
+        const chData = audioBuffer.getChannelData(ch);
+        for (let i = 0; i < vocalSamples.length; i++) {
+            vocalSamples[i] += chData[i] / nCh;
+        }
+    }
+
+    // Bandpass: preserves fundamental vocal frequencies,
+    // attenuates kick (< 200Hz) and hi-hats (> 5kHz).
+    // Implemented as a simple FIR approximation using Web Audio OfflineContext.
+    // OfflineAudioContext renders the full buffer at once — no streaming needed.
+    onProgress(40, 'applying bandpass filter…');
+
+    const offCtx = new OfflineAudioContext(1, vocalSamples.length, sr);
+    const src    = offCtx.createBufferSource();
+    const buf    = offCtx.createBuffer(1, vocalSamples.length, sr);
+    buf.getChannelData(0).set(vocalSamples);
+    src.buffer = buf;
+
+    // High-pass 500Hz: attenuates kick/bass fundamentals.
+    // Q=1.2 gives a steeper rolloff than Butterworth (Q=0.7) — more
+    // aggressive low-end rejection at the cost of a slight resonance peak.
+    const hp = offCtx.createBiquadFilter();
+    hp.type            = 'highpass';
+    hp.frequency.value = 500; // Higher values cuts more kick bleed
+    hp.Q.value         = 1.2; // Butterworth approximation — increase for steeper rolloff
+
+    // Peaking EQ +6dB at 3kHz: boosts consonant friction zone.
+    // The 'peaking' type adds gain at the centre frequency with a bell curve.
+    // Q=1.5 gives a moderate bandwidth (~2 octaves) centred on 3kHz,
+    // boosting the 2–5kHz range where 't', 'k', 's', 'p' transients live.
+    const peak = offCtx.createBiquadFilter();
+    peak.type = 'peaking'; peak.frequency.value = 3000;
+    peak.gain.value = 6; peak.Q.value = 1.5;
+
+    // Low-pass 8kHz: capture sibilant consonants (s, f, sh).
+    // Accepts more hi-hat bleed but the inverse beat masking step handles it.
+    const lp = offCtx.createBiquadFilter();
+    lp.type            = 'lowpass';
+    lp.frequency.value = 8000;
+    lp.Q.value         = 0.9;
+
+    src.connect(hp);
+    hp.connect(peak);
+    peak.connect(lp);
+    lp.connect(offCtx.destination);
+    src.start(0);
+
+    const rendered = await offCtx.startRendering();
+    // Copy filtered samples — Float32Array for Worker transfer
+    vocalSamples = rendered.getChannelData(0).slice();
+
+    onProgress(60, 'detecting vocal onsets…');
+
+    // Reuse the existing worker on the filtered vocal signal using
+    // vocal-specific params instead of full-mix params so the two 
+    // configs stay independent.
+    return new Promise((resolve, reject) => {
+        const worker = new Worker(getRadixWorkerUrl());
+        // Track separately from state.activeWorker so a concurrent full-mix
+        // analysis and vocal analysis don't cancel each other on cleanup.
+        let vocalWorker = worker;
+
+        worker.onmessage = (e) => {
+            const msg = e.data;
+            if (msg.type === 'autotune') {
+                // Write discovered params back to PARAMS
+                // so the user sees what was found and can 
+                // still adjust manually from that starting point
+                PARAMS.vocalDelta  = msg.params.delta;
+                PARAMS.vocalWait   = msg.params.wait;
+                PARAMS.vocalMinGap = msg.params.minGap;
+
+                // Sync all sliders that display these params via the existing broadcast system
+                ['vocalDelta', 'vocalWait', 'vocalMinGap'].forEach(id =>
+                    window.dispatchEvent(new CustomEvent('paramSync', {
+                        detail: { id, value: PARAMS[id], origin: null }
+                    }))
+                );
+                toast(
+                    `Auto-tuned: delta=${msg.params.delta} ` +
+                    `wait=${msg.params.wait}fr ` +
+                    `gap=${msg.params.minGap}s ` +
+                    `(score ${msg.score.toFixed(2)})`
+                );
+                return;
+            }
+            if (msg.type === 'progress') {
+                // Scale worker progress (0-100) into our 60-100 window
+                onProgress(60 + Math.round(msg.pct * 0.4), msg.label);
+                return;
+            }
+            if (msg.type === 'done') {
+                vocalWorker.terminate(); vocalWorker = null;
+                console.log(`[VocalProxy] onsets:${msg.onsets.length} sr:${sr} dur:${duration.toFixed(2)}s`);
+                resolve(msg.onsets);
+                return;
+            }
+            if (msg.type === 'error') {
+                vocalWorker.terminate(); vocalWorker = null;
+                reject(new Error(msg.message));
+            }
+        };
+        worker.onerror = (err) => {
+            vocalWorker.terminate(); vocalWorker = null;
+            reject(new Error('VocalWorker: ' + err.message));
+        };
+
+        // Engine rationale: spectral flux detects rate of spectral change, not amplitude.
+        // A soft vocal consonant entry produces strong spectral flux (energy suddenly
+        // appearing at 3–8kHz) even when total amplitude is low — invisible to Energy RMS.
+        // The bandpass pre-processing already narrows the signal, so the spectral flux
+        // engine operates on a vocal-biased spectrum rather than the full mix.
+        worker.postMessage(
+            { samples: vocalSamples, sr, engine: 'spectral',
+              delta:       PARAMS.vocalDelta,
+              wait:        PARAMS.vocalWait,
+              minGap:      PARAMS.vocalMinGap,
+              autoTune:    PARAMS.vocalAutoTune,
+              targetCount: state.lyrics.length,  // grid search targets this count
+              target: 'vocal',
+            },
+            [vocalSamples.buffer]
+        );
     });
 }
 
@@ -1281,26 +1889,29 @@ function extractRadix(audioFile, onProgress) {
 // ═══════════════════════════════════════════════════════════════════
 const state = {
     audioFile:    null,
-    beats:        [],
+    beats:        [],     // onsets from full mix — used for beat visualizer sync
+    vocalBeats:   [],     // onsets from vocal stem proxy — used for lyric snapping
+                          // populated by extractVocalProxy(); falls back to beats array if empty
+    waveformData: null,   // Float32Array[400] from Worker, null until first extraction
     bpm:          0,
-    lyrics:       [],  // lines from textarea, split at session start
-    results:      [],  // tapped entries: { text, start, end }
-    index:        0,   // current lyrics line index
-    active:       false,
-    mode:         'buffer',  // 'buffer' | 'snap'
-    engine:       'spectral',   // 'spectral' | 'energy'
+    lyrics:       [],     // lines from textarea, split at session start
+    results:      [],     // assigned lyrics: { text, start }
+                          // end is implicit: template renderer uses next line's start
+    index:        0,      // current lyrics line index
+    mode:         'buffer',     // 'buffer' | 'snap'
+    engine:       'spectral',   // 'spectral' | 'energy' — controls full-mix analysis
+    vocalEngine:  'dsp',        // 'dsp' | 'onnx' — controls vocal stem extraction
     player:       null,
     playerUrl:    null,   // stored separately — player.src becomes a resolved URL after assignment
-    rafId:        null,   // rAF handle for seek bar loop; cancelled on cleanup
     activeWorker: null,   // kept so cancel can terminate mid-analysis
     // Serialised export strings — populated by finishSession()
     beatsJson: '', lyricsJs: '', beatsRaw: '', lyricsRaw: '',
-    // Active preview blob URL — tracked so it can be revoked on close
-    previewBlobUrl: null,
+    // Preview state
+    previewActive:  false,  // true when in-page renderer is running
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// DOM REFS — gathered once at startup
+// COMMON DOM REFS — gathered once at startup
 // ═══════════════════════════════════════════════════════════════════
 const setupView       = document.getElementById('setup-view');
 const sessionView     = document.getElementById('session-view');
@@ -1311,6 +1922,15 @@ const lyricsInput     = document.getElementById('lyrics-input');
 const startBtn        = document.getElementById('start-btn');
 const finishBtn       = document.getElementById('finish-btn');
 const cancelBtn       = document.getElementById('cancel-btn');
+const reanalBtn       = document.getElementById('reanalyze-btn');
+const previewBtn      = document.getElementById('preview-btn');
+const autoassBtn      = document.getElementById('auto-assign-btn');
+const dbeatBtn        = document.getElementById('download-beats-btn');
+const dlyricsBtn      = document.getElementById('download-lyrics-btn');
+const cbeatBtn        = document.getElementById('copy-beats-btn');
+const clyricsBtn      = document.getElementById('copy-lyrics-btn');
+const cntsBtn         = document.getElementById('cnt-session-btn');
+const newsBtn         = document.getElementById('new-session-btn');
 const currLine        = document.getElementById('curr-line');
 const lineCounterSpan = document.getElementById('line-counter');
 const totalLinesSpan  = document.getElementById('total-lines');
@@ -1326,29 +1946,115 @@ const analysisBarWrap   = document.getElementById('analysis-bar-wrap');
 const analysisSpinWrap  = document.getElementById('analysis-spinner-wrap');
 const engineRow       = document.getElementById('engine-row');
 const previewWrap     = document.getElementById('preview-wrap');
-const previewFrame    = document.getElementById('preview-frame');
 const pbPlay          = document.getElementById('pb-play');
 const pbStop          = document.getElementById('pb-stop');
+const reslyBtn        = document.getElementById('reset-tap-btn');
+const applyBtn        = document.getElementById('preview-refresh-btn'); 
+const onsetBtn        = document.getElementById('toggle-onsets-btn');
+const closePrev       = document.getElementById('close-preview-btn')
 const seekTrack       = document.getElementById('seek-track');
 const seekFill        = document.getElementById('seek-fill');
 const eSelector       = document.getElementById('engine-selector');
 const setupParent     = document.getElementById('engine-param-panels');
 const sessionParent   = document.getElementById('session-param-panels');
+const vocalPanels     = {
+                        'vocal-setup': document.getElementById('params-vocal'),
+                        'vocal-session': document.getElementById('session-params-vocal')
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// Icon registry — single source of truth for all UI icons.
+// SVG paths are pixel-aligned at 16×16 viewBox for crispness at small sizes.
+// stroke='currentColor' inherits CSS color automatically.
+// ═══════════════════════════════════════════════════════════════════
+const ICONS = {
+    // ▶ play
+    play: `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M3 2.5v11l10-5.5L3 2.5z"/></svg>`,
+    // ⏸ pause
+    pause: `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="2" width="4" height="12" rx="1"/><rect x="9" y="2" width="4" height="12" rx="1"/></svg>`,
+    // ■ stop
+    stop: `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="12" height="12" rx="1"/></svg>`,
+    // ✓ check
+    check: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M2 8l4 4 8-8"/></svg>`,
+    // ↺ re-analyze
+    reanalyze: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5"/><path d="M8 1v3.5H4.5"/></svg>`,
+    // ⊞ preview
+    preview: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="14" height="14" rx="2"/><path d="M1 6h14M6 6v9"/></svg>`,
+    // ↓ download
+    download: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v8m-4-4 4 4 4-4"/><path d="M2 13h12"/></svg>`,
+    // ↩ back
+    back: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M10 3H5L2 8l3 5h5a5 5 0 0 0 0-10z"/><path d="M6 6L2 8l4 2"/></svg>`,
+    // ⟳ Refresh / Reset / Restart
+    refresh: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" xmlns="http://w3.org">
+        <path d="M1 8a7 7 0 1 1 2 4.9L1 15v-4h4"/>
+    </svg>`,
+    // ⌁ signal/beat indicator (replaces U+2401 which has poor coverage)
+    beat: `<svg width="16" height="10" viewBox="0 0 32 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M0 8h6l2-6 4 12 4-10 2 4h14"/></svg>`,
+    // ⎘ Copy / Duplicate
+    copy: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+        <rect x="5" y="5" width="8" height="8" rx="1"/>
+        <path d="M3 11V4a1 1 0 0 1 1-1h7"/>
+    </svg>`,
+    // ∞ Infinity / Loop
+    loop: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4.5 5.5c-2 0-3 1.25-3 2.5s1 2.5 3 2.5c1.5 0 2.5-1.5 4-3s2.5-3 4-3c2 0 3 1.25 3 2.5s-1 2.5-3 2.5c-1.5 0-2.5-1.5-4-3s-2.5-3-4-3z"/>
+    </svg>`,
+    // ⚠ Warning / Caution Triangle
+    warning: `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 2.5L1.5 13.5h13L8 2.5zM7.25 11h1.5v1.5h-1.5V11zm0-5.5h1.5v4h-1.5v-4z"/>
+    </svg>`,
+    // ◎ Record / Target / Bullseye
+    record: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://w3.org">
+        <circle cx="8" cy="8" r="7"/><circle cx="8" cy="8" r="2.5" fill="currentColor"/>
+    </svg>`,
+    // ⓘ Info / Help / Details
+    info: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" xmlns="http://w3.org">
+        <circle cx="8" cy="8" r="7"/>
+        <path d="M8 11.5V7.5"/>
+        <circle cx="8" cy="4.5" r="0.5" fill="currentColor"/>
+    </svg>`,
+    // ⚡ High Voltage / Lightning
+    bolt: `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 1L3 9h4l-1 6 7-8H9l1-6z"/></svg>`,
+};
+
+// Helper used wherever an icon is needed dynamically (e.g. play/pause toggle)
+function icon(name) { return ICONS[name] || ''; }
+
+// Set initial icon state — called once after DOM refs are established
+(function initIcons() {
+    pbPlay.innerHTML       = icon('play');
+    pbStop.innerHTML       = icon('stop');
+    reslyBtn.innerHTML     = icon('refresh');
+    // Buttons that never change can be set directly in HTML,
+    // but setting via JS keeps the single ICONS registry as source of truth
+    previewBtn.innerHTML   = icon('preview')  + ' PREVIEW';
+    reanalBtn.innerHTML    = icon('reanalyze') + ' RE-ANALYZE';
+    autoassBtn.innerHTML   = icon('bolt') + ' AUTO-ASSIGN'
+    dbeatBtn.innerHTML     = icon('download') + ' beats.json'
+    dlyricsBtn.innerHTML   = icon('download') + ' lyrics.js'
+    cbeatBtn.innerHTML     = icon('copy') + ' copy beats'
+    clyricsBtn.innerHTML   = icon('copy') + ' copy lyrics'
+    cntsBtn.innerHTML      = icon('back') + ' RESUME SESSION'
+    newsBtn.innerHTML      = icon('refresh') + ' NEW SESSION'
+    applyBtn.innerHTML     = icon('check')
+    onsetBtn.innerHTML     = icon('record') 
+})();
 
 // ═══════════════════════════════════════════════════════════════════
 // TOAST AND OVERLAY
 // ═══════════════════════════════════════════════════════════════════
 let _toastTimer = null;
+
 function toast(msg) {
     const el = document.getElementById('toast');
-    el.textContent = msg;
+    el.innerHTML = msg;
     el.classList.add('show');
     clearTimeout(_toastTimer);
     _toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
 }
 
 // showOverlay(engine) — shows the overlay with the correct indicator
-// incremental progress → progress bar, else spinner (indeterminate)
+// incremental progress: progress bar, else spinner (indeterminate)
 function showOverlay(engine) {
     analysisBar.style.width = '0%';
     analysisLabel.textContent = 'ANALYZING AUDIO';
@@ -1360,44 +2066,39 @@ function showOverlay(engine) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// SESSION CLEANUP
+// SESSION CLEANUP AND UI UPDATES
+// ═══════════════════════════════════════════════════════════════════
 // Order matters: Worker first (stops sending messages), then rAF
 // (stops the seek loop), then player (stops audio), then URL revoke.
 // Reversing this order can cause rAF to reference a null player.
-// ═══════════════════════════════════════════════════════════════════
 function cleanupSession() {
     if (state.activeWorker) { state.activeWorker.terminate(); state.activeWorker = null; }
-    if (state.rafId)        { cancelAnimationFrame(state.rafId); state.rafId = null; }
+    stopRafLoop();
+    // Stop in-page preview renderer before clearing state
+    stopPreviewRenderer();
+    if (_seekThrottle)      { clearTimeout(_seekThrottle); _seekThrottle = null; }
     if (state.player)       { state.player.pause(); state.player.src = ''; state.player = null; }
     if (state.playerUrl)    { URL.revokeObjectURL(state.playerUrl); state.playerUrl = null; }
-    // Clear iframe src to stop any running FIZX visualizer
-    // inside the preview then revoke the blob URL to free memory.
-    previewFrame.src = 'about:blank';
-    if (state.previewBlobUrl) { URL.revokeObjectURL(state.previewBlobUrl); state.previewBlobUrl = null; }
-    previewWrap.classList.remove('visible');
-    state.active = false; state.index = 0; state.results = []; state.beats = []; state.lyrics = []; state.bpm = 0;
+    _draggingIdx = -1;
+    previewWrap.classList.remove('visible'); 
+    state.index = 0; state.results = []; state.beats = []; 
+    state.vocalBeats = []; state.waveformData  = null;
+    state.lyrics = []; state.bpm = 0;
     progressFill.style.width = '0%';
     seekFill.style.width = '0%';
-    pbPlay.textContent = '▶';
+    pbPlay.innerHTML = icon('play');
+    _viewStart = 0; _viewDur = 0;
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// TIME LOOP
-// ═══════════════════════════════════════════════════════════════════
-function startTimeLoop() {
-    (function tick() {
-        if (!state.player) return;
-        const t   = state.player.currentTime;
-        const dur = state.player.duration || 1;
-        const pct = (t / dur) * 100;
-        seekFill.style.width = pct + '%';
-        const m  = Math.floor(t / 60);
-        const s  = String(Math.floor(t % 60)).padStart(2, '0');
-        const dm = Math.floor(dur / 60);
-        const ds = String(Math.floor(dur % 60)).padStart(2, '0');
-        timeDisplay.textContent = `${m}:${s} / ${dm}:${ds}`;
-        state.rafId = requestAnimationFrame(tick);
-    })();
+function refresUI() {
+    state.results   = [];
+    state.index     = 0;
+    totalLinesSpan.innerHTML    = state.lyrics.length || `${icon('loop')}`;
+    lineCounterSpan.textContent = '0';
+    bpmDisplay.textContent      = state.bpm > 0 ? `${state.bpm} BPM` : 'BPM —';
+    currLine.innerHTML          = state.lyrics.length > 0
+        ? state.lyrics[0]
+        : `${icon('beat')} NO LYRICS — TAPS MARK BEATS`; 
 }
 
 function updateProgress() {
@@ -1410,24 +2111,14 @@ function updateProgress() {
 // ═══════════════════════════════════════════════════════════════════
 pbPlay.addEventListener('click', () => {
     if (!state.player) return;
-    if (state.player.paused) {
-        state.player.play();
-        state.active = true;
-        pbPlay.textContent = '⏸';
-        if (!state.rafId) startTimeLoop();
-    } else {
-        state.player.pause();
-        state.active = false;
-        pbPlay.textContent = '▶';
-    }
+    state.player.paused ? state.player.play() : state.player.pause();
+    // No rAF management here — 'play'/'pause' events handle it
 });
 
 pbStop.addEventListener('click', () => {
     if (!state.player) return;
     state.player.pause();
     state.player.currentTime = 0;
-    state.active = false;
-    pbPlay.textContent = '▶';
 });
 
 // Seek by clicking the seek track — maps click X to audio position
@@ -1436,6 +2127,17 @@ seekTrack.addEventListener('click', (e) => {
     const rect = seekTrack.getBoundingClientRect();
     const pct  = (e.clientX - rect.left) / rect.width;
     state.player.currentTime = pct * state.player.duration;
+});
+
+reslyBtn.addEventListener('click', () => {
+    const confirmed = window.confirm("This will clear existing lyrics timestamps, continue?");
+    if (confirmed) {
+        // Refresh UI
+        closePrev.click();
+        pbStop.click();
+        refresUI();
+        toast('Lyrics timestamps cleared');
+    }
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1494,8 +2196,16 @@ seekTrack.addEventListener('click', (e) => {
         sessionParent.appendChild(sessionEl);
         renderParamPanel(sessionEl, specs, `${e.id}-session`);
     });
+
+    // Vocal param panel — separate from ENGINE_REGISTRY since it controls
+    // the vocal stem proxy, not the full-mix analysis engine.
+    Object.entries(vocalPanels).forEach(([label, id]) => {
+        renderParamPanel(id, PARAM_SPECS.vocal.params, label);
+    });
+
     // Set initial visibility
     updateParamVisibility();
+    updateToggles();
 })();
 
 // update all matching PARAM elements at once
@@ -1510,6 +2220,8 @@ window.addEventListener('paramSync', (e) => {
             el.value = value;
         } else if (el.type === 'radio') {
             if (el.value === value) el.checked = true;
+        } else if (el.type === 'checkbox') {
+            el.checked = value;
         }
     });
 
@@ -1520,6 +2232,11 @@ window.addEventListener('paramSync', (e) => {
         document.querySelectorAll(`[data-val-for="${id}"]`).forEach(valEl => {
             valEl.textContent = spec.fmt(parseFloat(value));
         });
+    }
+
+    // Update visibility only when relevant params change
+    if (id === 'stem') {
+        updateToggles();
     }
 });
 
@@ -1553,57 +2270,111 @@ function onProgress(pct, label) {
     analysisSub.textContent = label; // sub-label, not the main label
 }
 
+async function analAudio() {
+    if (state.mode === 'snap') {
+        showOverlay(state.engine);
+
+        // Full-mix beat extraction — drives beat visualizer sync
+        // engine is now passed inside the 
+        // Worker payload, no main-thread dispatch needed
+        const result = await extractRadix(state.audioFile, onProgress);
+        state.beats = result.onsets;
+        state.bpm   = result.bpm;
+        
+        if (!state.beats.length) {
+            toast('No onsets detected — switching to manual mode');
+            state.mode = 'buffer';
+            return;
+        } else if (PARAMS.stem) {
+            // Vocal stem extraction for lyric snapping.
+            // Runs after full-mix so overlay progress reads sequentially.
+            analysisLabel.textContent = 'VOCAL ANALYSIS';
+            try {
+                state.vocalBeats = await extractVocalProxy(state.audioFile, onProgress);
+                if (!state.vocalBeats.length) {
+                    console.warn('No vocal onsets — using full-mix beats for lyric snapping');
+                    state.vocalBeats = [...state.beats]; // shallow copy rather than a reference to maintain source integrety if used vocalOffset 
+                }
+                // // Inverse beat masking: discard vocal onsets that coincide with drum hits.
+                // // Any vocal onset within MASK_WINDOW of a full-mix beat is more likely
+                // // drum bleed that survived the bandpass than a genuine vocal attack.
+                // // 30ms window is tight enough to preserve on-beat vocal entries while
+                // // removing the most common false positives.
+                // // O(V × B) where V=vocal onsets (~33), B=beats (~180) — negligible.
+                // // The mask only works if the two arrays have different false positive profiles. 
+                // // "Different engines on the same signal" does not guarantee this. "Different signals" does. 
+                // // The separation has to happen at the signal level, not the detection level.
+                // // So the architecture reduces to this question: what is the most acoustically distinct signal 
+                // // you can produce from the full mix using only Web Audio API filters, that preserves vocal energy 
+                // // while attenuating percussion? The only signal-level separation available in the browser without ML 
+                // // is the bandpass filter. That's the single meaningful difference between the two analysis paths. 
+                // // Everything else — engine choice, threshold, debounce — is secondary.
+                // if (state.vocalBeats.length && state.beats.length) {
+                //     const MASK_WINDOW = 0.030; // 30ms
+                //     const masked = state.vocalBeats.filter(vt =>
+                //         // If it's a drum hit, penalize it by dropping it
+                //         !state.beats.some(bt => Math.abs(vt - bt) <= MASK_WINDOW)
+                //     );
+                //     // Only apply masking if we didn't lose too many onsets.
+                //     // If masking removes > 40% of onsets it suggests the track has strong
+                //     // on-beat vocal delivery — fall back to unmasked in that case.
+                //     if (masked.length >= state.vocalBeats.length * 0.6) {
+                //         console.log(`[BeatMask] ${state.vocalBeats.length - masked.length} onsets masked as drum bleed`);
+                //         state.vocalBeats = masked;
+                //     } else {
+                //         console.log(`[BeatMask] Masking skipped — too many onsets on beats (likely on-beat vocal delivery)`);
+                //     }
+                // }
+                // Show the vocal onset count after extraction so the user can tune params before populating
+                // This gives the user a single slider to tune global timing shift per track, which is far 
+                // more practical than trying to get the DSP isolation perfect.
+                toast(`${state.vocalBeats.length} vocal onsets detected (${state.lyrics.length} lyrics)`);
+                if (PARAMS.vocalOffset !== 0) {
+                    state.vocalBeats = state.vocalBeats.map(t =>
+                        parseFloat(Math.max(0, t + PARAMS.vocalOffset).toFixed(3))
+                    );
+                }
+                // If count is > 2× lyrics, suggest raising vocalMinGap
+                if (state.vocalBeats.length > state.lyrics.length * 2) {
+                    setTimeout(() => toast('Tip: raise Vocal Min Gap to reduce onsets to match lyric count'), 2500);
+                }
+            } catch (err) {
+                console.warn('Failed, falling back to full-mix beats:', err.message);
+                state.vocalBeats = state.beats;
+            }
+        }
+        analysisOverlay.classList.remove('visible');
+    }
+}
+
 startBtn.addEventListener('click', async () => {
     if (!state.audioFile) { toast('Drop an audio file first'); return; }
 
     state.lyrics = lyricsInput.value.split('\n').filter(l => l.trim());
     state.mode   = document.querySelector('input[name="mode"]:checked').value;
     state.engine = document.querySelector('input[name="engine"]:checked')?.value || 'spectral';
-    startBtn.textContent = '⏳ STARTING…';
+    startBtn.textContent = 'STARTING…';
     startBtn.disabled    = true;
 
     try {
-        if (state.mode === 'snap') {
-            showOverlay(state.engine);
-
-            // engine is now passed inside the 
-            // Worker payload, no main-thread dispatch needed
-            const result = await extractRadix(state.audioFile, onProgress);
-            
-            state.beats = result.onsets;
-            state.bpm   = result.bpm;
-            analysisOverlay.classList.remove('visible');
-
-            if (!state.beats.length) {
-                toast('No onsets detected — switching to manual mode');
-                state.mode = 'buffer';
-            }
-        }
+        // Initiate analysis
+        await analAudio();
 
         // Build audio player — store URL separately for reliable revoke later
         state.playerUrl = URL.createObjectURL(state.audioFile);
         state.player    = new Audio(state.playerUrl);
-        state.results   = [];
-        state.index     = 0;
-
-        totalLinesSpan.textContent  = state.lyrics.length || '∞';
-        lineCounterSpan.textContent = '0';
-        bpmDisplay.textContent      = state.bpm > 0 ? `${state.bpm} BPM` : 'BPM —';
         // Enable auto-assign now that beats are available
-        document.getElementById('auto-assign-btn').disabled = false;
-        currLine.textContent        = state.lyrics.length > 0
-            ? state.lyrics[0]
-            : '⌁ NO LYRICS — TAPS MARK BEATS';
+        autoassBtn.disabled = false;
+        refresUI();
 
         setupView.style.display   = 'none';
         sessionView.style.display = 'block';
         outputView.style.display  = 'none';
-        pbPlay.textContent        = '⏸';
+        pbPlay.innerHTML          = icon('pause')
         updateParamVisibility(); // syncs session-params panel visibility with current mode/engine
 
+        attachPlayerListeners(state.player);
         await state.player.play();
-        state.active = true;
-        startTimeLoop();
         updateProgress();
 
     } catch (err) {
@@ -1616,281 +2387,969 @@ startBtn.addEventListener('click', async () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// SPACEBAR TAP
-// Runs regardless of whether audio is playing (active flag allows
-// tapping while paused, useful for careful re-tapping).
+// LYRICS TIMESTAMPS 
 // ═══════════════════════════════════════════════════════════════════
-window.addEventListener('keydown', (e) => {
-    // Guard: only handle space when session view is visible
-    if (e.code !== 'Space' || !state.player || sessionView.style.display === 'none') return;
-    e.preventDefault();
-
+// Shared function for tap logic called by both spacebar and touch
+function recordTap() {
     let t = state.player.currentTime;
-    if      (state.mode === 'buffer')                        t = Math.max(0, t - 0.2);
-    else if (state.mode === 'snap' && state.beats.length)    t = state.beats.reduce((p,c) => Math.abs(c-t) < Math.abs(p-t) ? c : p);
+    if (state.mode === 'buffer') {
+        // Touch latency ~70ms (typically 50–80ms), keyboard latency ~200ms (keyboard reaction time 150–200ms).
+        // isTouchDevice is set on first touchstart anywhere on the page.
+        t = Math.max(0, t - (state.isTouchDevice ? 0.07 : 0.2));
+    } else if (state.mode === 'snap') {
+        // Snap lyric lines to vocalBeats (vocal stem proxy) when available.
+        // vocalBeats is populated by extractVocalProxy() and represents
+        // vocal attack onsets rather than full-mix transients.
+        // Falls back to state.beats if vocalBeats is empty.
+        const snapTarget = (state.vocalBeats.length ? state.vocalBeats : state.beats);
+        if (snapTarget.length) {
+            t = snapTarget.reduce((p, c) => Math.abs(c - t) < Math.abs(p - t) ? c : p);
+        }
+    }
 
+    // end is implicit — template renderer uses next line's start as end.
+    // Storing end here would be redundant and creates drift when lines are reordered.
     state.results.push({
         text:  state.lyrics[state.index] || `beat_${state.index + 1}`,
         start: parseFloat(t.toFixed(3)),
-        end:   parseFloat((t + 1).toFixed(3)),
     });
 
     state.index++;
     lineCounterSpan.textContent = state.index;
     updateProgress();
+    renderPreviewEditor();
 
-    const overflow = (state.index - state.lyrics.length) + 1;
+    // Visual feedback for touch — brief highlight on the stage
+    const stage = document.querySelector('.stage');
+    stage.style.background = 'rgba(0,255,136,0.08)';
+    setTimeout(() => { stage.style.background = ''; }, 80);
 
-    if (overflow > 0) {
-        currLine.textContent = `✓ ALL LYRICS + ${overflow} BEATS MARKED`;
+    const overflow = state.index - state.lyrics.length;
+
+    if (state.lyrics.length > 0 && overflow >= 0) {
+        currLine.innerHTML = (overflow === 0) 
+            ? `${icon('check')} ALL LYRICS MARKED`
+            : `${icon('check')} ALL LYRICS + ${overflow} BEATS MARKED`;
         // Keep player running so user can review timing before finishing
     } else {
-        currLine.textContent = state.lyrics.length > 0
+        currLine.innerHTML = state.lyrics.length > 0
             ? state.lyrics[state.index]
-            : `⌁ ${state.index} BEATS MARKED`;
+            : `${icon('beat')} ${state.index} BEATS MARKED`;
     }
+}
+
+// SPACEBAR TAP
+// Runs regardless of whether audio is playing (active flag allows
+// tapping while paused, useful for careful re-tapping)
+window.addEventListener('keydown', (e) => {
+    // Guard: only handle space when session view is visible
+    if (e.code !== 'Space' || !state.player || sessionView.style.display === 'none') return;
+    e.preventDefault();
+
+    recordTap();
 });
 
-// ═══════════════════════════════════════════════════════════════════
-// AUTO-ASSIGN
-// Maps state.lyrics[i] directly to state.beats[i] without tapping.
-// End timestamp uses beats[i+1] when available; falls back to
-// start + median inter-beat interval so the last line isn't zero-length.
+// Set isTouchDevice on first touch (not in UA string — unreliable):
+window.addEventListener('touchstart', () => {
+    state.isTouchDevice = true;
+}, { once: true, passive: true });
+
+// touchstart fires on finger-down, not finger-up — same timing model
+// as keydown. touchend adds ~80-120ms perceived latency which compounds
+// on fast lyrics. Using touchstart matches the attack-transient philosophy
+// of the whole extraction pipeline.
 //
-// Works best with the Energy engine on vocal-prominent tracks where
-// amplitude attacks align with lyric delivery. On dense mixes the
-// mapping degrades gracefully — wrong assignments are correctable in
-// the preview editor without re-tapping the whole session.
+// preventingDefault stops the subsequent synthetic mouse click that browsers
+// fire ~300ms after touch on some mobile browsers (double-trigger prevention).
 //
-// Overwrites state.results entirely — previous taps are discarded.
-// Re-tapping remains available at any point after.
+// The stage element is used as the tap target rather than window because:
+//   1. Avoids conflicts with scroll gestures on the rest of the page
+//   2. Gives a clear visual tap region the user can understand
+//   3. Doesn't interfere with button clicks in session-controls
+//
+// We check sessionView visibility so tapping while paused
+// still records a timestamp (same as spacebar behavior).
+document.querySelector('.stage').addEventListener('touchstart', (e) => {
+    // Ignore touches on child interactive elements (buttons, seek track)
+    if (e.target.closest('button, input, .seek-track, #session-controls')) return;
+    if (!state.player || sessionView.style.display === 'none') return;
+    e.preventDefault(); // prevent synthetic mouse click + scroll on iOS
+
+    recordTap();
+}, { passive: false }); // passive:false required for preventDefault to work on touchstart
+
 // ═══════════════════════════════════════════════════════════════════
-function autoAssignLyrics() {
-    if (!state.beats.length)  { toast('Run beat extraction first'); return; }
-    if (!state.lyrics.length) { toast('No lyrics to assign'); return; }
+// POPULATE EDITOR
+// Seeds the preview editor with beat-anchored placeholder times.
+// Uses vocalBeats (vocal stem proxy) when available — vocal onsets
+// align more closely with lyric delivery than full-mix transients.
+// Falls back to state.beats if vocalBeats is empty.
+//
+// Three modes in priority order:
+//   1. Beat-window: enough beats -> each lyric gets first beat of its window
+//   2. Sparse beats: fewer beats than lyrics -> nearest-beat snap with
+//      collision avoidance via lastUsedIdx
+//   3. No beats: evenly distributed timestamps across 95% of track duration
+//
+// end is implicit — omitted from results; renderer uses next line's start.
+// ═══════════════════════════════════════════════════════════════════
+function populateEditor() {
+    if (!state.lyrics.length) { toast('No lyrics to populate'); return; }
 
-    // Median inter-beat interval as fallback end-time for the last line.
-    // Median beats mean so a single long outro gap doesn't inflate the estimate.
-    const intervals = [];
-    for (let i = 1; i < state.beats.length; i++)
-        intervals.push(state.beats[i] - state.beats[i - 1]);
-    const sorted = [...intervals].sort((a, b) => a - b);
-    const medianInterval = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 1.0;
+    if (state.results.length > 0) {
+        // Allowing Manual tabs in editor, gates subsequent timing
+        // mutations (e.g.: re-analysis), solved by reslyBtn
+        state.results = state.results.map((res, i) => ({
+            ...res,
+            text: state.lyrics[i] || res.text // Use updated lyric text if available (mappig supports late lyrics text editing)
+        }));
+        // state.index remains as is (e.g., 5) so tapping can continue
+        toast(`${icon('bolt')} ${state.results.length} lines populated. Click ${icon('refresh')} to clear existing timing.`);
+    } else {
+        // Prefer vocalBeats for lyric placement — represents vocal attack onsets.
+        // Falls back to full-mix beats if vocal extraction was skipped or failed.
+        const n         = state.lyrics.length;
+        const duration  = state.player?.duration || 60;
+        const snapBeats = state.vocalBeats.length ? state.vocalBeats : state.beats;
 
-    state.results = state.lyrics.map((text, i) => {
-        const start = parseFloat((state.beats[i] ?? state.beats[state.beats.length - 1]).toFixed(3));
-        const end   = parseFloat((state.beats[i + 1] ?? start + medianInterval).toFixed(3));
-        return { text, start, end };
-    });
+        if (snapBeats.length >= n) {
+            // Beat-window mode: divide beats into N equal-count windows,
+            // assign each lyric the first beat of its window.
+            // windowSize = floor so windows are equal; remainder ignored.
+            const windowSize = Math.floor(snapBeats.length / n);
+            state.results = state.lyrics.map((text, i) => ({
+                text,
+                start: parseFloat(snapBeats[i * windowSize].toFixed(3)),
+            }));
 
-    state.index = state.results.length;
-    lineCounterSpan.textContent = state.index;
+        } else if (snapBeats.length > 0) {
+            // Sparse mode: distribute evenly by time, snap to nearest beat.
+            // lastUsedIdx prevents multiple lyrics from sharing the same beat.
+            const first = snapBeats[0], last = snapBeats[snapBeats.length - 1];
+            const range = last - first;
+            let lastUsedIdx = 0;
+
+            state.results = state.lyrics.map((text, i) => {
+                const target = first + range * (i / Math.max(n - 1, 1));
+                let best = lastUsedIdx, bestDist = Math.abs(snapBeats[lastUsedIdx] - target);
+                for (let j = lastUsedIdx; j < snapBeats.length; j++) {
+                    const d = Math.abs(snapBeats[j] - target);
+                    if (d < bestDist) { bestDist = d; best = j; }
+                    if (snapBeats[j] > target + 2) break;
+                }
+                lastUsedIdx = Math.min(best + 1, snapBeats.length - 1);
+                return { text, start: parseFloat(snapBeats[best].toFixed(3)) };
+            });
+
+        } else {
+            // No beats: even distribution with 5% end margin
+            const usable = duration * 0.95;
+            state.results = state.lyrics.map((text, i) => ({
+                text,
+                start: parseFloat((usable * (i / Math.max(n - 1, 1))).toFixed(3)),
+            }));
+        }
+        state.index = n;
+        toast(`${icon('bolt')} ${n} lines snapped to ${state.vocalBeats.length ? 'vocals' : 'beats'}`);
+    }
+
+    // UI Updates
+    lineCounterSpan.textContent = state.results.length;
+    currLine.innerHTML = `${icon('bolt')} EDITOR POPULATED — DRAG SLIDERS TO ADJUST`;
     updateProgress();
-
-    // When there are more lyrics than beats the overflow lines 
-    // share the last onset with a visible warning in the toast 
-    // and the stage display
-    const overflow = state.lyrics.length - state.beats.length;
-    const note     = overflow > 0 ? ` (${overflow} lines share last beat — trim in editor)` : '';
-    currLine.textContent = `⚡ AUTO-ASSIGNED ${state.results.length} LINES${note ? ' ⚠' : ''}`;
-    toast(`⚡ ${state.results.length} lines assigned${note}`);
-
-    // Sync editor and refresh iframe if preview is already open
     renderPreviewEditor();
-    if (previewWrap.classList.contains('visible')) refreshPreviewIframe();
+    previewWrap.classList.contains('visible') ? requestRedraw() : showPreview();
 }
 
-document.getElementById('auto-assign-btn').addEventListener('click', autoAssignLyrics);
+autoassBtn.addEventListener('click', populateEditor);
 
 // ═══════════════════════════════════════════════════════════════════
-// PREVIEW — floating panel, draggable + resizable
-// Builds a fizx_compiled.html string from current tap state and injects
-// it into the sandboxed iframe. Works with zero spacebar taps (renders
-// the visualizer without any lyrics).
+// PREVIEW 
 //
-// The preview reuses buildFizxHtml() — the same function used by the
-// generate button — so what you preview is exactly what you export.
+// Floating Lightweight unified canvas-based renderer that reads
+// state.results and state.beats directly on each rAF tick.
 //
-// WHY BLOB URL INSTEAD OF srcdoc:
-// srcdoc="<html>...<script>...<\/script>...</html>" is parsed by the
-// browser's HTML parser as an attribute value. The parser terminates
-// any <script> block at the first literal <\/script> it encounters in
-// the attribute, even when that token appears inside a JS string
-// inside the script. The compiled FIZX template contains <\/script>
-// inside its own script block (e.g. in template literal content),
-// which causes the iframe to stop executing mid-JS, silently.
+// Single canvas layout (top -> bottom):
+//   TOP 50%   : current lyric text (fade animation, accent when dragging)
+//   BOTTOM 50%: waveform bars + onset dots + numbered lyric lines
 //
-// logic: create a Blob URL and set iframe.src. The browser fetches the
-// blob as a standalone HTML document with a fresh parser — no
-// attribute-value context, no premature <\/script> termination.
-// The sandbox attribute still applies; the blob origin is null.
+// Interaction:
+//   Canvas drag on lyric line -> setResultStart() -> syncs slider + seek
+//   Slider drag               -> setResultStart() -> syncs canvas + seek
+//   Both paths share one mutation function — no divergence possible.
+//
+// Waveform data (state.waveformData):
+//   Computed inside the Worker during full-mix extraction (target='beats').
+//   Posted as type:'waveform' message and stored on main thread.
+//   Zero extra processing — reuses the normalised spectral/energy envelope.
+//   Null until first extraction; canvas draws without it gracefully.
+//
+// Drag atomicity:
+//   Canvas: 1px = (duration / canvasWidth) seconds.
+//   Shift key held -> 10× finer (useful on short display widths).
+//   Slider: step=0.001 (1ms), already precise.
+//
+// Architecture:
+//   - #preview-canvas: a <canvas> element inside the floating panel
+//     that draws the current lyric line in the same style as the FIZX
+//     template (accent colour, centred, fade on change).
+//   - The studio's own state.player is the audio source. Seeking the
+//     studio player (via the timeline sliders) immediately reflects in
+//     the renderer because they share the same currentTime.
+//   - rAF loop: reads state.player.currentTime each frame, finds the
+//     current lyric by implicit-end lookup, draws to canvas.
+//   - zero communication barrier.
+//
+// buildFizxHtml() is kept for the export button. It remains the source
+// of truth for the final output, full visual preview of the output goes 
+// to a new tab, the tab gets its own browsing context.
 // ═══════════════════════════════════════════════════════════════════
 function buildFizxHtml() {
-    const lyricsRaw = JSON.stringify(state.results);
-    const beatsRaw  = JSON.stringify(state.beats);
-    return FIZX_TEMPLATE
-        .replace(/\[\[LYRICS_DATA\]\]/g, lyricsRaw)
-        .replace(/\[\[BEATS_DATA\]\]/g,  beatsRaw)
-        .replace(/\[\[BPM_DATA\]\]/g,    String(state.bpm || 0));
+    // Format data chunks with readable one-object-per-line for LYRICS
+    const lyricsItems = state.results.length
+        ? state.results.map(l => `  ${JSON.stringify(l)}`).join(",\n")
+        : state.results; // []
+    const beatsArray  = JSON.stringify(state.beats);
+
+    // Map of placeholders to their content
+    const replacements = {
+        'LYRICS_DATA': `[\n${lyricsItems}\n]`,
+        'BEATS_DATA':  `${beatsArray}\n`,
+        'BPM_DATA':  String(state.bpm || 0)
+    };
+
+    // Single-pass replacement — avoids multiple scans of a large string
+    return FIZX_TEMPLATE.replace(/\[\[(\w+)\]\]/g, (match, tag) =>
+        replacements[tag] ?? match
+    );
 }
 
-// Revokes stale blob URL, creates new one, sets src.
-function refreshPreviewIframe() {
-    // Always revoke before creating — accumulating blob URLs leaks memory
-    if (state.previewBlobUrl) {
-        URL.revokeObjectURL(state.previewBlobUrl);
-        state.previewBlobUrl = null;
+// ── In-page preview renderer ──────────────────────────────────────
+// Canvas-based preview, draws the current lyric
+// line using the studio's player.currentTime.
+let _previewCanvas = null;
+let _previewCtx    = null;
+let _lastLyricIdx  = -1; // track changes to trigger fade animation
+let _fadeOpacity   = 1;
+let _draggingIdx   = -1;     // -1 = none; ≥0 = index of line being dragged
+let _showOnsets    = false;
+let _seekThrottle  = null;
+let _accentColor   = null;
+// View window — defines the visible time range on the canvas.  
+// At zoom=1: viewStart=0, viewDur=duration (full track).
+// Zoom in: viewDur shrinks. Zoom out: viewDur grows back to duration.
+let _viewStart = 0;   // seconds from track start to left edge of canvas.
+let _viewDur   = 0;   // seconds of audio visible across full canvas width — 0 means "use full duration" (uninitialised guard)
+
+// ── Canvas Helpers ─────────────────────────────────────────
+function setResultStart(i, v, originSlider) {
+    // Single mutation point, all timing changes route here. 
+    // Syncs state, slider, seek.
+    const dur = state.player?.duration || 60;
+    v = parseFloat(Math.max(0, Math.min(dur, v)).toFixed(3));
+    state.results[i].start = v;
+    // Sync slider if not the origin
+    const sl = document.getElementById(`psl-${i}`);
+    if (sl && sl !== originSlider) sl.value = v;
+    // Sync number input
+    const numInput = document.getElementById(`num-${i}`);
+    if (numInput && numInput !== originSlider) numInput.value = v;
+    // Throttled seek so studio audio follows without artifacts.
+    // Canvas renderer reflects the change immediately on the next rAF tick.
+    if (!_seekThrottle) {
+        _seekThrottle = setTimeout(() => {
+            if (state.player) {
+                state.player.currentTime = state.results[i]?.start ?? v;
+            }
+            _seekThrottle = null;
+        }, 100);
     }
-    state.previewBlobUrl = URL.createObjectURL(new Blob([buildFizxHtml()], { type: 'text/html' }));
-    previewFrame.src = state.previewBlobUrl;
+    requestRedraw(); // canvas reflects change on next frame
 }
 
-// Preview editor, rebuilds timing rows from state.results.
-// Full re-render on every structural change (add/delete).
-// Acceptable for expected sizes (<300 lines); avoids index-offset bugs
-// that event delegation on a mutable list would introduce.
+function applyRowFocus(activeIdx) {
+    document.querySelectorAll('.edit-row').forEach((row, i) => {
+        row.classList.toggle('row-active', i === activeIdx);
+        row.classList.toggle('row-dimmed', activeIdx >= 0 && i !== activeIdx);
+    });
+}
+
+// Show / close preview
+function showPreview() {
+    previewWrap.classList.add('visible');
+    renderPreviewEditor();
+    startPreviewRenderer();
+    initPreviewDrag();
+    initPreviewResize();
+    initCanvasDrag();
+}
+
+// Convert canvas x-pixel → audio time using current view window
+function xToTime(x) {
+    const dur = _viewDur || (state.player?.duration || 60);
+    return _viewStart + (x / (_previewCanvas?.offsetWidth || 1)) * dur;
+}
+
+// Convert audio time → canvas x-pixel using current view window
+function timeToX(t) {
+    const dur = _viewDur || (state.player?.duration || 60);
+    const w   = _previewCanvas?.offsetWidth || 1;
+    return ((t - _viewStart) / dur) * w;
+}
+
+// Clamp view window so it never scrolls outside [0, totalDuration]
+function clampView(totalDur) {
+    _viewDur   = Math.min(_viewDur, totalDur);
+    _viewDur   = Math.max(_viewDur, 0.5);           // 0.5s minimum window
+    _viewStart = Math.max(0, _viewStart);
+    _viewStart = Math.min(_viewStart, totalDur - _viewDur);
+}
+
+function getAccent() {
+    // Computed once and cached — getComputedStyle at 60fps forces style recalc every frame
+    if (!_accentColor) {
+        _accentColor = getComputedStyle(document.documentElement)
+            .getPropertyValue('--accent').trim() || '#e0a96d';
+    }
+    return _accentColor;
+}
+
+// ── rAF loop ──────────────────────────────────────────────────────
+function startPreviewRenderer() {
+    if (state.previewActive) return;
+    initPreviewCanvas();
+    state.previewActive = true;
+    _lastLyricIdx = -1;
+    requestRedraw(); // draw immediately; loop starts if audio is playing
+}
+
+function stopPreviewRenderer() {
+    state.previewActive = false;
+    if (_draggingIdx < 0 && !(state.player && !state.player.paused)) stopRafLoop();
+    _draggingIdx = -1;
+}
+
+// ── Canvas init ───────────────────────────────────────────────────
+function initPreviewCanvas() {
+    if (_previewCanvas) return;
+    _previewCanvas = document.getElementById('preview-canvas');
+    if (!_previewCanvas) return;
+    _previewCtx = _previewCanvas.getContext('2d');
+}
+
+// ── Canvas draw ───────────────────────────────────────────────────
+function drawPreviewFrame() {
+    if (!_previewCanvas || !_previewCtx || !state.player) return;
+
+    const t   = state.player.currentTime;
+    const dur = state.player.duration || 60;
+    const w   = _previewCanvas.offsetWidth;
+    const h   = _previewCanvas.offsetHeight;
+
+    // Resize canvas backing store to match display size (prevents blur)
+    if (_previewCanvas.width !== w || _previewCanvas.height !== h) {
+        _previewCanvas.width = w; _previewCanvas.height = h;
+    }
+
+    const ctx    = _previewCtx;
+    const accent = getAccent();
+    ctx.clearRect(0, 0, w, h);
+    
+    // Background
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+
+    // Layout
+    const LYRIC_H  = h * 0.50;   // top half: lyric text
+    const WAVE_TOP = h * 0.50;   // bottom half: waveform + lines
+    const WAVE_H   = h * 0.50;
+    const WAVE_MID = WAVE_TOP + WAVE_H * 0.55; // waveform vertical midpoint
+
+    // ── Waveform bars ─────────────────────────────────────────────
+    const wd = state.waveformData;
+    if (wd) {
+        const maxAmp = WAVE_H * 0.35;
+        ctx.fillStyle = 'rgba(255,255,255,0.11)';
+        const cols = wd.length;
+        for (let c = 0; c < cols; c++) {
+            const t_col = (c / cols) * dur;
+            const x = timeToX(t_col);
+            if (x < 0 || x > w) continue;
+            const bh  = wd[c] * maxAmp;
+            ctx.fillRect(Math.round(x), WAVE_MID - bh, Math.max(1, w / cols), bh * 2);
+        }
+    }
+
+    // ── Onset dots ────────────────────────────────────────────────
+    if (_showOnsets) {
+        // Full-mix beats: small dim circles at midline
+        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        for (const b of state.beats) {
+            const x = timeToX(b);
+            if (x < 0 || x > w) continue;
+            ctx.beginPath(); ctx.arc(x, WAVE_MID, 2, 0, Math.PI * 2); ctx.fill();
+        }
+        // Vocal onsets: slightly larger accent circles above midline
+        ctx.fillStyle = accent; ctx.globalAlpha = 0.55;
+        for (const b of (state.vocalBeats || [])) {
+            const x = timeToX(b);
+            if (x < 0 || x > w) continue;
+            ctx.beginPath(); ctx.arc(x, WAVE_MID - 8, 2.5, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+    }
+
+    // ── Lyric vertical lines (numbered, draggable) ────────────────
+    state.results.forEach((r, i) => {
+        // const x      = (r.start / dur) * w;
+        const x = timeToX(r.start);
+        // Skip lines outside the visible window but keep a small margin
+        // so lines at the edge are still partially visible
+        if (x < -10 || x > w + 10) return;
+        const isDrag = i === _draggingIdx;
+        const anyDrag = _draggingIdx >= 0;
+
+        ctx.save();
+        ctx.globalAlpha = isDrag ? 1.0 : (anyDrag ? 0.20 : 0.65);
+        ctx.strokeStyle = isDrag ? accent : 'rgba(255,255,255,0.7)';
+        ctx.lineWidth   = isDrag ? 2 : 1;
+        ctx.setLineDash(isDrag ? [] : [3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(x, WAVE_TOP + 14);
+        ctx.lineTo(x, WAVE_TOP + WAVE_H * 0.88);
+        ctx.stroke();
+
+        // Numbered circle
+        const cR = 8, label = String(i + 1);
+        ctx.fillStyle = isDrag ? accent : (anyDrag ? 'rgba(50,48,44,0.9)' : 'rgba(70,66,60,0.9)');
+        ctx.beginPath(); ctx.arc(x, WAVE_TOP + cR + 2, cR, 0, Math.PI * 2); ctx.fill();
+        ctx.font = `700 8px 'merri', monospace`;
+        ctx.fillStyle = isDrag ? '#000' : '#fff';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(label, x, WAVE_TOP + cR + 2);
+        ctx.restore();
+    });
+
+    // ── Lyric text (top half) ─────────────────────────────────────
+    // When dragging: show dragged line. Otherwise: show line at playback position.
+    const displayIdx = _draggingIdx >= 0 ? _draggingIdx
+        : state.results.findIndex((r, i) => t >= r.start && t < (state.results[i+1]?.start ?? Infinity));
+
+    // Fade animation: brief opacity pulse when lyric changes
+    if (displayIdx !== _lastLyricIdx) {
+        _fadeOpacity = _draggingIdx >= 0 ? 1 : 0.3;
+        _lastLyricIdx = displayIdx;
+    }
+    if (_draggingIdx < 0) _fadeOpacity = Math.min(1, _fadeOpacity + 0.07); // ramp up over ~10 frames
+
+    if (displayIdx >= 0) {
+        const text   = state.results[displayIdx].text || `(line ${displayIdx + 1})`;
+        const fSize  = Math.max(14, Math.min(28, Math.floor(w / 18))); // Responsive font size: scale to canvas width, clamp 14–28px
+        ctx.save();
+        ctx.globalAlpha  = _draggingIdx >= 0 ? 1 : _fadeOpacity;
+        ctx.fillStyle    = _draggingIdx >= 0 ? accent : '#fff';
+        ctx.shadowColor  = accent;
+        ctx.shadowBlur   = _draggingIdx >= 0 ? 24 : 16;
+        ctx.font         = `500 ${fSize}px 'deja', sans-serif`;
+        ctx.textAlign    = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(`${displayIdx + 1}. ${text}`, w / 2, LYRIC_H / 2, w - 24);
+        ctx.restore();
+    }
+
+    // ── Beat flash border ─────────────────────────────────────────
+    // Uses ±30ms window — generous enough for visual sync without being distracting
+    if (state.beats.some(b => Math.abs(b - t) < 0.03)) {
+        ctx.save(); ctx.strokeStyle = accent;
+        ctx.lineWidth = 2; ctx.globalAlpha = 0.4;
+        ctx.strokeRect(1, 1, w - 2, h - 2); ctx.restore();
+    }
+
+    // ── Seek strip at bottom ──────────────────────────────────────
+    // show playback position relative to full track, not view
+    // keeps the strip meaningful as a global position indicator even when zoomed
+    const pct = dur ? t / dur : 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(0, h - 2, w, 2);
+    ctx.fillStyle = accent; ctx.fillRect(0, h - 2, pct * w, 2);
+
+    // ── Zoom Indicator ──────────────────────────────────────
+    // show current view window as a highlighted region on the seek strip
+    if (_viewDur && _viewDur < dur) {
+        const zx = (_viewStart / dur) * w;
+        const zw = (_viewDur / dur) * w;
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.fillRect(zx, h - 5, zw, 3);
+    }
+
+}
+
+// ── Slider editor ─────────────────────────────────────────────────
 function renderPreviewEditor() {
     const editor = document.getElementById('preview-editor');
     const empty  = document.getElementById('preview-editor-empty');
+    if (!editor) return;
+
     editor.querySelectorAll('.edit-row').forEach(r => r.remove());
+    if (!state.results.length) { if (empty) empty.style.display = 'block'; return; }
+    if (empty) empty.style.display = 'none';
 
-    if (!state.results.length) { empty.style.display = 'block'; return; }
-    empty.style.display = 'none';
+    const dur = state.player?.duration || 60;
 
+    // One row per lyric: [num | text | start | del] then [slider].
     state.results.forEach((result, i) => {
         const row = document.createElement('div');
         row.className = 'edit-row';
         row.innerHTML = `
-            <input type="text"   class="edit-text"  value="${result.text.replace(/"/g, '&quot;')}" title="Lyric text">
-            <input type="number" class="edit-start" value="${result.start}" step="0.001" min="0" title="Start (s)">
-            <input type="number" class="edit-end"   value="${result.end}"   step="0.001" min="0" title="End (s)">
-            <button class="edit-row-del" title="Delete">×</button>`;
+            <span class="edit-num">${i + 1}</span>
+            <input type="text" id="text-${i}"
+                value="${(result.text || '').replace(/"/g, '&quot;')}"
+                placeholder="lyric…" title="Lyric text">
+            <input type="number" id="num-${i}"
+                value="${result.start.toFixed(3)}" step="0.001" 
+                min="0" max="${dur.toFixed(3)}" title="Start (s)">
+            <button class="edit-row-del" title="Remove">x</button>
+            <input type="range" class="edit-timeline" id="psl-${i}"
+                min="0" max="${dur.toFixed(3)}" step="0.001" 
+                value="${result.start}"
+                title="Drag slider to set start — drag on waveform for fine control">`;
 
-        // Inputs write directly to state.results[i] — Refresh picks up changes
-        row.querySelector('.edit-text').addEventListener('input',  e => { state.results[i].text  = e.target.value; });
-        row.querySelector('.edit-start').addEventListener('input', e => { state.results[i].start = parseFloat(parseFloat(e.target.value).toFixed(3)) || 0; });
-        row.querySelector('.edit-end').addEventListener('input',   e => { state.results[i].end   = parseFloat(parseFloat(e.target.value).toFixed(3)) || 0; });
+        row.querySelector('input[type="text"]').addEventListener('input', e => {
+            state.results[i].text = e.target.value;
+        });
 
-        // Delete: splice + full re-render to fix closure indices
+        const sl = row.querySelector(`#psl-${i}`);
+        // Throttled drag 
+        sl.addEventListener('input', e => {
+            _draggingIdx = i;
+            applyRowFocus(i);
+            setResultStart(i, parseFloat(e.target.value), sl);
+            if (state.player) state.player.play();
+        });
+        // Release: final exact position, no snap
+        // exact position is intentional
+        sl.addEventListener('change', e => {
+            _draggingIdx = -1;
+            applyRowFocus(-1);            
+            setResultStart(i, parseFloat(e.target.value), sl);
+            if (state.player) state.player.pause();
+        });
+        // Delete: splice + re-render to avoid closure
+        // index bugs that event delegation on a mutable list introduces.
+        // For expected sizes (<300 lines) the re-render cost is imperceptible.
         row.querySelector('.edit-row-del').addEventListener('click', () => {
             state.results.splice(i, 1);
             state.index = Math.min(state.index, state.results.length);
             lineCounterSpan.textContent = state.index;
+            _draggingIdx = -1;
             renderPreviewEditor();
+            requestRedraw();
         });
-
         editor.appendChild(row);
     });
 }
 
-// Add blank line at current playback position for missed taps
-document.getElementById('preview-add-btn').addEventListener('click', () => {
-    const t = state.player ? parseFloat(state.player.currentTime.toFixed(3)) : 0;
-    state.results.push({ text: '', start: t, end: parseFloat((t + 1).toFixed(3)) });
-    state.index = state.results.length;
-    lineCounterSpan.textContent = state.index;
-    renderPreviewEditor();
-    const editor = document.getElementById('preview-editor');
-    editor.scrollTop = editor.scrollHeight;
-});
+// ── Canvas Lyrics drag ───────────────────────────────────────────────────
+// One-time setup. Grab radius HIT_R=10px around each lyric line.
+// Shift held -> 10× finer movement. Empty area click -> seek.
+function initCanvasDrag() {
+    if (!_previewCanvas || _previewCanvas._dragInit) return;
+    _previewCanvas._dragInit = true;
 
-// Show / refresh / close
-function showPreview() {
-    renderPreviewEditor();
-    refreshPreviewIframe();
-    previewWrap.classList.add('visible');
+    const HIT_R      = 10;
+    const WAVE_FRAC  = 0.50; // top 50% = lyric text, bottom 50% = waveform
+    let   dragging   = false;
+    let   idx        = -1;
+    let   lastX      = 0;
+    let   panning    = false;
+    let   panStartX  = 0;
+    let   panViewStart = 0;
+
+    function nearestLine(x) {
+        let best = -1, bestD = HIT_R;
+        state.results.forEach((r, i) => {
+            const d = Math.abs(timeToX(r.start) - x);
+            if (d < bestD) { bestD = d; best = i; }
+        });
+        return best;
+    }
+
+    _previewCanvas.addEventListener('pointerdown', e => {
+        if (e.button === 1 || e.button === 2) return; // middle/right handled separately
+        const r = _previewCanvas.getBoundingClientRect();
+        const x = e.clientX - r.left;
+        const y = e.clientY - r.top;
+
+        // Bottom half only for lyric/waveform interaction
+        if (y < _previewCanvas.offsetHeight * WAVE_FRAC) return;
+
+        idx = nearestLine(x);
+
+        if (idx >= 0) {
+            // Lyric line grab
+            dragging = true;
+            lastX    = x;
+            _draggingIdx = idx;
+            applyRowFocus(idx);
+            document.getElementById(`psl-${idx}`)
+                ?.closest('.edit-row')
+                ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        } else {
+            // Empty area: left-click seeks, right-click pans (handled below)
+            if (state.player) {
+                state.player.currentTime = xToTime(x);
+                requestRedraw();
+            }
+            return; // no capture needed for seek
+        }
+
+        // Capture pointer so move/up fire even if cursor leaves canvas.
+        // no manual cleanup needed, pointerup releases capture automatically.
+        _previewCanvas.setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+
+    _previewCanvas.addEventListener('pointermove', e => {
+        const r  = _previewCanvas.getBoundingClientRect();
+        const x  = e.clientX - r.left;
+
+        if (dragging && idx >= 0) {
+            const dx   = x - lastX; lastX = x;
+            const fine = e.shiftKey || e.pressure < 0.3; // shift or light touch = fine mode
+            const dt   = (dx / _previewCanvas.offsetWidth)
+                       * (_viewDur || state.player?.duration || 60)
+                       * (fine ? 0.1 : 1.0);
+            setResultStart(idx, state.results[idx].start + dt, null);
+            // requestRedraw() is called inside setResultStart — no duplicate needed
+            return;
+        }
+
+        if (panning) {
+            const dx  = x - panStartX;
+            const dt  = -(dx / _previewCanvas.offsetWidth) * (_viewDur || state.player?.duration || 60);
+            _viewStart = panViewStart + dt;
+            clampView(state.player?.duration || 60);
+            requestRedraw();
+            return;
+        }
+
+        // Cursor hint — only in waveform zone
+        if (e.buttons === 0 && e.clientY - r.top > _previewCanvas.offsetHeight * WAVE_FRAC) {
+            _previewCanvas.style.cursor = nearestLine(x) >= 0 ? 'grab' : 'crosshair';
+        }
+    });
+
+    _previewCanvas.addEventListener('pointerup', e => {
+        if (dragging) {
+            dragging     = false;
+            _draggingIdx = -1;
+            applyRowFocus(-1);
+            _previewCanvas.style.cursor = 'crosshair';
+            if (state.player) state.player.pause();
+            requestRedraw();
+        }
+        if (panning) {
+            panning = false;
+            _previewCanvas.style.cursor = 'crosshair';
+        }
+        // Pointer capture releases automatically on pointerup
+    });
+
+    _previewCanvas.addEventListener('pointercancel', e => {
+        // Covers cases like incoming phone call on mobile cancelling the touch
+        dragging = false; panning = false;
+        _draggingIdx = -1;
+        applyRowFocus(-1);
+        requestRedraw();
+    });
+
+    // ── Right-click / middle-click pan ────────────────────────────
+    // Separate pointerdown for pan since left-click is reserved for grab/seek.
+    // Pointer capture keeps pan smooth even if cursor moves fast off canvas.
+    _previewCanvas.addEventListener('pointerdown', e => {
+        if (e.button !== 1 && e.button !== 2) return;
+        const r  = _previewCanvas.getBoundingClientRect();
+        panning      = true;
+        panStartX    = e.clientX - r.left;
+        panViewStart = _viewStart;
+        _previewCanvas.setPointerCapture(e.pointerId);
+        _previewCanvas.style.cursor = 'ew-resize';
+        e.preventDefault();
+    });
+
+    _previewCanvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    // ── Zoom via wheel ────────────────────────────────────────────
+    _previewCanvas.addEventListener('wheel', e => {
+        e.preventDefault();
+        const totalDur = state.player?.duration || 60;
+        if (_viewDur === 0) { _viewStart = 0; _viewDur = totalDur; }
+        const r       = _previewCanvas.getBoundingClientRect();
+        const cursorT = xToTime(e.clientX - r.left);
+        const factor  = e.deltaY < 0 ? 0.75 : 1 / 0.75;
+        _viewDur      = _viewDur * factor;
+        const frac    = (e.clientX - r.left) / _previewCanvas.offsetWidth;
+        _viewStart    = cursorT - frac * _viewDur;
+        clampView(totalDur);
+        requestRedraw();
+    }, { passive: false });
+
+    // ── Pinch zoom ────────────────────────────────────────────────
+    let _pinchDist = 0;
+    _previewCanvas.addEventListener('touchstart', e => {
+        if (e.touches.length === 2) {
+            _pinchDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+        }
+    }, { passive: true });
+
+    _previewCanvas.addEventListener('touchmove', e => {
+        if (e.touches.length !== 2 || !_pinchDist) return;
+        e.preventDefault();
+        const totalDur = state.player?.duration || 60;
+        if (_viewDur === 0) { _viewStart = 0; _viewDur = totalDur; }
+        const dist   = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+        );
+        const factor = _pinchDist / dist;
+        _pinchDist   = dist;
+        const midX   = (e.touches[0].clientX + e.touches[1].clientX) / 2
+                       - _previewCanvas.getBoundingClientRect().left;
+        const midT   = xToTime(midX);
+        _viewDur     = _viewDur * factor;
+        _viewStart   = midT - (midX / _previewCanvas.offsetWidth) * _viewDur;
+        clampView(totalDur);
+        requestRedraw();
+    }, { passive: false });
+
+    // ── Double-click reset zoom ───────────────────────────────────
+    _previewCanvas.addEventListener('dblclick', () => {
+        _viewStart = 0; _viewDur = state.player?.duration || 60;
+        requestRedraw();
+    });
 }
 
-document.getElementById('preview-btn').addEventListener('click', showPreview);
-
-// Deliberate choice not to auto-refresh the iframe on every keystroke. 
-// The iframe navigation itself has a small cost and more importantly 
-// would reset the FIZX animation state mid-edit. The user clicks Refresh
-// when they want to see the result. This also makes it clear that the
-// iframe is a render of the saved state, not a live binding.
-document.getElementById('preview-refresh-btn').addEventListener('click', () => {
-    refreshPreviewIframe();
-    toast('Preview refreshed');
-});
-
-document.getElementById('close-preview-btn').addEventListener('click', () => {
-    previewFrame.src = 'about:blank'; // halts iframe JS immediately
-    if (state.previewBlobUrl) { URL.revokeObjectURL(state.previewBlobUrl); state.previewBlobUrl = null; }
-    previewWrap.classList.remove('visible');
-});
-
-// Drag (titlebar)
+// ── Titlebar Drag ─────────────────────────────────────────────
 // Pointer offset from panel corner tracked at drag-start so the panel
 // doesn't jump to cursor. Listeners on document catch fast moves that
 // leave the titlebar during drag.
-;(function initPreviewDrag() {
+function initPreviewDrag() {
     const titlebar = document.getElementById('preview-titlebar');
     let dragging = false, ox = 0, oy = 0;
 
-    function startDrag(cx, cy) {
+    titlebar.addEventListener('pointerdown', e => {
+        // Only left-click/touch
+        if (e.button !== 0) return;
+
+        // Only background interactions
+        if (e.target.closest('button')) return;
+        
         dragging = true;
         const r = previewWrap.getBoundingClientRect();
-        ox = cx - r.left; oy = cy - r.top;
-        document.addEventListener('mousemove', onMouse);
-        document.addEventListener('mouseup', stop);
-        document.addEventListener('touchmove', onTouch, { passive: true });
-        document.addEventListener('touchend', stop);
-    }
-    function onMouse(e) { if (dragging) move(e.clientX, e.clientY); }
-    function onTouch(e) { if (dragging) move(e.touches[0].clientX, e.touches[0].clientY); }
-    function move(cx, cy) {
+        ox = e.clientX - r.left; 
+        oy = e.clientY - r.top;
+        
+        titlebar.setPointerCapture(e.pointerId);
+    });
+
+    titlebar.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        
         const w = previewWrap.offsetWidth, h = previewWrap.offsetHeight;
-        const x = Math.max(0, Math.min(window.innerWidth  - w, cx - ox));
-        const y = Math.max(0, Math.min(window.innerHeight - h, cy - oy));
+        // Clamp to viewport
+        const x = Math.max(0, Math.min(window.innerWidth  - w, e.clientX - ox));
+        const y = Math.max(0, Math.min(window.innerHeight - h, e.clientY - oy));
+        
         previewWrap.style.left  = x + 'px';
         previewWrap.style.top   = y + 'px';
-        previewWrap.style.right = 'auto'; // clear initial CSS right:24px
-    }
-    function stop() {
+        previewWrap.style.right = 'auto'; 
+    });
+
+    titlebar.addEventListener('pointerup', e => {
         dragging = false;
-        document.removeEventListener('mousemove', onMouse);
-        document.removeEventListener('mouseup', stop);
-        document.removeEventListener('touchmove', onTouch);
-        document.removeEventListener('touchend', stop);
-    }
+        titlebar.releasePointerCapture(e.pointerId);
+    });
+}
 
-    titlebar.addEventListener('mousedown',  e => startDrag(e.clientX, e.clientY));
-    titlebar.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-})();
-
-// Resize (corner handle)
+// ── Resize (corner handle) ─────────────────────────────────────────────
 // Tracks delta from resize-start dimensions. Min size enforced to keep
-// editor and iframe usable (260×300).
-;(function initPreviewResize() {
+// editor and preview usable (260×300).
+function initPreviewResize() {
     const handle = document.getElementById('preview-resize');
     let resizing = false, sx = 0, sy = 0, sw = 0, sh = 0;
 
-    function startResize(cx, cy) {
+    handle.addEventListener('pointerdown', e => {
+        if (e.button !== 0) return;
+        
         resizing = true;
-        sx = cx; sy = cy;
-        sw = previewWrap.offsetWidth; sh = previewWrap.offsetHeight;
-        document.addEventListener('mousemove', onMouse);
-        document.addEventListener('mouseup', stop);
-        document.addEventListener('touchmove', onTouch, { passive: true });
-        document.addEventListener('touchend', stop);
-    }
-    function onMouse(e) { if (resizing) resize(e.clientX, e.clientY); }
-    function onTouch(e) { if (resizing) resize(e.touches[0].clientX, e.touches[0].clientY); }
-    function resize(cx, cy) {
-        previewWrap.style.width  = Math.max(260, sw + cx - sx) + 'px';
-        previewWrap.style.height = Math.max(300, sh + cy - sy) + 'px';
-    }
-    function stop() {
+        sx = e.clientX; 
+        sy = e.clientY;
+        sw = previewWrap.offsetWidth; 
+        sh = previewWrap.offsetHeight;
+        
+        handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener('pointermove', e => {
+        if (!resizing) return;
+        
+        previewWrap.style.width  = Math.max(260, sw + e.clientX - sx) + 'px';
+        previewWrap.style.height = Math.max(300, sh + e.clientY - sy) + 'px';
+        
+        // Trigger a redraw if canvas size depends on the wrapper size
+        // requestRedraw();
+    });
+
+    handle.addEventListener('pointerup', e => {
         resizing = false;
-        document.removeEventListener('mousemove', onMouse);
-        document.removeEventListener('mouseup', stop);
-        document.removeEventListener('touchmove', onTouch);
-        document.removeEventListener('touchend', stop);
+        handle.releasePointerCapture(e.pointerId);
+    });
+}
+
+// ── PREVIEW Controls ─────────────────────────────────────────────
+// Add blank line at current playback position.
+// start = player.currentTime (captured at click, not typed).
+// end omitted — implicit. User adjusts start via slider.
+document.getElementById('preview-add-btn')?.addEventListener('click', () => {
+    const t = state.player ? parseFloat(state.player.currentTime.toFixed(3)) : 0;
+    state.results.push({ text: '', start: t });
+    state.index = state.results.length;
+    lineCounterSpan.textContent = state.index;
+    renderPreviewEditor();
+    requestRedraw();
+    const editor = document.getElementById('preview-editor');
+    if (editor) editor.scrollTop = editor.scrollHeight;
+});
+
+onsetBtn.addEventListener('click', function() {
+    if (!state.waveformData) {
+        toast('Beatsdata not available in manual mode');
+        return;
+    }
+    _showOnsets = !_showOnsets;
+    this.classList.toggle('btn-active', _showOnsets);
+    requestRedraw();
+});
+
+// APPLY button in preview titlebar — re-renders editor rows only.
+// The canvas renderer already reflects live state on every rAF tick,
+// so no explicit refresh is needed for timing changes made via sliders.
+applyBtn.addEventListener('click', () => {
+    renderPreviewEditor();
+    toast('Preview synced');
+});
+
+closePrev.addEventListener('click', () => {
+    stopPreviewRenderer();
+    previewWrap.classList.remove('visible');
+});
+
+
+document.getElementById('zoom-reset-btn')?.addEventListener('click', () => {
+    const totalDur = state.player?.duration || 60;
+    _viewStart = 0; _viewDur = totalDur;
+    requestRedraw();
+});
+
+// Full visual preview in a new tab
+previewBtn.addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([buildFizxHtml()], { type: 'text/html' }));
+    window.open(url, '_blank');
+    // Revoke after a delay — tab has already loaded the document by then.
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+});
+
+// ── Unified rAF scheduler ─────────────────────────────────────────
+// Instead of perpetual loops, we schedule exactly one frame whenever
+// state changes. If audio is playing, each frame reschedules itself.
+// If paused, the loop stops after drawing the final state.
+// If a drag happens while paused, requestRedraw() triggers one frame.
+//
+// This means: zero rAF overhead when paused and not dragging,
+// full 60fps when playing or dragging, single frame on seek/drag-end.
+// ═══════════════════════════════════════════════════════════════════
+
+let _rafId        = null;  // unified handle for both seek bar and canvas
+let _redrawQueued = false;
+
+function _rafTick() {
+    _rafId        = null;
+    _redrawQueued = false;
+
+    // Draw seek bar
+    if (state.player) {
+        const t   = state.player.currentTime;
+        const dur = state.player.duration || 1;
+        seekFill.style.width = ((t / dur) * 100) + '%';
+        const m  = Math.floor(t / 60);
+        const s  = String(Math.floor(t % 60)).padStart(2, '0');
+        const dm = Math.floor(dur / 60);
+        const ds = String(Math.floor(dur % 60)).padStart(2, '0');
+        timeDisplay.textContent = `${m}:${s} / ${dm}:${ds}`;
     }
 
-    handle.addEventListener('mousedown',  e => startResize(e.clientX, e.clientY));
-    handle.addEventListener('touchstart', e => startResize(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-})();
+    // Draw canvas if preview is open
+    if (state.previewActive && _previewCanvas) drawPreviewFrame();
+
+    // Reschedule only if something will keep changing next frame:
+    // - audio playing: cursor position changes every frame
+    // - drag in progress: line position changes on pointer move
+    // In all other cases (paused + no drag), stop here.
+    // The next state change will call requestRedraw() to restart.
+    // Add new features "activity" flag to keepGoing and call requestRedraw() when they change.
+    const keepGoing = (state.player && !state.player.paused) || _draggingIdx >= 0;
+    if (keepGoing) { // the loop dies immediately if falsy
+        _rafId = requestAnimationFrame(_rafTick);
+    }
+}
+
+// Call this whenever state changes and a redraw is needed.
+// any mutation to _viewStart, _viewDur, or state.results[i].start 
+// must end with requestRedraw(). The loop never polls for changes 
+// it only draws when explicitly told to.
+// idempotent, _redrawQueued coalesces into one frame.
+// Works during drag (paused or playing), after seek, after param change.
+function requestRedraw() {
+    if (_redrawQueued || _rafId) return; // already scheduled
+    _redrawQueued = true;
+    _rafId = requestAnimationFrame(_rafTick);
+}
+
+// Start continuous loop — called on play event
+function startRafLoop() {
+    if (_rafId) return; // already running
+    _rafId = requestAnimationFrame(_rafTick);
+}
+
+// Stop loop — called on pause/ended/cleanup
+function stopRafLoop() {
+    if (_rafId) { cancelAnimationFrame(_rafId); _rafId = null; }
+    _redrawQueued = false;
+}
+
+function attachPlayerListeners(player) {
+    player.addEventListener('play',  () => { pbPlay.innerHTML = icon('pause'); startRafLoop(); });
+    player.addEventListener('pause', () => {
+        pbPlay.innerHTML = icon('play');
+        // Don't stop loop if drag is active — drag keeps it alive
+        if (_draggingIdx < 0) stopRafLoop();
+        requestRedraw(); // one final frame to settle seek bar at exact paused position
+    });
+    player.addEventListener('ended', () => { pbPlay.innerHTML = icon('play'); stopRafLoop(); requestRedraw(); });
+    player.addEventListener('seeked', () => requestRedraw()); // redraw on seek while paused
+}
+
+// Tab visibility — pause loops when hidden, resume when visible
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+        stopRafLoop();
+    } else {
+        // Resume if audio was playing or drag is active
+        if ((state.player && !state.player.paused) || _draggingIdx >= 0) {
+            startRafLoop();
+        }
+    }
+});
 
 // ═══════════════════════════════════════════════════════════════════
 // FINISH
@@ -1900,8 +3359,7 @@ document.getElementById('close-preview-btn').addEventListener('click', () => {
 // ═══════════════════════════════════════════════════════════════════
 finishBtn.addEventListener('click', () => {
     if (state.player) state.player.pause();
-    if (state.rafId)  { cancelAnimationFrame(state.rafId); state.rafId = null; }
-    pbPlay.textContent = '▶';
+    stopRafLoop();
 
     // Serialise export data — results may be empty array, which is valid
     state.beatsJson = JSON.stringify(state.beats, null, 2);
@@ -1937,32 +3395,31 @@ cancelBtn.addEventListener('click', () => {
 // because buildFizxHtml() reads state.beats at call time, not at
 // session start.
 // ═══════════════════════════════════════════════════════════════════
-document.getElementById('reanalyze-btn').addEventListener('click', async () => {
+reanalBtn.addEventListener('click', async () => {
     if (!state.audioFile || state.mode !== 'snap') {
         toast('Re-analyze not available in manual mode');
         return;
     }
-    const btn = document.getElementById('reanalyze-btn');
-    btn.disabled    = true;
-    btn.textContent = '↺ ANALYZING…';
+    pbStop.click()
+    reanalBtn.disabled    = true;
+    reanalBtn.innerHTML = `${icon('reanalyze')} ANALYZING…`;
     // Read engine selection fresh — user may have changed it since session start
     state.engine = document.querySelector('input[name="engine"]:checked')?.value || 'spectral';
 
     showOverlay(state.engine);
 
     try {
-        const result = await extractRadix(state.audioFile, onProgress);
-        state.beats = result.onsets;
-        state.bpm   = result.bpm;
+        await analAudio();
         bpmDisplay.textContent = state.bpm > 0 ? `${state.bpm} BPM` : 'BPM —';
-        toast(`↺ ${state.beats.length} onsets · ${state.bpm} BPM`);
+        toast(`${icon('reanalyze')} ${state.beats.length} onsets · ${state.bpm} BPM`);
     } catch (err) {
         console.error('Re-analyze failed:', err);
         toast('Re-analyze failed: ' + (err.message || err));
     } finally {
         analysisOverlay.classList.remove('visible');
-        btn.disabled    = false;
-        btn.textContent = '↺ RE-ANALYZE';
+        reanalBtn.disabled    = false;
+        reanalBtn.innerHTML = `${icon('reanalyze')} RE-ANALYZE`;
+        if (previewWrap.classList.contains('visible')) autoassBtn.click(); // display updated timestamps
     }
 });
 
@@ -1973,45 +3430,44 @@ document.getElementById('generate-fizx-btn').addEventListener('click', () => {
     download('fizx_compiled.html', buildFizxHtml());
 });
 
-document.getElementById('download-beats-btn').addEventListener('click', () =>
+dbeatBtn.addEventListener('click', () =>
     // beats.json includes bpm so it matches ex_beats.py output format exactly
-    download('beats_tapper.json', JSON.stringify({ beats: state.beats, bpm: state.bpm }, null, 2))
+    download('beats.json', JSON.stringify({ beats: state.beats, bpm: state.bpm }, null, 2))
 );
-document.getElementById('download-lyrics-btn').addEventListener('click', () =>
-    download('lyrics_tapper.js', state.lyricsJs)
+dlyricsBtn.addEventListener('click', () =>
+    download('lyrics.js', state.lyricsJs)
 );
-document.getElementById('copy-beats-btn').addEventListener('click', () => {
-    navigator.clipboard.writeText(state.beatsRaw); toast('⎘ Beats copied');
+cbeatBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(state.beatsRaw); toast(`${icon('copy')} Beats copied`);
 });
-document.getElementById('copy-lyrics-btn').addEventListener('click', () => {
-    navigator.clipboard.writeText(state.lyricsRaw); toast('⎘ Lyrics copied');
+clyricsBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(state.lyricsRaw); toast(`${icon('copy')} Lyrics copied`);
 });
-document.getElementById('new-session-btn').addEventListener('click', () => {
-    cleanupSession();
-    setupView.style.display = 'block'; 
-    sessionView.style.display = 'none'; 
-    outputView.style.display = 'none';
-    startBtn.disabled = false; 
-    startBtn.textContent = 'START SESSION';
-    lyricsInput.value = '';
-    dropZone.innerHTML = 'DROP AUDIO FILE<div class="dz-hint">MP3 · WAV · OGG · FLAC</div>';
-    fileInput.value = '';  // Without it, re-selecting the same file fires no change event
-    dropZone.classList.remove('loaded');
-    state.audioFile = null; state.beats = []; state.lyrics = []; state.bpm = 0;
+newsBtn.addEventListener('click', () => {
+    const confirmed = window.confirm("This will force a fresh start (data wipe), continue?");
+    if (confirmed) {
+        cleanupSession();
+        setupView.style.display = 'block'; 
+        sessionView.style.display = 'none'; 
+        outputView.style.display = 'none';
+        startBtn.disabled = false; 
+        startBtn.textContent = 'START SESSION';
+        lyricsInput.value = '';
+        dropZone.innerHTML = 'DROP AUDIO FILE<div class="dz-hint">MP3 · WAV · OGG · FLAC</div>';
+        fileInput.value = '';  // Without it, re-selecting the same file fires no change event
+        dropZone.classList.remove('loaded');
+        state.audioFile = null; state.beats = []; state.vocalBeats = []; state.lyrics = []; state.bpm = 0;
+    }
 });
-document.getElementById('cnt-session-btn').addEventListener('click', () => {
+cntsBtn.addEventListener('click', () => {
     // Restore session view — player already exists, just resume UI state.
     // Does not restart analysis or reset taps.
     outputView.style.display = 'none';
     sessionView.style.display = 'block'; 
     // Restart seek loop (was stopped by finishBtn handler)
-    if (state.player && !state.rafId) startTimeLoop();
-    // Restore play button icon to match actual player state
-    pbPlay.textContent = state.player && !state.player.paused ? '⏸' : '▶';
+    startRafLoop();
     // Re-sync session-params visibility in case engine changed in output view
     updateParamVisibility();
-    // Restore active flag if there are lyrics remaining to tap
-    if (state.player && state.index < state.lyrics.length) state.active = true;
 });
 
 // download() creates and immediately revokes the blob URL to avoid memory leaks

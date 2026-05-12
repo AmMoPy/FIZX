@@ -7,8 +7,6 @@ USAGE:
     python compile.py <audio_file> [options]
 
     <audio_file>        Path to audio file (MP3/WAV/OGG).
-                        If beats.json is missing or stale,
-                        ex_beats.py is called automatically.
 
 OPTIONS:
     --preset [name[,name,...]]
@@ -25,14 +23,12 @@ OPTIONS:
                         Rationale: visualizers are small; including all costs ~5KB.
                         The --visualizer flag exists for extreme size optimization.
 
-    --extract           Re-extract beats even if beats.json exists and valid
+    --extract           Triggers lyrics/beats extraction
 
-    --studio            Compile template_studio.html → studio.html.
-                        Injects the FIZX template and Essentia WASM binary.
-
-    --out [filename]    Output filename. Default: <audio_stem>.html
+    --out [filename]    Output filename. Default: omit to build studio only.
 
 INJECTION BLOCKS (in template.html):
+    /* @@FONTS@@      */ ... /* @@END_FONTS@@      */
     /* @@STYLES@@     */ ... /* @@END_STYLES@@     */
     /* @@VISUALIZERS@@*/ ... /* @@END_VISUALIZERS@@*/
     /* @@PRESETS@@    */ ... /* @@END_PRESETS@@    */
@@ -41,58 +37,94 @@ INJECTION BLOCKS (in template.html):
 
 INJECTION BLOCKS (in studio.html):
     /* @@FIZX_TEMPLATE@@ */   — replaced with the full compiled FIZX template,
-                                backtick-escaped, so studio can use it as a JS string.
+                                so studio can re-generate modified template.
+    /* @@FONTS@@ */           — replaced with pre-generated base64 subset covering 
+                                only the characters actually used to keep the size 
+                                reasonable (~20KB per variant).
 """
 
-import argparse
-import json
 import re
-import subprocess
 import sys
+import json
+import logging
+import argparse
+import urllib.parse
 from pathlib import Path
 
+# ═══════════════════════════════════════════════════════════════════
+# CONFIG & PATHS
+# ═══════════════════════════════════════════════════════════════════
+
+# Logging
+log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+logging.basicConfig(
+    level=getattr(logging, "INFO"),
+    format=log_format
+)
+
+logger = logging.getLogger("[FIZX]")
+
+# Paths
 ROOT = Path(__file__).parent
 SRC  = ROOT / "src"
+FD   = ROOT / 'assets' / 'fonts' # fonts directory, base64 subsets
 
-
-# ═══════════════════════════════════════════════════════════════════
-# BEAT EXTRACTION
-# ═══════════════════════════════════════════════════════════════════
-
-def run_beat_extractor(audio_path: Path) -> Path:
-    extractor = SRC / "ex_beats.py"
-    if not extractor.exists():
-        print(f"❌ ex_beats.py not found at {extractor}")
-        sys.exit(1)
-    print(f"⚙️  Running ex_beats.py on {audio_path.name}…")
-    result = subprocess.run(
-        [sys.executable, str(extractor), str(audio_path)],
-        capture_output=False
-    )
-    if result.returncode != 0:
-        print("❌ ex_beats.py failed.")
-        sys.exit(1)
-    return SRC / "beats.json"
-
-def needs_extraction(audio_path: Path, beats_json: Path) -> bool:
-    """True if beats.json is missing or has different file name"""
-    if not beats_json.exists():
-        return True
-    data = json.loads(beats_json.read_text())
-    return data.get('source') != audio_path.name
+# @font-face configs
+FONT_MAP = {
+    'merri': {'p': FD / 'Merriweather.b64', 'w': 'normal', 's': 'normal'}, # path, weight, style
+    'deja': {'p': FD / 'DejaVuSans.b64', 'w': 'normal', 's': 'normal'}, # arabic support
+}
 
 
 # ─────────────────────────────────────────────────────────────────
 # SOURCE HELPERS
 # ─────────────────────────────────────────────────────────────────
 
-def _strip_export(src: str) -> str:
-    """Remove ES module export keywords for inline use."""
-    return re.sub(r'\bexport\s+const\s+', 'const ', src)
+def _strip(src: str) -> str:
+    """Remove // comments, ES module exports, and empty lines."""
+    text = re.sub(r"//.*", "", src)
+    text = re.sub(r"\bexport\s+const\s+", "const ", text)
+    # Generator expression inside join to avoid intermediate list
+    # Filter(None, ...) is highly optimized in Python
+    # rstrip removes trailing spaces/newlines, preserving indentation
+    return "\n".join(filter(None, (line.rstrip() for line in text.splitlines())))
 
-def _strip_line_comments(src: str) -> str:
-    """Remove // single-line comments. Preserves block comments and strings."""
-    return re.sub(r'(?m)//.*$', '', src)
+def _replace_tag(match:str, data_map:dict, is_studio_prep:bool):
+    """Handle tag replacement to avoid double-tagging"""
+    tag = match.group(1)
+
+    if tag not in data_map:
+        # Leave unknown blocks untouched
+        return match.group(0)
+    
+    if is_studio_prep and tag in ['BEATS', 'LYRICS']:
+        return f"[[{tag}_DATA]]"
+        
+    content = str(data_map.get(tag, match.group(0))).strip()
+    return f"/* @@{tag}@@ */\n{content}\n/* @@END_{tag}@@ */"
+
+def _format_beats_json(data: dict) -> str:
+    """Keep beats array on one line for readability."""
+    beats_line = json.dumps(data.get('beats', []))
+    return (
+        f"const BEAT_DATA = {{\n"
+        f"  \"beats\": {beats_line},\n"
+        f"  \"bpm\": {data.get('bpm', 0)}\n"
+        f"}};"
+    )
+
+def _format_lyrics_json(data: dict) -> str:
+    """One object per line for readability without vertical bloat"""
+    formatted = data.get('LYRICS', [])
+    if formatted:
+        # Serialize everything once
+        lyrics = json.dumps(formatted)
+        # Transform: [{"a":1}, {"a":2}] -> [\n  {"a":1},\n  {"a":2}\n]
+        # replaces the separator '}, {' with '},\n  {'
+        formatted = lyrics.replace("}, {", "},\n  {")
+        # Fix the start and end of the string
+        formatted = formatted.replace("[{", "[\n  {").replace("}]", "}\n]")
+    return f"const LYRICS = {formatted};"
 
 def extract_array_values(src: str, var_name: str) -> list[str]:
     """Extract string values from: const VAR = ['a', 'b', ...];"""
@@ -104,13 +136,13 @@ def extract_array_values(src: str, var_name: str) -> list[str]:
 def brace_walk(src: str, start_pos: int) -> int:
     """
     Walk from start_pos (which must be at or before the opening '{') to
-    the matching '}'. Returns the index after the closing '}'.
+    the matching '}'. Returns the index after the closing '}', or -1 if unmatched.
     """
     i = src.find('{', start_pos)
     if i == -1:
         return -1
-    depth = 0
-    while i < len(src):
+    depth, length = 0, len(src)
+    while i < length:
         if src[i] == '{':
             depth += 1
         elif src[i] == '}':
@@ -124,106 +156,66 @@ def brace_walk(src: str, start_pos: int) -> int:
 # ═══════════════════════════════════════════════════════════════════
 # PRESETS EXTRACTION
 # Parses presets.js to extract:
-#   - The list of all preset keys (from PRESET_ORDER)
-#   - The list of default preset keys (from DEFAULT_PRESETS)
-#   - The `styles` string for each preset
-#   - A clean JS object literal for each preset (cssVars, effects, ...)
-#     with the `styles` key removed (it belongs in <style>, not in JS)
+#   - All preset keys (PRESET_ORDER) and defaults (DEFAULT_PRESETS)
+#   - CSS `styles` string per preset
 # ═══════════════════════════════════════════════════════════════════
 
-def build_presets_block(src: str, preset_keys: list[str]) -> str:
+def extract_preset_data(src: str, preset_keys: list[str]) -> tuple[str, str]:
     """
-    Build PRESETS JS object containing ONLY the requested preset keys.
-    Also builds PRESET_ORDER array from those keys.
+    Build PRESETS JS object containing ONLY the requested preset keys and
+    Extract the backtick `styles` string from a named preset block.
+    Returns (styles_block, presets_block) for the given keys.
     """
-    clean = _strip_line_comments(_strip_export(src))
-    
-    # Extract the raw text of each requested preset's object literal
-    preset_definitions = {}
+    # Strip comments and export keywords once
+    clean = _strip(src)
+
+    styles_parts = []
+    preset_defs = {}
+
     for key in preset_keys:
         # Find the start of the preset block: "key: {"
         pattern = re.compile(rf'\b{re.escape(key)}\s*:\s*\{{')
         m = pattern.search(clean)
         if not m:
-            print(f"⚠️  Preset '{key}' definition not found in presets.js")
+            logger.warning(f"Preset '{key}' definition not found in presets.js")
             continue
-        
         # Walk braces to capture the full preset object
         start = m.start()
         end = brace_walk(clean, start)
         if end == -1:
-            print(f"⚠️  Could not find closing brace for preset '{key}'")
+            logger.warning(f"Could not find closing brace for preset '{key}'")
             continue
-        
-        preset_raw = clean[start:end]
-        # Remove the `styles: ` backtick string — belongs in <style>, not JS
-        preset_raw = re.sub(r'\bstyles\s*:\s*`.*?`\s*,?', '', preset_raw, flags=re.DOTALL)
+        block = clean[start:end]
+
+        # Extract the backtick string value of `styles`
+        style_match = re.search(r'\bstyles\s*:\s*`(.*?)`', block, re.DOTALL)
+        if style_match:
+            css = style_match.group(1).strip()
+            styles_parts.append(f"/* ── {key.upper()} ── */\n{css}")
+
+        # Strip the styles key to build the JS object
+        js_block = re.sub(r'\bstyles\s*:\s*`.*?`\s*,?', '', block, flags=re.DOTALL)
         # Clean up double commas or trailing commas before '}'
-        preset_raw = re.sub(r',\s*,', ',', preset_raw)
-        preset_raw = re.sub(r',\s*\}', '}', preset_raw)
-        preset_definitions[key] = preset_raw
-    
-    # Build the final PRESETS object
-    if not preset_definitions:
-        print("⚠️  No valid preset definitions found.")
-        return "const PRESETS = {};\nconst PRESET_ORDER = [];"
-    
-    # Build PRESET_ORDER array
-    inner = ',\n'.join(preset_definitions.values())
-    presets_obj = f"const PRESETS = {{\n{inner}\n}};"
-    order_str = f"const PRESET_ORDER = {json.dumps(preset_keys)};"
-    
-    return presets_obj + "\n" + order_str
+        js_block = re.sub(r',\s*,', ',', js_block)
+        js_block = re.sub(r',\s*}', '}', js_block)
+        preset_defs[key] = js_block
 
+    # Build the final object
+    if not styles_parts:
+        logger.warning("No valid styles definitions found.")
+        styles_block = styles_parts
+    else:
+        styles_block = '\n\n'.join(styles_parts)
 
-# ═══════════════════════════════════════════════════════════════════
-# STYLES EXTRACTION
-# ═══════════════════════════════════════════════════════════════════
+    if not preset_defs:
+        logger.warning("No valid preset definitions found.")
+        presets_obj =  "const PRESETS = {};\nconst PRESET_ORDER = [];"
+    else:
+        inner = ',\n'.join(preset_defs.values())
+        presets_obj = f"const PRESETS = {{\n{inner}\n}};"
+        order_str = f"const PRESET_ORDER = {json.dumps(preset_keys)};"
 
-def extract_styles_for_preset(src: str, key: str) -> str:
-    """
-    Extract the backtick `styles` string from a named preset block.
-    Uses brace walking to find the preset block boundary first,
-    then regex inside that block for the backtick string.
-
-    We look for:
-        <key>: {
-            ...
-            styles: `...`,
-            ...
-        }
-    """
-    # Find the start of the preset block: "key: {"
-    key_pattern = re.compile(rf'\b{re.escape(key)}\s*:\s*\{{')
-    m = key_pattern.search(src)
-    if not m:
-        return ''
-
-    # Walk forward to find the matching closing brace of the preset block
-    start = m.start()
-    end = brace_walk(src, start)
-    if end == -1:
-        return ''
-
-    block = src[start:end]
-
-    # Extract the backtick string value of `styles`
-    m2 = re.search(r'\bstyles\s*:\s*`(.*?)`', block, re.DOTALL)
-    if not m2:
-        return ''
-    return m2.group(1).strip()
-
-def build_styles_block(src: str, preset_keys: list[str]) -> str:
-    """
-    Collects the `styles` strings from all requested presets and 
-    concatenates them into a single CSS block for injection into <style>.
-    """
-    parts = []
-    for key in preset_keys:
-        css = extract_styles_for_preset(src, key)
-        if css:
-            parts.append(f"/* ── {key.upper()} ── */\n{css}")
-    return '\n\n'.join(parts)
+    return styles_block, presets_obj + "\n" + order_str
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -254,7 +246,7 @@ def build_visualizers_block(src: str, viz_keys: list[str], fltr: bool) -> str:
     """
     Build the full visualizers JS block for injection.
     """
-    clean = _strip_line_comments(_strip_export(src))
+    clean = _strip(src)
     
     # default path - all included
     if not fltr:
@@ -275,7 +267,7 @@ def build_visualizers_block(src: str, viz_keys: list[str], fltr: bool) -> str:
     if base_src:
         parts.append(base_src)
     else:
-        print("⚠️  BaseVisualizer not found in visualizers.js")
+        logger.warning("BaseVisualizer not found in visualizers.js")
 
     # Parse VISUALIZERS map from source
     viz_map_match = re.search(r'const\s+VISUALIZERS\s*=\s*\{([^}]+)\}', clean, re.DOTALL)
@@ -295,7 +287,7 @@ def build_visualizers_block(src: str, viz_keys: list[str], fltr: bool) -> str:
         if cls_src:
             parts.append(cls_src)
         else:
-            print(f"⚠️  Class {cls_name} not found in visualizers.js (key: {key})")
+            logger.warning(f"Class {cls_name} not found in visualizers.js (key: {key})")
         entries.append(f"    {key}: {cls_name},")
 
     viz_map = "const VISUALIZERS = {\n" + "\n".join(entries) + "\n};"
@@ -308,92 +300,99 @@ def build_visualizers_block(src: str, viz_keys: list[str], fltr: bool) -> str:
 
     return '\n\n'.join(parts)
 
-
-# ═══════════════════════════════════════════════════════════════════
-# LYRICS
-# ═══════════════════════════════════════════════════════════════════
-
-def load_lyrics_js() -> str:
-    src = (SRC / "lyrics.js").read_text()
-    src = _strip_export(src)
-    src = _strip_line_comments(src)
-    return src.strip()
-
-
 # ═══════════════════════════════════════════════════════════════════
 # BLOCK INJECTION AND REWRITE
 # ═══════════════════════════════════════════════════════════════════
 
-def inline_block(html: str, tag: str, replacement: str) -> str:
+def inline_blocks(template: str, data_map: dict[str, str], is_studio_prep: bool = False) -> str:
     """
-    Replaces /* @@TAG@@ */ ... /* @@END_TAG@@ */ in HTML.
-    Robust against whitespace variations around markers.
+    Replace all /* @@TAG@@ */ ... /* @@END_TAG@@ */ blocks in one pass.
+    Ensures no whitespace bloat by stripping content before injection.
     """
-    start_marker = f'/* @@{tag}@@ */'
-    end_marker   = f'/* @@END_{tag}@@ */'
-    
-    if start_marker not in html or end_marker not in html:
-        print(f"⚠️  Markers for @@{tag}@@ not found in template.html")
-        return html
-    
-    # Split into three parts: before start, between markers, after end
-    before, rest = html.split(start_marker, 1)
-    middle, after = rest.split(end_marker, 1)
-    
-    # Reassemble with replacement in the middle
-    return before + start_marker + '\n' + replacement.strip() + '\n' + end_marker + after
+    # Build a pattern that captures TAG and the inner content (non-greedy)
+    pattern = r'/\* @@(\w+)@@ \*/(.*?)/\* @@END_\1@@ \*/'
 
-def set_initial_preset(html: str, preset_key: str) -> str:
-    """Reorder PRESET_ORDER so the chosen preset is first (loads on boot).""" 
-    def reorder(m):
-        keys = re.findall(r"'([^']+)'|\"([^\"]+)\"", m.group(1))
-        flat = [a or b for a, b in keys]
-        if preset_key in flat:
-            flat.remove(preset_key)
-            flat.insert(0, preset_key)
-        return f"const PRESET_ORDER = [{', '.join(repr(k) for k in flat)}];"
-    return re.sub(r'const PRESET_ORDER\s*=\s*\[([^\]]+)\];', reorder, html)
+    return re.sub(
+        pattern, 
+        lambda m: _replace_tag(m, data_map, is_studio_prep), 
+        template, 
+        flags=re.DOTALL
+    )
+
+def build_fonts(font_names: list[str]):
+    """Build @font-face blocks from base64-encoded .b64 files."""
+    replacement = ""
+    for name in font_names:
+        cfg = FONT_MAP.get(name)
+        if not cfg:
+            continue
+        path = cfg.get('p')
+        if not path or not path.exists():
+            logger.warning(f'Font file missing: {name} — skipping')
+            continue
+        # read encoding from path
+        b64 = path.read_text().strip()
+        # build font style
+        data_uri = f"url('data:font/woff2;base64,{b64}') format('woff2')"
+        # font-display: block prevents Flash of Unstyled Text (FOUT) for consistent layout
+        replacement += f"""
+        @font-face {{
+            font-family: '{name}';
+            font-weight: {cfg['w']};
+            font-style: {cfg['s']};
+            font-display: block;
+            src: {data_uri};
+        }}
+        """
+        logger.info(f'Font injected: {path.name} ({len(b64)//1024}KB encoded)')
+    if not replacement:
+        logger.warning(f'No Fonts detected, ensure font file exists and are correctly mapped in FONT_MAP')
+        replacement = "/* Inline fonts not available — using system fallback */"
+    
+    return replacement
 
 
 # ═══════════════════════════════════════════════════════════════════
 # STUDIO BUILD
 # ═══════════════════════════════════════════════════════════════════
 
-def escape_for_js_backtick(s: str) -> str:
+def build_studio(
+    fizx_template: str,
+    fonts_block: str,
+    template_marker: str = '/* @@FIZX_TEMPLATE@@ */',
+    fonts_marker: str = '/* @@FONTS@@ */'
+    ) -> str:
     """
-    Escape a string for safe embedding inside a JS template literal.
-    Escapes backticks, backslashes, and ${...} interpolation sequences.
-    The compiled FIZX template contains all three in practice.
-    """
-    s = s.replace('\\', '\\\\')
-    s = s.replace('`', '\\`')
-    s = s.replace('${', '\\${')
-    s = s.replace('</script>', '<\\/script>')
-    return s
+    Produce studio.html by injecting into template_studio.html:
+      - Compiled FIZX template (URL-encoded) at @@FIZX_TEMPLATE@@
+      - Base64 fonts at @@FONTS@@
 
-def build_studio(fizx_template: str) -> str:
-    """
-    Produce a self-contained studio.html by injecting into template_studio.html:
-      - The compiled FIZX template (backtick-escaped) at /* @@FIZX_TEMPLATE@@ */
-
-    template_studio.html must use these single-line markers (no END_ counterpart):
-        - const FIZX_TEMPLATE = `/* @@FIZX_TEMPLATE@@ */`;
+    URL encoding chosen over backtick escaping because the FIZX template
+    contains backticks, backslashes, and ${ sequences that are difficult
+    to escape reliably across all content variations.
+    The studio uses decodeURIComponent() to restore the original string.
     """
     studio_path = SRC / "template_studio.html"
     if not studio_path.exists():
-        print(f"❌ template_studio.html not found at {studio_path}")
+        logger.error(f"template_studio.html not found at {studio_path}")
         sys.exit(1)
 
     studio = studio_path.read_text()
 
     # ── Inject FIZX template ───────────────────────────────────
-    template_marker = '/* @@FIZX_TEMPLATE@@ */'
     if template_marker not in studio:
-        print(f"⚠️  {template_marker} not found in template_studio.html — skipping template injection")
+        logger.warning(f"{template_marker} not found in template_studio.html — skipping template injection")
     else:
-        escaped = escape_for_js_backtick(fizx_template)
-        studio = studio.replace(template_marker, escaped)
-        print(f"   FIZX template injected ({len(fizx_template)//1024} KB)")
+        # URL safe component encoding for the studio quine
+        s_encoded = urllib.parse.quote(fizx_template)
+        studio = studio.replace(template_marker, s_encoded)
+        logger.info(f"FIZX template injected ({len(fizx_template)//1024} KB)")
+    
+    # ── Inject Fonts ───────────────────────────────────
+    if fonts_marker not in studio:
+        logger.warning(f"{fonts_marker} not found in template_studio.html — skipping fonts injection")
+    else:
+        studio = studio.replace(fonts_marker, fonts_block)
 
     return studio
 
@@ -424,36 +423,55 @@ def parse_list_arg(values: list[str]) -> list[str]:
 
 def main():
     parser = argparse.ArgumentParser(description="FIZX Visualizer build script")
-    parser.add_argument("audio",                   help="Path to audio file")
-    parser.add_argument("--preset",   "-p",        action="append", default=[], metavar="NAME[,NAME]",
+    parser.add_argument("audio",                   
+                        help="Path to audio file")
+    parser.add_argument("--preset",     "-p",      action="append", default=[], metavar="NAME[,NAME]",
                         help="Preset(s) to include. Comma-separated or repeat flag. "
                              "'all' = include everything. No flag = defaults only.")
     parser.add_argument("--all",                   action="store_true",
                         help="Include all presets (shorthand for --preset all)")
     parser.add_argument("--visualizer", "-v",      action="append", default=[], metavar="NAME[,NAME]",
                         help="Visualizer(s) to include. No flag = all.")
-    parser.add_argument("--extract",  "-e",        action="store_true",
-                        help="Re-extract beats even if beats.json exists and valid")
-    parser.add_argument("--studio",   "-s",        action="store_true",
-                        help="Compile template_studio.html → studio.html")   
-    parser.add_argument("--out",      "-o",        default=None,
+    parser.add_argument("--extract",    "-e",      action="store_true",
+                        help="Triggers lyrics/beats extraction")
+    parser.add_argument("--out",                   default=None,
                         help="Output filename (default: <stem>.html)")
-    args = parser.parse_args()
+    
+    # parse_known_args grabs the above args and keep the 
+    # rest in 'extra_argv' as a list of strings ['--beats', '--force']
+    # to be passed to the beats/lyrics extractor
+    args, extra_argv = parser.parse_known_args()
 
     audio_path = Path(args.audio).resolve()
     if not audio_path.exists():
-        print(f"❌ Audio file not found: {audio_path}")
+        logger.error(f"Audio file not found: {audio_path}")
         sys.exit(1)
 
-    # ── Beat extraction ───────────────────────────────────────────
-    beats_json = SRC / "beats.json"
-    if args.extract or needs_extraction(audio_path, beats_json):
-        beats_json = run_beat_extractor(audio_path)
-    else:
-        print(f"✅ beats.json up to date")
-    beats_data = json.loads(beats_json.read_text())
+    # ── Beat/Lyrics extraction ───────────────────────────────────────────
+    beats_json  = SRC / "beats.json"
+    lyrics_json = SRC / "lyrics.json"   
 
-    # ── Read sources ─────────────────────────────────────────
+    if args.extract:
+        from src import ex_beats
+        # 'audio' is a positional arg, it was already 
+        # consumed by the caller, add back for the extractor
+        extra_argv.append(args.audio)
+        # The caller doesn't parse extractor flags; it just passes the whole argv
+        # This effectively "hands off" control to the extractor's main()
+        beats_data, lyrics_data = ex_beats.main(
+            extra_argv,
+            logger=logger,
+            beats_json=beats_json,
+            lyrics_json=lyrics_json
+        )
+    else:
+        # Fast fallback just return empty structures if no data available
+        logger.warning(f"Skipping extraction, loading existing data if available...")
+        beats_data  = json.loads(beats_json.read_text()) if beats_json.exists() else {"beats": [], "bpm": 0}
+        lyrics_data = json.loads(lyrics_json.read_text()) if lyrics_json.exists() else []
+
+
+    # ── Read JS sources ─────────────────────────────────────────
     presets_src  = (SRC / "presets.js").read_text()
     viz_src      = (SRC / "visualizers.js").read_text()
     template     = (SRC / "template.html").read_text()
@@ -471,7 +489,6 @@ def main():
 
     if include_all:
         preset_keys = all_preset_keys
-        print(f"📦 Including all presets: {preset_keys}")
     elif raw_presets:
         # only add user-specified presets
         preset_keys = []
@@ -479,15 +496,13 @@ def main():
             if key in all_preset_keys:
                 preset_keys.append(key)
             else:
-                print(f"⚠️  Preset '{key}' not found skipping")
+                logger.warning(f"Preset '{key}' not found skipping")
 
         if not preset_keys:
-            print(f"⚠️  No valid presets — falling back to defaults")
+            logger.warning(f"No valid presets — falling back to defaults")
             preset_keys = default_preset_keys
-        print(f"📦 Presets: {preset_keys}")
     else:
         preset_keys = default_preset_keys
-        print(f"📦 Default presets only: {preset_keys}")
 
     # ── Resolve visualizer keys ───────────────────────────────────
     raw_viz = parse_list_arg(args.visualizer)
@@ -499,97 +514,79 @@ def main():
             if key in all_viz_keys:
                 viz_keys.append(key)
             else:
-                print(f"⚠️  Visualizer '{key}' not found skipping")
+                logger.warning(f"Visualizer '{key}' not found skipping")
         
         if not viz_keys:
-            print(f"⚠️  No valid Visualizer — falling back to defaults")
+            logger.warning(f"No valid Visualizer — falling back to defaults")
             viz_keys = all_viz_keys
             fltr = False
-        print(f"🎨 Visualizers: {viz_keys}")
     else:
         viz_keys = all_viz_keys # default all keys
         fltr = False
-        print(f"🎨 All visualizers included")
 
     # ── Build injection blocks ────────────────────────────────────
-    styles_block    = build_styles_block(presets_src, preset_keys)
-    presets_block   = build_presets_block(presets_src, preset_keys)
-    viz_block       = build_visualizers_block(viz_src, viz_keys, fltr)
-    lyrics_block    = load_lyrics_js()
-    beats_block     = (
-        f"const BEAT_DATA = {{\n"
-        f"    beats: {json.dumps(beats_data['beats'])},\n"
-        f"    bpm:   {beats_data['bpm']},\n"
-        f"}};"
-    )
+    styles_block, presets_block = extract_preset_data(presets_src, preset_keys)
+    viz_block     = build_visualizers_block(viz_src, viz_keys, fltr)
+    fonts_block   = build_fonts(['merri', 'deja'])
+    beats_block   = _format_beats_json(beats_data)
+    lyrics_block  = _format_lyrics_json(lyrics_data)
 
-    # ── Inject into template ──────────────────────────────────────
+    # ── Compile FIZIX template ──────────────────────────────────────
     out = template
-    out = inline_block(out, 'STYLES',      styles_block)
-    out = inline_block(out, 'VISUALIZERS', viz_block)
-    out = inline_block(out, 'PRESETS',     presets_block)
-    out = inline_block(out, 'LYRICS',      lyrics_block)
-    out = inline_block(out, 'BEATS',       beats_block)
-
-    # Set the boot preset to the first in the requested list
-    out = set_initial_preset(out, preset_keys[0])
-
+    # Assembl
+    inj_blocks = {
+        'FONTS': fonts_block,
+        'STYLES': styles_block,
+        'VISUALIZERS': viz_block,
+        'PRESETS': presets_block,
+        'BEATS': beats_block, 
+        'LYRICS': lyrics_block
+    }
+    out = inline_blocks(out, inj_blocks)
     # Update title
     out = out.replace('<title>FIZX VISUALIZER</title>',
                       f'<title>FIZX · {audio_path.stem}</title>')
-
     # Safety: strip type="module" if present (compiled file is plain JS)
     out = re.sub(r'<script\s+type=["\']module["\']>', '<script>', out)
 
-    # ── Write output ──────────────────────────────────────────────
-    out_name = args.out or f"{audio_path.stem}.html"
-    out_path = ROOT / out_name
-    out_path.write_text(out)
-
-    size_kb = out_path.stat().st_size / 1024
-    print(f"\n✅ Success {out_path.name}  ({size_kb:.1f} KB)")
-    print(f"   Presets     : {preset_keys}")
-    print(f"   Visualizers : {viz_keys}")
-    print(f"   Beats       : {len(beats_data['beats'])} onsets · {beats_data['bpm']} BPM")
-    print(f"\n   Open {out_name} — no server, no dependencies.")
-
-    # ── Optionally compile studio ─────────────────────────────────
-    if args.studio:
-        print(f"\n⚙️  Building studio…")
-        # The template injected into the studio is the bare template.html
-        # with all blocks populated but WITHOUT audio-specific data (no beats,
-        # no lyrics). Studio will substitute [[LYRICS_DATA]], [[BEATS_DATA]]
-        # and [[BPM_DATA]] at export time using its own tapping session results.
-        #
-        # We reuse the already-compiled `out` string but replace the
-        # injected beats/lyrics with the placeholder tokens that studio
-        # expects, so the Quine strategy works correctly.
-        studio_template = out
-        studio_template = inline_block(
-            studio_template, 
-            'BEATS', 
-            'const BEAT_DATA = { beats: [[BEATS_DATA]], bpm: [[BPM_DATA]] };'
-        )
-        # Replace the full LYRICS const assignment with the placeholder.
-        # _strip_export already ran, so it's `const LYRICS = [...]`.
-        studio_template = inline_block(
-            studio_template, 
-            'LYRICS', 
-            'const LYRICS = [[LYRICS_DATA]];'
+    # ── Write FIZX output (optional) ────────────────────────────────
+    if args.out:
+        out_path = ROOT / args.out
+        out_path.write_text(out)
+        size_kb = out_path.stat().st_size / 1024
+        logger.info(
+            f"VISUALIZER GENERATED\n"
+            f"{'*'*20}\n- {out_path.name}  ({size_kb:.1f} KB)\n"
+            f"- Presets: {preset_keys}\n"
+            f"- Visualizers: {viz_keys}\n{'*'*20}"
         )
 
-        studio_html = build_studio(studio_template)
-        studio_out  = ROOT / "studio.html"
-        studio_out.write_text(studio_html)
+    # ── Compile studio template ─────────────────────────────────────
+    # The template injected into the studio is the bare template.html
+    # with all blocks populated but WITHOUT audio-specific data (beats/lyrics)
+    # so the Quine strategy works correctly.Studio will substitute 
+    # [[LYRICS_DATA]], [[BEATS_DATA]] and [[BPM_DATA]] at export time
+    # using its own session results.
+    logger.info(f"\n{'*'*20}Building studio{'*'*20}")
+    studio_template = out
+    # Assembl
+    placeholders = {
+        'BEATS':  'const BEAT_DATA = { beats: [[BEATS_DATA]], bpm: [[BPM_DATA]] };',
+        'LYRICS': 'const LYRICS = [[LYRICS_DATA]];'
+    }
+    studio_template = inline_blocks(studio_template, placeholders)
+    studio_html = build_studio(studio_template, fonts_block)
 
-        studio_kb = studio_out.stat().st_size / 1024
-        print(f"✅ studio.html  ({studio_kb:.1f} KB)")
-        print(f"   Contains: FIZX template")
-
-    print(f"\n   Open {out_name} in any browser — no server, no dependencies.")
-    if args.studio:
-        print(f"   Open studio.html to tap lyrics and export new fizx files.")
-
+    # ── Write Studio output ────────────────────────────────────────
+    studio_out  = ROOT / "studio.html"
+    studio_out.write_text(studio_html)
+    studio_kb = studio_out.stat().st_size / 1024
+    logger.info(
+        f"STUDIO COMPILED\n"
+        f"{'*'*20}\n- studio.html  ({studio_kb:.1f} KB)\n"
+        f"- Contains generic FIZX template\n"
+        f"- Open studio to edit the template\n{'*'*20}"
+    )
 
 if __name__ == "__main__":
     main()

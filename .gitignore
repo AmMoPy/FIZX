@@ -1,3 +1,11 @@
+# Python
+__pycache__/
+
 # samples
 songs/
-beats.json
+
+# Virtual environments
+faenv/
+
+# Experimenting
+models/

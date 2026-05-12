@@ -1,2 +1,18 @@
-librosa==0.11.0
-numpy==2.4.1
+# Aeneas DTW, cpu friendly (python 10/11)
+# requires ffmpeg and espeak in PATH
+# Install numpy first
+numpy==1.23.5
+# Install these after numpy is confirmed
+scipy>=1.8.0,<1.11.0
+scikit-learn>=1.1.0,<1.4.0
+librosa<=0.11.0
+# install aeneas via a separate command:
+# pip install aeneas --no-build-isolation
+
+# If you still need automated lyrics extraction
+# but fighting with Aeneas Installation
+# ctc_forced_aligner 
+# sherpa-onnx 
+# onnxruntime 
+# Unidecode 
+# nltk
