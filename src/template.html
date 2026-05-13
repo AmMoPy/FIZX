@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>FIZX VISUALIZER</title>
     <!-- Self-hosted subsetted fonts — no network request, works fully offline.
-         Base64 strings injected by compile.py from generated .b64 files in assets/fonts/.-->
+         Base64 strings injected by compile.py from generated .b64 files in assets/fonts/.-->    
     <style>
         /* @@FONTS@@ */
         /* @@END_FONTS@@ */
@@ -21,14 +21,15 @@
             --color-dim:     #3c9e3c;
             --color-faint:   #2a8a2a;
             --color-muted:   #3a7a3a;
-            --shadow-screen: inset 0 0 25px rgba(0,255,0,0.06);
             --shadow-outer:  0 0 0 2px #1a3a1a,0 20px 40px rgba(0,0,0,0.5);
+            --shadow-screen: inset 0 0 25px rgba(0,255,0,0.06);
             --bg-stats:      #0a0c0a;
             --bg-btn:        #1a2a1a;
             --border-btn:    #3c9e3c;
             --color-btn:     #aaffaa;
             --flash-color:   rgba(0,255,0,0.4);
-            --prim:          'merri', 'deja', 'Consolas', monospace;
+            --prim:          'merri','deja','Consolas',monospace; /* DejaVuSans for Arabic fallback */
+            --crt-on:        0;
         }
 
         * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
@@ -40,22 +41,25 @@
             justify-content: center;
             align-items: center;
             font-family: var(--prim);
-            transition: background 0.5s ease;
+            transition: background 0.5s;
         }
 
         svg {
-            vertical-align: middle;
-            margin-bottom: 0.125em;
+            vertical-align: middle; /* SVGs often sit slightly "higher" than text */
+            margin-bottom: 0.125em; /* Fine-tune to align with font baseline */
         }
 
-        /* ── STAGE ───────────────────────────────────────────────────── */
+        /* ── STAGE ────────────────────────────────────────────────────
+           9:16 default. .ar-landscape flips to 16:9.
+           max-width = min() prevents overflow on both axes.
+        ── */
         .stage {
             aspect-ratio: 9 / 16;
             max-width: min(100vw, calc(100vh * 9 / 16));
             width: 100%;
             position: relative;
             box-shadow: var(--shadow-outer);
-            transition: box-shadow 0.5s ease, max-width 0.3s ease, aspect-ratio 0.3s ease;
+            transition: box-shadow 0.5s, max-width 0.3s, aspect-ratio 0.3s;
         }
         .stage.ar-landscape {
             aspect-ratio: 16 / 9;
@@ -69,7 +73,7 @@
             display: flex;
             flex-direction: column;
             padding: 1px 2px 14px 2px;
-            transition: background 0.5s ease;
+            transition: background 0.5s;
         }
 
         /* ── SCREEN ──────────────────────────────────────────────────── */
@@ -82,9 +86,11 @@
             overflow: hidden;
             border: 1px solid var(--border-screen);
             margin-bottom: 6px;
-            transition: background 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
+            transition: background 0.5s, border-color 0.5s, box-shadow 0.5s;
         }
 
+        /* CRT scanlines — CSS pseudo-elements, GPU composited.
+           Toggled via .crt-on class by applyPreset(). */
         .screen.crt-on::before {
             content: "";
             position: absolute;
@@ -106,13 +112,33 @@
             z-index: 5;
         }
 
+        /* Screen flash — animates box-shadow via CSS keyframe.
+           The browser GPU compositor runs this at native frame rate
+           with zero JS involvement after the class is added. */
         @keyframes kScreenFlash {
             0%  { box-shadow: inset 0 0 60px var(--flash-color), 0 0 20px var(--flash-color); }
             100%{ box-shadow: var(--shadow-screen); }
         }
-        .screen.screen-flash { animation: kScreenFlash 0.12s ease-out; }
+        .screen.screen-flash { animation: kScreenFlash 0.12s ease-out forwards; }
+
+        /* ── MASTER CANVAS ───────────────────────────────────────────── */
+        /* Renders: background fill, CRT (canvas version when crt-on),
+           dust particles, visualizer drawImage.
+           Does NOT render: lyrics, flash — those stay in the DOM
+           where the CSS engine animates them at native quality. */
+        #masterCanvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            z-index: 1;
+        }
 
         /* ── LYRIC AREA ──────────────────────────────────────────────── */
+        /* Sits above the canvas in z-order. The CSS engine handles all
+           text rendering and animation — subpixel antialiasing, kerning,
+           hardware-accelerated transforms. No canvas approximation. */
         .lyric-area {
             position: absolute;
             inset: 0;
@@ -123,18 +149,19 @@
             text-align: center;
             z-index: 10;
             padding: 30px 20px 80px 20px;
+            pointer-events: none;
         }
 
         .current-line {
             font-family: var(--prim);
-            font-size: clamp(2.5rem, 6vw, 3rem);
+            font-size: clamp(2.5rem, 6vw, 2.8rem);
             font-weight: bold;
             color: var(--color-primary);
             text-shadow: 0 0 5px var(--color-dim), 0 0 8px var(--color-faint);
             margin-bottom: 16px;
             line-height: 1.4;
             will-change: transform, opacity, filter;
-            transition: color 0.5s ease, text-shadow 0.5s ease;
+            transition: color 0.5s, text-shadow 0.5s;
         }
 
         .next-line {
@@ -144,44 +171,21 @@
             opacity: 0.7;
             border-top: 1px dashed var(--color-faint);
             padding-top: 15px;
-            transition: color 0.5s ease, border-color 0.5s ease;
+            transition: color 0.5s, border-color 0.5s;
         }
 
         /* ── VISUALIZER WRAP ─────────────────────────────────────────── */
+        /* Invisible positioning anchor — the visualizer's canvas is
+           drawImage'd onto masterCanvas each frame. visWrap itself is
+           never painted; it just provides getBoundingClientRect(). */
         .visualizer-wrap {
             position: absolute;
             bottom: -30px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 12;
-            will-change: transform, opacity;
-        }
-        .visualizer-wrap.viz-off { display: none; }
-
-        /* ── DUST CANVAS ─────────────────────────────────────────────── */
-        /* Single canvas replaces 20 DOM .dust-particle divs.
-           Internal resolution clamped to 480px; CSS scales to fill .screen. */
-        #dustCanvas {
-            position: absolute;
-            inset: 0;
+            visibility: hidden;
             pointer-events: none;
-            z-index: 6;
-            width: 100%;
-            height: 100%;
-        }
-
-        /* ── STATUS BAR ──────────────────────────────────────────────── */
-        .stats {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: var(--color-faint);
-            font-size: 8px;
-            background: var(--bg-stats);
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-family: monospace;
-            transition: background 0.5s ease, color 0.5s ease;
+            z-index: 2;
         }
 
         /* ── SEEKBAR ─────────────────────────────────────────────────── */
@@ -191,7 +195,6 @@
             gap: 6px;
             padding: 4px 10px 0 10px;
         }
-
         #seekBar {
             flex: 1;
             -webkit-appearance: none;
@@ -204,28 +207,31 @@
         }
         #seekBar::-webkit-slider-thumb {
             -webkit-appearance: none;
-            appearance: none;
-            width: 10px;
-            height: 10px;
+            width: 10px; height: 10px;
             border-radius: 50%;
             background: var(--color-primary);
             cursor: pointer;
             box-shadow: 0 0 4px var(--color-dim);
         }
         #seekBar::-moz-range-thumb {
-            width: 10px;
-            height: 10px;
-            border: none;
-            border-radius: 50%;
+            width: 10px; height: 10px;
+            border: none; border-radius: 50%;
             background: var(--color-primary);
             cursor: pointer;
         }
-        #seekElapsed {
+
+        /* ── STATS BAR ───────────────────────────────────────────────── */
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--color-faint);
+            font-size: 8px;
+            background: var(--bg-stats);
+            padding: 4px 10px;
+            border-radius: 20px;
             font-family: monospace;
-            font-size: 7px;
-            color: var(--color-muted);
-            min-width: 26px;
-            text-align: right;
+            transition: background 0.5s, color 0.5s;
         }
 
         /* ── CONTROLS ────────────────────────────────────────────────── */
@@ -236,15 +242,19 @@
             gap: 10px;
             margin-top: 6px;
         }
-
+        .controls-row-main {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        /* Icon-only circular buttons — tooltip via data-tip + ::after */
         button {
             background: var(--bg-btn);
             border: 1px solid var(--border-btn);
             color: var(--color-btn);
             font-family: monospace;
             font-weight: bold;
-            width: 32px;
-            height: 32px;
+            width: 32px; height: 32px;
             border-radius: 50%;
             cursor: pointer;
             font-size: 0.85rem;
@@ -255,10 +265,7 @@
             position: relative;
             transition: filter 0.1s, box-shadow 0.1s, border-color 0.4s, color 0.4s, background 0.4s;
         }
-        button:hover {
-            filter: brightness(1.5);
-            box-shadow: 0 0 8px var(--color-primary);
-        }
+        button:hover { filter:brightness(1.5); box-shadow:0 0 8px var(--color-primary); }
         button::after {
             content: attr(data-tip);
             position: absolute;
@@ -276,17 +283,10 @@
             transition: opacity 0.15s;
             border: 1px solid var(--border-btn);
         }
-        button:hover::after { opacity: 1; }
-
-        .controls-row-main {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
-
+        button:hover::after { opacity:1; }
+        /* Util buttons — pill shape, smaller text */
         button.btn-util {
-            width: auto;
-            height: 20px;
+            width: auto; height: 20px;
             border-radius: 10px 30px;
             font-size: 0.6rem;
             padding: 0 8px;
@@ -300,50 +300,35 @@
             margin-top: 4px;
             color: var(--color-muted);
             font-family: monospace;
-            transition: color 0.5s ease;
+            transition: color 0.5s;
         }
 
-        /* ── RECORDING STATE ─────────────────────────────────────────── */
-        /* Pulse ring on the record button while recording is active */
-        @keyframes kRecordPulse {
-            0%,100% { box-shadow: 0 0 0 0 rgba(255,40,40,0.7); }
-            50%      { box-shadow: 0 0 0 6px rgba(255,40,40,0); }
-        }
-        button.recording-active {
-            border-color: #ff2828 !important;
-            color: #ff2828 !important;
-            animation: kRecordPulse 1s ease-in-out infinite;
-        }
-
-        /* ── PRESET STYLES INJECTION POINT ───────────────────────────── */
+        /* ── PRESET STYLES ───────────────────────────────────────────── */
+        /* compile.py injects all @keyframes and .fx-* classes here.
+           Template owns zero preset-specific CSS. */
         /* @@STYLES@@ */
         /* @@END_STYLES@@ */
     </style>
 </head>
 <body>
-<!--
-    Compositor canvas — hidden from the user, captured by MediaRecorder.
-    Sized to match .screen at record-start time. Never displayed.
-    All visual layers are drawn onto this canvas each rAF frame
-    during recording by reading live computed styles off the DOM elements.
--->
-<canvas id="compositorCanvas" style="position:fixed;top:-9999px;left:-9999px;pointer-events:none;visibility:hidden;"></canvas>
 
 <div class="stage" id="stage">
     <div class="container">
         <div class="screen" id="screen">
-            <!-- Canvas-based dust system: single draw call per frame, zero DOM nodes -->
-            <canvas id="dustCanvas"></canvas>
+            <!-- Canvas: background, CRT scanlines, dust, visualizer -->
+            <canvas id="masterCanvas"></canvas>
+
+            <!-- DOM lyric layer: CSS engine handles text rendering + animation -->
             <div class="lyric-area">
                 <div class="current-line" id="currentLine"></div>
                 <div class="next-line"    id="nextLine"></div>
             </div>
+
+            <!-- Invisible anchor for visualizer getBoundingClientRect() -->
             <div class="visualizer-wrap" id="visualizerWrap"></div>
         </div>
 
-        <!-- Seekbar: above stats bar, driven by AudioContext clock -->
         <div class="seekbar-container">
-            <span id="seekElapsed">0:00</span>
             <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1">
         </div>
 
@@ -361,7 +346,6 @@
                 <button id="modeBtn"   data-tip="Sync mode A/B"></button>
                 <button id="presetBtn" data-tip="Switch preset"></button>
                 <button class="btn-util" id="vizBtn"   data-tip="Visualizer"></button>
-                <button class="btn-util" id="recBtn"   data-tip="Record video"></button>
             </div>
         </div>
         <div class="status-text" id="statusText"></div>
@@ -370,7 +354,8 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
-// INJECTED BLOCKS — compile.py replaces each sentinel pair.
+// INJECTED BLOCKS
+// compile.py replaces each block
 // ═══════════════════════════════════════════════════════════════════
 
 /* @@VISUALIZERS@@ */
@@ -388,187 +373,220 @@
 // ═══════════════════════════════════════════════════════════════════
 // DOM REFS
 // ═══════════════════════════════════════════════════════════════════
-const stageEl          = document.getElementById('stage');
-const screenEl         = document.getElementById('screen');
-const currentLineEl    = document.getElementById('currentLine');
-const nextLineEl       = document.getElementById('nextLine');
-const timeDisplay      = document.getElementById('timeDisplay');
-const bpmDisplay       = document.getElementById('bpmDisplay');
-const statusMsg        = document.getElementById('statusMsg');
-const playBtn          = document.getElementById('playBtn');
-const resetBtn         = document.getElementById('resetBtn');
-const modeBtn          = document.getElementById('modeBtn');
-const presetBtn        = document.getElementById('presetBtn');
-const arBtn            = document.getElementById('arBtn');
-const vizBtn           = document.getElementById('vizBtn');
-const recBtn           = document.getElementById('recBtn');
-const visWrap          = document.getElementById('visualizerWrap');
-const seekBar          = document.getElementById('seekBar');
-const seekElapsed      = document.getElementById('seekElapsed');
-const dustCanvas       = document.getElementById('dustCanvas');
-const dustCtx          = dustCanvas.getContext('2d');
-const compositorCanvas = document.getElementById('compositorCanvas');
-const compCtx          = compositorCanvas.getContext('2d');
+const stageEl      = document.getElementById('stage');
+const screenEl     = document.getElementById('screen');
+const masterCanvas = document.getElementById('masterCanvas');
+const mCtx         = masterCanvas.getContext('2d');
+const visWrap      = document.getElementById('visualizerWrap');
+const currentLineEl = document.getElementById('currentLine');
+const nextLineEl    = document.getElementById('nextLine');
+const timeDisplay  = document.getElementById('timeDisplay');
+const bpmDisplay   = document.getElementById('bpmDisplay');
+const statusMsg    = document.getElementById('statusMsg');
+const playBtn      = document.getElementById('playBtn');
+const resetBtn     = document.getElementById('resetBtn');
+const modeBtn      = document.getElementById('modeBtn');
+const presetBtn    = document.getElementById('presetBtn');
+const arBtn        = document.getElementById('arBtn');
+const vizBtn       = document.getElementById('vizBtn');
+const seekBar      = document.getElementById('seekBar');
 
 // ═══════════════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════════════
-let beatTimestamps = [...BEAT_DATA.beats];
-let bpm            = BEAT_DATA.bpm;
-let currentMode    = 'A';
-let currentPreset  = PRESET_ORDER[0];
-let isLandscape    = false;
-let isPlaying      = false;
-let flashCycleIdx  = 0;
+let beatTimestamps   = [...BEAT_DATA.beats];  // Copy to allow modification
+let bpm              = BEAT_DATA.bpm;
+let currentMode      = 'A'; // 'A' = beat triggers, 'B' = lyric start triggers
+let currentPreset    = PRESET_ORDER[0];
+let isLandscape      = false;
+let isPlaying        = false;
+let flashCycleIdx    = 0;
+let lastFiredBeatIdx = 0;
+let currentLyricIdx  = -1;  // -2=pre-roll, -3=credits
+let animFrameId      = null;
+let isSeeking        = false;
 
+// VISUALIZER_ORDER is injected by compile.py from visualizers.js.
+// The 'off' sentinel maps to null (no visualizer rendered).
 const VIZ_ORDER = (typeof VISUALIZER_ORDER !== 'undefined')
-    ? VISUALIZER_ORDER
-    : ['off', 'particles', 'waveform'];
-let vizIndex = 0;
-let vizs     = null;
+    ? VISUALIZER_ORDER : ['off'];
+let vizIndex = 0;    // current position in VIZ_ORDER
+let vizs     = null; // active BaseVisualizer instance or null
 
-// ═══════════════════════════════════════════════════════════════════
-// AUDIO PIPELINE — Web Audio API / AudioBufferSourceNode
-//
-// Architecture:
-//   FileReader → ArrayBuffer → decodeAudioData → AudioBufferSourceNode
-//   → AnalyserNode (fftSize 256) → destination
-//
-// Why not HTML5 Audio:
-//   - AudioContext.currentTime is locked to the sound card driver clock.
-//     HTML5 audio.currentTime drifts relative to it, causing beat
-//     scheduler misalignment at scale.
-//   - AudioBufferSourceNode.onended fires precisely at buffer end.
-//     No polling required.
-//   - AnalyserNode gives visualizers frequency data without extra wiring.
-// ═══════════════════════════════════════════════════════════════════
-let audioContext  = null;   // one context per page load; recreated only on reset
-let analyserNode  = null;   // persistent; reconnected to each new sourceNode
-let sourceNode    = null;   // current AudioBufferSourceNode (replaced on seek/play)
-let audioBuffer   = null;   // decoded PCM buffer — loaded once, reused on seek/replay
-let startOffset   = 0;      // buffer position (seconds) where current play began
-let startedAt     = 0;      // audioContext.currentTime snapshot at last play() call
-let audioDuration = 0;      // total track duration in seconds
-let isSeeking     = false;  // true while seekbar thumb is held
-
-// ── Beat + lyric cursor state ──────────────────────────────────────
-// Linear integer pointers advance inside the rAF loop.
-// Zero allocations per beat — no setTimeout forest, no array splices.
-// On seek: both pointers reset and fast-forward to the target position.
-let lastFiredBeatIdx = 0;   // next unprocessed index into beatTimestamps (or lyric starts)
-let currentLyricIdx  = -1;  // -2 = pre-roll, -3 = credits
-
-// ── CSS effect debounce registry ──────────────────────────────────
-// Maps className → setTimeout id for pending class removal.
-// Only used for short-lived CSS animation cleanup (100–400 ms window).
-// Beat scheduling itself is entirely rAF-driven.
+// ── Effect class removal debounce ─────────────────────────────────
+// Short-lived CSS cleanup timers only — beat scheduling is rAF-driven.
 const effectRemovalTimers = {};
 
-// ── Display loop handle ───────────────────────────────────────────
-let animFrameId = null;
+// ═══════════════════════════════════════════════════════════════════
+// AUDIO PIPELINE
+// ═══════════════════════════════════════════════════════════════════
+let audioContext  = null;
+let analyserNode  = null;
+let sourceNode    = null;
+let audioBuffer   = null;
+let startOffset   = 0;
+let startedAt     = 0;
+let audioDuration = 0;
 
 // ═══════════════════════════════════════════════════════════════════
-// RECORDING STATE
-// ═══════════════════════════════════════════════════════════════════
-let isRecording          = false;
-let mediaRecorder        = null;
-let recordedChunks       = [];
-// MediaStreamAudioDestinationNode — branched off analyserNode at context
-// creation time so all future sourceNodes feed it automatically.
-let recordingAudioDest   = null;
-
-// ═══════════════════════════════════════════════════════════════════
-// DUST PARTICLE SYSTEM — canvas-based, single draw call per frame
+// MASTER CANVAS — background, dust, visualizer
 //
-// Replaces 20 independent .dust-particle DOM elements, each with its
-// own CSS animation. Those cause 20 separate compositor layers on
-// legacy GPUs. This implementation:
-//   - Stores all particle state in one static Float32Array (no GC).
-//   - Builds a single canvas path per frame and calls fill() once.
-//   - Clamps internal canvas resolution to 480px max width; CSS
-//     scales it smoothly — reduces GPU fill rate on HiDPI screens.
-//   - Uses bitwise OR 0 for integer pixel coordinates, preventing
-//     sub-pixel rasterization on legacy GPU pipelines.
+// Architecture: two rendering systems, each doing what it does best.
+//
+//   masterCanvas (canvas 2D):
+//     - Background fill (--bg-screen)
+//     - Dust particles (typed Float32Array, single draw call)
+//     - Visualizer (drawImage from vizs.canvas)
+//     Internal resolution = screen px × DPR, capped at 1080p height
+//     to protect legacy hardware fill rate.
+//
+//   DOM layer (z-index above canvas):
+//     - .current-line / .next-line text
+//     - CSS keyframe animations (fx-* classes from presets)
+//     - screen-flash box-shadow animation
+//     - CRT ::before/::after pseudo-elements
+//     The browser GPU compositor handles these at native quality —
+//     subpixel text, hardware-accelerated transforms, no JS overhead.
 // ═══════════════════════════════════════════════════════════════════
-const DUST_COUNT  = 20;
-const DUST_STRIDE = 7;   // [x, y, vx, vy, alpha, size, fadeSpeed]
+let mW = 1;
+let mH = 1;
 
-// Static typed array — allocated once at boot, never reallocated.
-const dustState = new Float32Array(DUST_COUNT * DUST_STRIDE);
-let dustColor   = '#1eff00';
-let dustCanvasW = 1;
-let dustCanvasH = 1;
-
-function _initDustParticle(i) {
-    const b = i * DUST_STRIDE;
-    dustState[b + 0] = Math.random() * dustCanvasW;
-    dustState[b + 1] = dustCanvasH - Math.random() * (dustCanvasH * 0.4);
-    dustState[b + 2] = (Math.random() - 0.5) * 0.4;
-    dustState[b + 3] = -(0.2 + Math.random() * 0.6);
-    dustState[b + 4] = 0;
-    dustState[b + 5] = 1 + Math.random() * 2;
-    dustState[b + 6] = 0.004 + Math.random() * 0.006;
-}
-
-function initDust(color) {
-    dustColor   = color;
-    dustCanvasW = dustCanvas.width;
-    dustCanvasH = dustCanvas.height;
-    for (let i = 0; i < DUST_COUNT; i++) {
-        _initDustParticle(i);
-        // Stagger starting y so particles don't all rise in sync at boot
-        dustState[i * DUST_STRIDE + 1] = Math.random() * dustCanvasH;
+function resizeMasterCanvas() {
+    const rect = screenEl.getBoundingClientRect();
+    const dpr  = window.devicePixelRatio || 1;
+    let w = (rect.width  * dpr + 0.5) | 0;
+    let h = (rect.height * dpr + 0.5) | 0;
+    // Cap longer dimension at 1920 — keeps fill rate manageable on 2-core GPU
+    const longer = Math.max(w, h);
+    if (longer > 1920) {
+        const s = 1920 / longer;
+        w = (w * s + 0.5) | 0;
+        h = (h * s + 0.5) | 0;
+    }
+    if (masterCanvas.width !== w || masterCanvas.height !== h) {
+        masterCanvas.width  = w;
+        masterCanvas.height = h;
+        mW = w;
+        mH = h;
+        _initAllDust();
     }
 }
 
-function drawDust() {
-    dustCtx.clearRect(0, 0, dustCanvasW, dustCanvasH);
-    dustCtx.fillStyle = dustColor;
-    dustCtx.beginPath();
+// ═══════════════════════════════════════════════════════════════════
+// PRESET VARS CACHE
+// Read once per preset change via _readPresetVars().
+// Zero getComputedStyle calls inside rAF.
+// ═══════════════════════════════════════════════════════════════════
+const PV = {
+    bgScreen:  '#0a0e0a',
+    colorDim:  '#3c9e3c',
+    dustColor: '#1eff00',
+    label:     '',
+};
 
+function _readPresetVars() {
+    const root    = getComputedStyle(document.documentElement);
+    PV.bgScreen   = root.getPropertyValue('--bg-screen').trim();
+    PV.colorDim   = root.getPropertyValue('--color-dim').trim();
+    const p       = PRESETS[currentPreset];
+    PV.dustColor  = p.dustColor;
+    PV.label      = p.label;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DUST PARTICLE SYSTEM
+// Static Float32Array — one allocation at boot, never reallocated.
+// Single beginPath/fill call per frame: one GPU draw call for all 20.
+// Draws directly onto masterCanvas.
+//
+// - Stores all particle state in one static Float32Array (no GC).
+// - Builds a single canvas path per frame and calls fill() once.
+// - Clamps internal canvas resolution to 480px max width; CSS
+//   scales it smoothly — reduces GPU fill rate on HiDPI screens.
+// - Uses bitwise OR 0 for integer pixel coordinates, preventing
+//   sub-pixel rasterization on legacy GPU pipelines.
+// ═══════════════════════════════════════════════════════════════════
+const DUST_COUNT  = 20;
+const DUST_STRIDE = 7;  // [x, y, vx, vy, alpha, size, fadeSpeed]
+const dustState   = new Float32Array(DUST_COUNT * DUST_STRIDE);
+
+function _initDustParticle(i) {
+    const b = i * DUST_STRIDE;
+    dustState[b+0] = Math.random() * mW;
+    dustState[b+1] = mH - Math.random() * (mH * 0.4);
+    dustState[b+2] = (Math.random() - 0.5) * 0.4;
+    dustState[b+3] = -(0.2 + Math.random() * 0.6);
+    dustState[b+4] = 0;
+    dustState[b+5] = 1 + Math.random() * 2;
+    dustState[b+6] = 0.004 + Math.random() * 0.006;
+}
+
+function _initAllDust() {
+    for (let i = 0; i < DUST_COUNT; i++) {
+        _initDustParticle(i);
+        // Stagger starting y so particles don't all rise in sync at boot
+        dustState[i * DUST_STRIDE + 1] = Math.random() * mH;
+    }
+}
+
+function _drawDust() {
+    mCtx.fillStyle = PV.dustColor;
+    mCtx.beginPath();
     for (let i = 0; i < DUST_COUNT; i++) {
         const b = i * DUST_STRIDE;
-        let x     = dustState[b + 0];
-        let y     = dustState[b + 1];
-        let alpha = dustState[b + 4];
+        const x = dustState[b+0];
+        const y = dustState[b+1];
+        let alpha = dustState[b+4];
 
         // Advance particle — mutate in-place
-        dustState[b + 0] = x + dustState[b + 2];
-        dustState[b + 1] = y + dustState[b + 3];
-        dustState[b + 4] = alpha < 0.5
-            ? alpha + dustState[b + 6]
-            : alpha - dustState[b + 6] * 0.3;
+        dustState[b+0] = x + dustState[b+2];
+        dustState[b+1] = y + dustState[b+3];
+        dustState[b+4] = alpha < 0.5
+            ? alpha + dustState[b+6]
+            : alpha - dustState[b+6] * 0.3;
 
-        if (y < 0 || dustState[b + 4] <= 0) {
-            _initDustParticle(i);
-            continue;
-        }
+        if (y < 0 || dustState[b+4] <= 0) { _initDustParticle(i); continue; }
 
         // Bitwise OR 0 truncates to integer — no sub-pixel rasterization
         const ix = (x + 0.5) | 0;
         const iy = (y + 0.5) | 0;
-        const ir = ((dustState[b + 5] * 0.5) + 0.5) | 0;
-
-        dustCtx.globalAlpha = alpha;
-        dustCtx.moveTo(ix + ir, iy);
-        dustCtx.arc(ix, iy, ir || 1, 0, 6.2832);
+        const ir = ((dustState[b+5] * 0.5) + 0.5) | 0 || 1;
+        mCtx.globalAlpha = alpha;
+        mCtx.moveTo(ix + ir, iy);
+        mCtx.arc(ix, iy, ir, 0, 6.2832);
     }
-
-    dustCtx.fill();
-    dustCtx.globalAlpha = 1;
+    mCtx.fill();
+    mCtx.globalAlpha = 1;
 }
 
-function resizeDustCanvas() {
-    // Internal resolution capped at 480px wide.
-    // CSS width:100% / height:100% on #dustCanvas scales it up — fill rate savings.
-    const rect = screenEl.getBoundingClientRect();
-    const w = (Math.min(rect.width, 480) + 0.5) | 0;
-    const h = ((rect.height * w / rect.width) + 0.5) | 0;
-    if (dustCanvas.width !== w || dustCanvas.height !== h) {
-        dustCanvas.width  = w;
-        dustCanvas.height = h;
-        dustCanvasW = w;
-        dustCanvasH = h;
+// ═══════════════════════════════════════════════════════════════════
+// CANVAS DRAW FRAME
+// Draws only the canvas layers. DOM layers (lyrics, flash, CRT CSS)
+// are composited above this by the browser's own GPU pipeline.
+// ═══════════════════════════════════════════════════════════════════
+function drawFrame() {
+    // Background
+    mCtx.globalAlpha = 1;
+    mCtx.shadowBlur  = 0;
+    mCtx.fillStyle   = PV.bgScreen;
+    mCtx.fillRect(0, 0, mW, mH);
+
+    // Dust
+    _drawDust();
+
+    // Visualizer — drawImage from vizs.canvas onto masterCanvas.
+    // Position derived from visWrap.getBoundingClientRect() relative
+    // to screenEl — correct in both portrait and landscape.
+    if (vizs && vizs.canvas && vizs.canvas.width > 0) {
+        const sr  = screenEl.getBoundingClientRect();
+        const vr  = visWrap.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const vx  = ((vr.left - sr.left) * dpr + 0.5) | 0;
+        const vy  = ((vr.top  - sr.top)  * dpr + 0.5) | 0;
+        const vw  = (vr.width  * dpr + 0.5) | 0;
+        const vh  = (vr.height * dpr + 0.5) | 0;
+        mCtx.shadowBlur = 0;
+        mCtx.drawImage(vizs.canvas, vx, vy, vw, vh);
     }
 }
 
@@ -576,30 +594,29 @@ function resizeDustCanvas() {
 // ICON REGISTRY
 // ═══════════════════════════════════════════════════════════════════
 const ICONS = {
-    play:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M3 2.5v11l10-5.5L3 2.5z"/></svg>`,
-    pause:   `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="2" width="4" height="12" rx="1"/><rect x="9" y="2" width="4" height="12" rx="1"/></svg>`,
-    stop:    `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="12" height="12" rx="1"/></svg>`,
-    warning: `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M8 2.5L1.5 13.5h13L8 2.5zM7.25 11h1.5v1.5h-1.5V11zm0-5.5h1.5v4h-1.5v-4z"/></svg>`,
-    grid:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" xmlns="http://w3.org"><rect x="2" y="2" width="5.5" height="5.5" rx="0.5"/><rect x="8.5" y="2" width="5.5" height="5.5" rx="0.5"/><rect x="2" y="8.5" width="5.5" height="5.5" rx="0.5"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="0.5"/></svg>`,
-    swap:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://w3.org"><path d="M11 4l3 3-3 3M14 7H5M5 12l-3-3 3-3M2 9h9"/></svg>`,
-    theme:   `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://w3.org"><path d="M8 1a7 7 0 1 0 7 7 2 2 0 0 0-2-2h-1c-1 0-1-1-1-1V4a3 3 0 0 0-3-3zM4 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm3-3a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm4 1a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm1 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>`,
-    refresh: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" xmlns="http://w3.org"><path d="M1 8a7 7 0 1 1 2 4.9L1 15v-4h4"/></svg>`,
-    record:  `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://w3.org"><circle cx="8" cy="8" r="7"/><circle cx="8" cy="8" r="2.5" fill="currentColor"/></svg>`,
-    star:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M8 1l2.16 4.38 4.84.7-3.5 3.41.83 4.82L8 12.04l-4.33 2.27.83-4.82-3.5-3.41 4.84-.7L8 1z"/></svg>`,
-    bolt:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 1L3 9h4l-1 6 7-8H9l1-6z"/></svg>`,
+    play:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5v11l10-5.5z"/></svg>`,
+    pause:   `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="4" height="12" rx="1"/><rect x="9" y="2" width="4" height="12" rx="1"/></svg>`,
+    stop:    `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12" rx="1"/></svg>`,
+    warning: `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2.5L1.5 13.5h13L8 2.5zM7.25 11h1.5v1.5h-1.5zm0-5.5h1.5v4h-1.5z"/></svg>`,
+    grid:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5.5" height="5.5" rx="0.5"/><rect x="8.5" y="2" width="5.5" height="5.5" rx="0.5"/><rect x="2" y="8.5" width="5.5" height="5.5" rx="0.5"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="0.5"/></svg>`,
+    swap:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M11 4l3 3-3 3M14 7H5M5 12l-3-3 3-3M2 9h9"/></svg>`,
+    theme:   `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 7 7 2 2 0 0 0-2-2h-1c-1 0-1-1-1-1V4a3 3 0 0 0-3-3zM4 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm3-3a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm4 1a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm1 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>`,
+    refresh: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 8a7 7 0 1 1 2 4.9L1 15v-4h4"/></svg>`,
+    record:  `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><circle cx="8" cy="8" r="2.5" fill="currentColor"/></svg>`,
+    star:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l2.16 4.38 4.84.7-3.5 3.41.83 4.82L8 12.04l-4.33 2.27.83-4.82-3.5-3.41 4.84-.7z"/></svg>`,
+    bolt:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M10 1L3 9h4l-1 6 7-8H9z"/></svg>`,
 };
 
 function icon(name) { return ICONS[name] || ''; }
 
-(function initIcons() {
+// Set initial icon state — called once after DOM refs are established
+(function _initIcons() {
     playBtn.innerHTML   = icon('play');
     resetBtn.innerHTML  = icon('refresh');
     modeBtn.innerHTML   = icon('swap');
     presetBtn.innerHTML = icon('theme');
     arBtn.innerHTML     = icon('grid');
     vizBtn.innerHTML    = icon('record');
-    recBtn.innerHTML    = icon('record');
-    recBtn.setAttribute('data-tip', 'Record video');
     statusMsg.innerHTML = `click ${icon('play')} to load audio`;
 })();
 
@@ -607,20 +624,13 @@ function icon(name) { return ICONS[name] || ''; }
 // VISUALIZER MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════
 function buildVisualizer(key) {
+    // Destroy existing instance with full GPU cleanup before creating new one.
+    // destroy() in BaseVisualizer zeros canvas dimensions -> immediate GPU release.
     if (vizs) { vizs.destroy(); vizs = null; }
-
-    if (key === 'off' || !key) {
-        visWrap.classList.add('viz-off');
+    if (key === 'off' || !key || typeof VISUALIZERS === 'undefined' || !VISUALIZERS[key]) {
         vizBtn.setAttribute('data-tip', 'off');
         return;
     }
-
-    if (typeof VISUALIZERS === 'undefined' || !VISUALIZERS[key]) {
-        visWrap.classList.add('viz-off');
-        return;
-    }
-
-    visWrap.classList.remove('viz-off');
     vizs = new VISUALIZERS[key](visWrap);
     vizBtn.setAttribute('data-tip', key);
 }
@@ -632,21 +642,30 @@ function cycleVisualizer() {
 
 // ═══════════════════════════════════════════════════════════════════
 // PRESET APPLICATION
+// Injects CSS vars, sets flash color var, toggles CRT class,
 // ═══════════════════════════════════════════════════════════════════
 function applyPreset(key) {
     const p = PRESETS[key];
     if (!p) return;
-
     currentPreset = key;
     flashCycleIdx = 0;
 
+    // CSS custom properties are injected via
+    // root.style.setProperty() which overrides any existing inline styles.
+    // This is intentional — presets fully own the visual theme.  
     const root = document.documentElement;
     Object.entries(p.cssVars).forEach(([k, v]) => root.style.setProperty(k, v));
+    // --flash-color drives @keyframes kScreenFlash — set here so the
+    // flash is always theme-correct with no JS branching in triggerVisual.    
     root.style.setProperty('--flash-color', p.flashColor);
+    // The '--crt-on' property is read as a string, not a boolean.    
     screenEl.classList.toggle('crt-on', p.cssVars['--crt-on'] === '1');
 
-    // Reinitialise canvas dust — no DOM nodes created or destroyed
-    initDust(p.dustColor);
+    _readPresetVars();
+
+    // Do NOT rebuild the visualizer here. CSS vars are now injected above,
+    // and the running visualizer reads them on its next draw frame automatically.
+    // This is zero-coupling contract: preset switch = CSS vars only.
 
     const nextKey = PRESET_ORDER[(PRESET_ORDER.indexOf(key) + 1) % PRESET_ORDER.length];
     presetBtn.setAttribute('data-tip', `\u27a1 ${PRESETS[nextKey].label}`);
@@ -654,16 +673,17 @@ function applyPreset(key) {
 
 // ═══════════════════════════════════════════════════════════════════
 // VISUAL TRIGGER
-// Called from the rAF loop when a beat or lyric timestamp is crossed.
+// Called from the rAF beat loop. Applies a CSS effect class to
+// .current-line and optionally fires the screen-flash animation.
 //
-// Effect class lifecycle (no void offsetWidth reflows):
+// rAF-defer pattern (replaces void offsetWidth reflow):
 //   Frame N:   remove class
-//   Frame N+1: add class  (rAF defers to next paint — browser sees real remove+add)
-//   Frame N+1+duration: setTimeout removes class
+//   Frame N+1: re-add class → browser sees a genuine remove+add cycle,
+//              restarting the CSS animation from 0%
+//   Timer:     remove class after duration + buffer
 //
-// The rAF defer replaces the void offsetWidth reflow. Both force a
-// fresh animation start, but rAF does not block the main thread with
-// a synchronous layout calculation.
+// The effectRemovalTimers registry cancels any stale removal timer
+// before re-arming, so rapid beats don't cut animations short.
 // ═══════════════════════════════════════════════════════════════════
 function triggerVisual() {
     const p      = PRESETS[currentPreset];
@@ -688,7 +708,9 @@ function triggerVisual() {
     if (effect.useFlash) {
         if (p.flashCycle && p.flashCycleColors && p.flashCycleColors.length) {
             flashCycleIdx = (flashCycleIdx + 1) % p.flashCycleColors.length;
-            document.documentElement.style.setProperty('--flash-color', p.flashCycleColors[flashCycleIdx]);
+            document.documentElement.style.setProperty(
+                '--flash-color', p.flashCycleColors[flashCycleIdx]
+            );
         }
         screenEl.classList.remove('screen-flash');
         requestAnimationFrame(() => {
@@ -710,17 +732,18 @@ function triggerVisual() {
 
 // ═══════════════════════════════════════════════════════════════════
 // LYRICS CURSOR
+// Updates DOM text content only when the lyric index changes.
 // ═══════════════════════════════════════════════════════════════════
 function updateLyrics(t) {
     if (!LYRICS.length) {
         currentLineEl.innerHTML = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
-        nextLineEl.innerHTML = !beatTimestamps.length
+        nextLineEl.innerHTML    = !beatTimestamps.length
             ? `${icon('warning')} No lyrics or beats detected`
             : `${icon('warning')} No lyrics detected`;
         return;
     }
 
-    if (t < LYRICS[0].start) {
+    if (t < LYRICS[0].start) { // "Before Song Starts"
         if (currentLyricIdx !== -2) {
             currentLineEl.innerHTML = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
             nextLineEl.textContent  = `\u27a1 ${LYRICS[0].text}`;
@@ -729,20 +752,25 @@ function updateLyrics(t) {
         return;
     }
 
+    // Cursor Logic: Advance index based on time
+    // We find the LAST index where t >= start
     let newIdx = currentLyricIdx < 0 ? 0 : currentLyricIdx;
     while (LYRICS[newIdx + 1] && t >= LYRICS[newIdx + 1].start) newIdx++;
+    // Reverse cursor: allow seeking backwards in the seekbar
     while (newIdx > 0 && t < LYRICS[newIdx].start) newIdx--;
-
+    // Update DOM only when the index actually changes
     if (newIdx !== currentLyricIdx) {
         currentLyricIdx = newIdx;
         currentLineEl.textContent = LYRICS[currentLyricIdx].text;
         const next = LYRICS[currentLyricIdx + 1];
-        nextLineEl.textContent = next ? `\u27a1 ${next.text}` : `Audit Complete`;
+        nextLineEl.textContent = next ? `\u27a1 ${next.text}` : 'Audit Complete';
     }
 
+    // Post-Song Credits
+    // Trigger 5 seconds after the final lyric starts
     const lastLyric = LYRICS[LYRICS.length - 1];
-    if (t > lastLyric.start + 5 && currentLyricIdx !== -3) {
-        currentLineEl.textContent = `@AmMoPy`;
+    if (t > lastLyric.start + 5 && currentLyricIdx !== -3) { // -3 as unique state for "Credits"
+        currentLineEl.textContent = '@AmMoPy';
         nextLineEl.innerHTML      = `${icon('star')} SHOW SOME LOVE ${icon('star')}`;
         currentLyricIdx = -3;
     }
@@ -760,28 +788,22 @@ function _updateSeekBarVisual(t) {
                     .getPropertyValue('--color-primary').trim();
     seekBar.style.background =
         `linear-gradient(to right, ${col} ${pct}%, var(--bg-btn) ${pct}%)`;
-    seekElapsed.textContent = fmt(t);
 }
 
 function seekTo(pct) {
     const target = (pct / 100) * audioDuration;
-
     // Reset pointers and fast-forward to target without firing triggers
     lastFiredBeatIdx = 0;
     currentLyricIdx  = -1;
-
     const src = currentMode === 'A' ? beatTimestamps : LYRICS.map(l => l.start);
-    while (src[lastFiredBeatIdx] !== undefined && src[lastFiredBeatIdx] < target) {
+    while (src[lastFiredBeatIdx] !== undefined && src[lastFiredBeatIdx] < target)
         lastFiredBeatIdx++;
-    }
-
     if (!isPlaying) {
         startOffset = target;
         updateLyrics(target);
         timeDisplay.textContent = fmt(target);
         return;
     }
-
     // Playing: restart source from new offset
     _startSourceAt(target);
 }
@@ -820,26 +842,19 @@ function displayLoop() {
         const src = currentMode === 'A'
             ? beatTimestamps
             : LYRICS.map(l => l.start);
-
-        while (src[lastFiredBeatIdx] !== undefined &&
-               t >= src[lastFiredBeatIdx]) {
+        while (src[lastFiredBeatIdx] !== undefined && t >= src[lastFiredBeatIdx]) {
             triggerVisual();
             lastFiredBeatIdx++;
         }
     }
 
-    drawDust();
-    // Compositor pass — only runs while recording, zero cost otherwise.
-    // Placed after drawDust() so the dust canvas is already updated
-    // before we drawImage it onto the compositor this frame.
-    if (isRecording) _drawCompositorFrame();
+    drawFrame();
     animFrameId = requestAnimationFrame(displayLoop);
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // AUDIO LIFECYCLE
 // ═══════════════════════════════════════════════════════════════════
-
 function _ensureContext() {
     if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -848,11 +863,6 @@ function _ensureContext() {
         // the analysis buffer small and fast to read each frame.
         analyserNode.fftSize = 256;
         analyserNode.connect(audioContext.destination);
-        // Audio tap for recording — branched in parallel with destination.
-        // Every sourceNode routes through analyserNode, so this tap
-        // captures all audio without any per-source rewiring.
-        recordingAudioDest = audioContext.createMediaStreamDestination();
-        analyserNode.connect(recordingAudioDest);
     }
 }
 
@@ -865,17 +875,14 @@ function _startSourceAt(offset) {
         sourceNode.disconnect();
         sourceNode = null;
     }
-
     sourceNode = audioContext.createBufferSource();
     sourceNode.buffer = audioBuffer;
     // Route through analyser — visualizers can read frequency data without
     // separate wiring.
     sourceNode.connect(analyserNode);
-
     startOffset = offset;
     startedAt   = audioContext.currentTime;
     sourceNode.start(0, offset);
-
     // onended fires at natural buffer completion, not on manual stop().
     // This is the only place end-of-track state is set.
     sourceNode.onended = () => {
@@ -884,7 +891,7 @@ function _startSourceAt(offset) {
         startOffset      = 0;
         lastFiredBeatIdx = 0;
         currentLyricIdx  = -1;
-        playBtn.innerHTML = icon('play');
+        playBtn.innerHTML   = icon('play');
         statusMsg.innerHTML = `${icon('stop')} done`;
         _updateSeekBarVisual(0);
     };
@@ -892,12 +899,12 @@ function _startSourceAt(offset) {
 
 async function loadAudioBuffer(file) {
     _ensureContext();
-    statusMsg.textContent = `decoding\u2026`;
+    statusMsg.textContent = 'decoding';
     const arrayBuf = await file.arrayBuffer();
     audioBuffer    = await audioContext.decodeAudioData(arrayBuf);
     audioDuration  = audioBuffer.duration;
     bpmDisplay.textContent = `${bpm} BPM`;
-    statusMsg.innerHTML    = `${icon('bolt')} ${file.name.slice(0, 22)}\u2026`;
+    statusMsg.innerHTML    = `${icon('bolt')} ${file.name.slice(0, 22)}`;
 }
 
 function selectAudio() {
@@ -907,7 +914,6 @@ function selectAudio() {
     input.onchange = async e => {
         const file = e.target.files[0];
         if (!file) return;
-
         // Tear down any running source before replacing the buffer
         if (sourceNode) {
             isPlaying = false;
@@ -916,16 +922,11 @@ function selectAudio() {
             sourceNode.disconnect();
             sourceNode = null;
         }
-
-        startOffset      = 0;
-        lastFiredBeatIdx = 0;
-        currentLyricIdx  = -1;
-
+        startOffset = 0; lastFiredBeatIdx = 0; currentLyricIdx = -1;
         await loadAudioBuffer(file);
         updateLyrics(0);
         timeDisplay.textContent = fmt(0);
         _updateSeekBarVisual(0);
-
         statusMsg.textContent = `${beatTimestamps.length} beats \u00b7 ${LYRICS.length} lines`;
     };
     input.click();
@@ -934,12 +935,9 @@ function selectAudio() {
 // ── Play / Pause ──────────────────────────────────────────────────
 async function togglePlay() {
     if (!audioBuffer) { selectAudio(); return; }
-
     _ensureContext();
     if (audioContext.state === 'suspended') await audioContext.resume();
-
     if (isPlaying) {
-        // Capture elapsed offset before stopping
         startOffset = audioContext.currentTime - startedAt + startOffset;
         if (sourceNode) {
             sourceNode.onended = null;
@@ -952,11 +950,10 @@ async function togglePlay() {
         statusMsg.innerHTML = `${icon('pause')} ${fmt(startOffset)}`;
         return;
     }
-
     _startSourceAt(startOffset);
     isPlaying = true;
     playBtn.innerHTML   = icon('pause');
-    statusMsg.innerHTML = `${icon('play')} ${PRESETS[currentPreset].label} \u00b7 ${currentMode}`;
+    statusMsg.innerHTML = `${icon('play')} ${PV.label} \u00b7 ${currentMode}`;
 }
 
 // ── Reset ─────────────────────────────────────────────────────────
@@ -970,9 +967,6 @@ async function togglePlay() {
 //   7. Restart display loop and visualizer (display-only, no audio)
 //   8. Prompt for new file
 async function resetAudio() {
-    // 0. Stop any active recording before teardown
-    if (isRecording) stopRecording();
-
     // 1.
     if (sourceNode) {
         isPlaying = false;
@@ -991,34 +985,27 @@ async function resetAudio() {
 
     // 3.
     if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
-
-    // 4. Await ensures DSP release before new context can be created
-    if (audioContext) { await audioContext.close(); audioContext = null; analyserNode = null; recordingAudioDest = null; }
-
+    // 4. AudioContext — await ensures DSP resources are released before
+    //    a new context might be created by setupAudio()
+    if (audioContext) { await audioContext.close(); audioContext = null; analyserNode = null; }
     // 5.
     if (vizs) { vizs.destroy(); vizs = null; }
 
     // 6.
-    audioBuffer      = null;
-    audioDuration    = 0;
-    startOffset      = 0;
-    startedAt        = 0;
-    lastFiredBeatIdx = 0;
-    currentLyricIdx  = -1;
-    flashCycleIdx    = 0;
+    audioBuffer = null; audioDuration = 0; startOffset = 0; startedAt = 0;
+    lastFiredBeatIdx = 0; currentLyricIdx = -1; flashCycleIdx = 0;
 
-    timeDisplay.textContent = fmt(0);
-    bpmDisplay.textContent  = `-- BPM`;
-    seekBar.value           = 0;
-    seekElapsed.textContent = '0:00';
-    seekBar.style.background = '';
-    playBtn.innerHTML       = icon('play');
-    currentLineEl.innerHTML = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
-    nextLineEl.innerHTML    = `${icon('play')} select audio file`;
-    statusMsg.innerHTML     = `${icon('refresh')} select new file`;
+    timeDisplay.textContent   = fmt(0);
+    bpmDisplay.textContent    = '-- BPM';
+    seekBar.value             = 0;
+    seekBar.style.background  = '';
+    playBtn.innerHTML         = icon('play');
+    currentLineEl.innerHTML   = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
+    nextLineEl.innerHTML      = `${icon('play')} select audio file`;
+    statusMsg.innerHTML       = `${icon('refresh')} select new file`;
 
-    // 7. Restart display loop — dust + UI update continues without audio
-    displayLoop();
+    // 7.
+    requestAnimationFrame(displayLoop);
     buildVisualizer(VIZ_ORDER[vizIndex]);
 
     // 8.
@@ -1028,17 +1015,13 @@ async function resetAudio() {
 // ── Mode toggle ───────────────────────────────────────────────────
 function toggleMode() {
     currentMode = currentMode === 'A' ? 'B' : 'A';
-
     // Fast-forward pointer to current playback position in the new source array
     lastFiredBeatIdx = 0;
     const t   = (isPlaying && audioContext)
-        ? audioContext.currentTime - startedAt + startOffset
-        : startOffset;
+        ? audioContext.currentTime - startedAt + startOffset : startOffset;
     const src = currentMode === 'A' ? beatTimestamps : LYRICS.map(l => l.start);
-    while (src[lastFiredBeatIdx] !== undefined && src[lastFiredBeatIdx] < t) {
+    while (src[lastFiredBeatIdx] !== undefined && src[lastFiredBeatIdx] < t)
         lastFiredBeatIdx++;
-    }
-
     statusMsg.textContent = `MODE ${currentMode}`;
 }
 
@@ -1054,10 +1037,7 @@ function toggleAR() {
     stageEl.classList.toggle('ar-landscape', isLandscape);
     arBtn.setAttribute('data-tip', isLandscape ? '9:16' : '16:9');
     // Resize dust canvas on next paint after layout settles
-    requestAnimationFrame(() => {
-        resizeDustCanvas();
-        initDust(PRESETS[currentPreset].dustColor);
-    });
+    requestAnimationFrame(() => { resizeMasterCanvas(); _readPresetVars(); });
 }
 
 // ── Utilities ─────────────────────────────────────────────────────
@@ -1069,390 +1049,15 @@ function fmt(sec) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// COMPOSITOR DRAW
-//
-// Called every rAF frame while recording is active.
-// Mirrors the live screen onto compositorCanvas by reading computed
-// styles — zero knowledge of which preset or effect class is active.
-//
-// Layer order (matches DOM z-index stack):
-//   1. Background fill           (--bg-screen CSS var)
-//   2. CRT scanline overlay      (--crt-on CSS var → repeating-linear-gradient)
-//   3. Dust canvas               (drawImage — already a canvas)
-//   4. Lyric text — next line    (computed styles: color, opacity, font)
-//   5. Lyric text — current line (computed styles + transform + filter + textShadow)
-//   6. Screen flash overlay      (parse kScreenFlash inset box-shadow alpha)
-//   7. Visualizer canvas         (drawImage — vizs.canvas, null-guarded)
-//
-// getComputedStyle returns the browser's interpolated animated value
-// at the exact moment of this rAF frame — mid-keyframe opacity,
-// mid-keyframe transform matrix, mid-keyframe filter string.
-// Applying these directly to the canvas draw is a pixel-accurate
-// mirror of whatever the CSS engine has rendered this frame.
-//
-// Text shadow on canvas:
-//   ctx.shadowColor + ctx.shadowBlur approximate the CSS text-shadow.
-//   Multiple text-shadow layers (e.g. "0 0 5px #x, 0 0 8px #y") are
-//   parsed and drawn as successive shadow passes — first pass sets the
-//   shadow, draws the text transparently; second pass adds blur.
-//   In practice a single-pass approximation (largest blur, first color)
-//   is visually indistinguishable at video playback resolution.
+// EVENT LISTENERS
 // ═══════════════════════════════════════════════════════════════════
 
-// Parses the first rgba/rgb/hex color and blur radius from a CSS
-// text-shadow string. Returns { color, blur } or null if empty/none.
-function _parseTextShadow(ts) {
-    if (!ts || ts === 'none') return null;
-    // Match: optional-offset optional-offset blur color
-    // text-shadow values are: [offset-x offset-y blur-radius color]
-    // getComputedStyle always returns rgb() or rgba() for colors.
-    const m = ts.match(/(-?[\d.]+px\s+-?[\d.]+px\s+)([\d.]+)px\s+(rgba?\([^)]+\)|#[\da-f]+)/i);
-    if (!m) return null;
-    return { blur: parseFloat(m[2]), color: m[3] };
-}
-
-// Parses the inset glow alpha from a kScreenFlash-style box-shadow string.
-// kScreenFlash animates: inset 0 0 60px rgba(r,g,b,A)
-// We extract A to use as the flash overlay opacity.
-// Returns 0 if no inset glow found (animation not running / ended).
-function _parseFlashAlpha(boxShadow) {
-    if (!boxShadow || boxShadow === 'none') return 0;
-    // Look for the inset segment containing rgba with alpha
-    const m = boxShadow.match(/inset[^,]+rgba\([^)]*,\s*([\d.]+)\)/i);
-    return m ? parseFloat(m[1]) : 0;
-}
-
-// Parses a CSS transform matrix string into a DOMMatrix.
-// Returns null if transform is 'none' or unparseable.
-// ctx.setTransform(DOMMatrix) applies translation + scale + rotation atomically.
-function _parseTransform(transformStr) {
-    if (!transformStr || transformStr === 'none') return null;
-    try { return new DOMMatrix(transformStr); } catch (_) { return null; }
-}
-
-function _drawCompositorFrame() {
-    const cw = compositorCanvas.width;
-    const ch = compositorCanvas.height;
-
-    // ── Read all computed styles in one batch ────────────────────
-    // getComputedStyle is O(1) for custom properties and returns
-    // animated mid-frame values — this is the key to fidelity.
-    const rootStyle    = getComputedStyle(document.documentElement);
-    const screenStyle  = getComputedStyle(screenEl);
-    const currStyle    = getComputedStyle(currentLineEl);
-    const nextStyle    = getComputedStyle(nextLineEl);
-
-    const bgColor      = rootStyle.getPropertyValue('--bg-screen').trim();
-    const crtOn        = rootStyle.getPropertyValue('--crt-on').trim() === '1';
-    const flashColor   = rootStyle.getPropertyValue('--flash-color').trim();
-    const colorPrimary = rootStyle.getPropertyValue('--color-primary').trim();
-    const colorDim     = rootStyle.getPropertyValue('--color-dim').trim();
-    const colorFaint   = rootStyle.getPropertyValue('--color-faint').trim();
-
-    // Compute scale factor: compositor canvas vs actual screen element
-    const screenRect = screenEl.getBoundingClientRect();
-    const scaleX     = cw / screenRect.width;
-    const scaleY     = ch / screenRect.height;
-
-    compCtx.clearRect(0, 0, cw, ch);
-
-    // ── 1. Background ────────────────────────────────────────────
-    compCtx.fillStyle = bgColor;
-    compCtx.fillRect(0, 0, cw, ch);
-
-    // ── 2. CRT scanline overlay ──────────────────────────────────
-    // Replicate the repeating-linear-gradient from .screen.crt-on::before
-    // and the radial vignette from ::after.
-    if (crtOn) {
-        // Horizontal scanlines: 2px green / 3px transparent repeating
-        const lineH  = (5 * scaleY) | 0 || 1;
-        const lineOn = (2 * scaleY) | 0 || 1;
-        compCtx.save();
-        for (let y = 0; y < ch; y += lineH) {
-            compCtx.fillStyle = 'rgba(0,255,0,0.04)';
-            compCtx.fillRect(0, y, cw, lineOn);
-        }
-        // Radial vignette
-        const grad = compCtx.createRadialGradient(
-            cw * 0.5, ch * 0.4, 0,
-            cw * 0.5, ch * 0.4, Math.max(cw, ch) * 0.7
-        );
-        grad.addColorStop(0.5, 'rgba(0,0,0,0)');
-        grad.addColorStop(1.0, 'rgba(0,0,0,0.5)');
-        compCtx.fillStyle = grad;
-        compCtx.fillRect(0, 0, cw, ch);
-        compCtx.restore();
-    }
-
-    // ── 3. Dust canvas ───────────────────────────────────────────
-    // dustCanvas internal resolution != compositor resolution;
-    // drawImage handles the scaling automatically.
-    compCtx.drawImage(dustCanvas, 0, 0, cw, ch);
-
-    // ── 4. Next line text ────────────────────────────────────────
-    {
-        const nextRect  = nextLineEl.getBoundingClientRect();
-        const nx        = (nextRect.left - screenRect.left) * scaleX;
-        const ny        = (nextRect.top  - screenRect.top)  * scaleY;
-        const nw        = nextRect.width  * scaleX;
-        const nh        = nextRect.height * scaleY;
-        const nFontSize = parseFloat(nextStyle.fontSize) * scaleY;
-        const nOpacity  = parseFloat(nextStyle.opacity);
-
-        compCtx.save();
-        compCtx.globalAlpha = nOpacity * 0.7; // matches CSS opacity:0.7 on .next-line
-        compCtx.fillStyle   = colorDim;
-        compCtx.font        = `${nFontSize}px ${nextStyle.fontFamily}`;
-        compCtx.textAlign   = 'center';
-        compCtx.textBaseline = 'top';
-
-        // Dashed separator line above next-line text
-        compCtx.strokeStyle = colorFaint;
-        compCtx.lineWidth   = 1;
-        compCtx.setLineDash([4, 4]);
-        compCtx.beginPath();
-        compCtx.moveTo(nx, ny);
-        compCtx.lineTo(nx + nw, ny);
-        compCtx.stroke();
-        compCtx.setLineDash([]);
-
-        const paddingTop = parseFloat(nextStyle.paddingTop) * scaleY;
-        compCtx.fillText(nextLineEl.textContent, cw / 2, ny + paddingTop, nw);
-        compCtx.restore();
-    }
-
-    // ── 5. Current line text (with full animated style mirror) ───
-    {
-        const currRect   = currentLineEl.getBoundingClientRect();
-        const cx         = (currRect.left - screenRect.left + currRect.width  / 2) * scaleX;
-        const cy         = (currRect.top  - screenRect.top  + currRect.height / 2) * scaleY;
-        const cFontSize  = parseFloat(currStyle.fontSize)  * scaleY;
-
-        // Read animated values — these are mid-keyframe interpolated values
-        const opacity    = parseFloat(currStyle.opacity);
-        const filterStr  = currStyle.filter;         // e.g. "blur(1.5px) brightness(1.3)"
-        const transformM = _parseTransform(currStyle.transform);
-        const textColor  = currStyle.color || colorPrimary;
-        const shadow     = _parseTextShadow(currStyle.textShadow);
-
-        compCtx.save();
-        compCtx.globalAlpha = isNaN(opacity) ? 1 : opacity;
-
-        // Apply CSS filter — canvas ctx.filter accepts the same string
-        if (filterStr && filterStr !== 'none') {
-            // Scale any px values in blur() to compositor resolution
-            compCtx.filter = filterStr.replace(
-                /blur\(([\d.]+)px\)/g,
-                (_, v) => `blur(${(parseFloat(v) * scaleY).toFixed(2)}px)`
-            );
-        }
-
-        // Apply transform relative to the text's own centre point.
-        // CSS transforms are applied around the element's transform-origin
-        // (default: 50% 50%). We translate to centre, apply matrix, translate back.
-        compCtx.translate(cx, cy);
-        if (transformM) {
-            // DOMMatrix { a,b,c,d,e,f } — e/f are translation, already factored
-            // out via our cx/cy translate above so zero them out.
-            compCtx.transform(
-                transformM.a, transformM.b,
-                transformM.c, transformM.d,
-                0, 0
-            );
-        }
-
-        compCtx.font        = `bold ${cFontSize}px ${currStyle.fontFamily}`;
-        compCtx.textAlign   = 'center';
-        compCtx.textBaseline = 'middle';
-
-        // Text shadow — approximate CSS multi-layer text-shadow with a single
-        // canvas shadowBlur pass. Visually accurate at video resolution.
-        if (shadow) {
-            compCtx.shadowColor = shadow.color;
-            compCtx.shadowBlur  = shadow.blur * scaleY;
-        } else {
-            // Resting state glow from .current-line CSS
-            compCtx.shadowColor = colorDim;
-            compCtx.shadowBlur  = 5 * scaleY;
-        }
-
-        compCtx.fillStyle = textColor;
-        compCtx.fillText(currentLineEl.textContent, 0, 0);
-
-        compCtx.restore();
-    }
-
-    // ── 6. Screen flash overlay ──────────────────────────────────
-    // kScreenFlash animates box-shadow: inset 0 0 60px rgba(r,g,b,A).
-    // We parse the inset glow alpha from the live computed box-shadow
-    // and paint a matching full-screen rect — decoupled from the CSS.
-    {
-        const alpha = _parseFlashAlpha(screenStyle.boxShadow);
-        if (alpha > 0.01) {
-            compCtx.save();
-            // Use --flash-color as fill, override alpha with parsed value
-            // so the overlay tracks the CSS animation decay exactly.
-            const baseColor = flashColor.replace(/[\d.]+\)$/, `${alpha.toFixed(3)})`);
-            compCtx.fillStyle = baseColor;
-            compCtx.fillRect(0, 0, cw, ch);
-            // Inner glow: brighter centre fading to edges
-            const glowGrad = compCtx.createRadialGradient(
-                cw / 2, ch / 2, 0,
-                cw / 2, ch / 2, Math.max(cw, ch) * 0.6
-            );
-            glowGrad.addColorStop(0,   baseColor);
-            glowGrad.addColorStop(1.0, 'rgba(0,0,0,0)');
-            compCtx.fillStyle = glowGrad;
-            compCtx.fillRect(0, 0, cw, ch);
-            compCtx.restore();
-        }
-    }
-
-    // ── 7. Visualizer canvas ─────────────────────────────────────
-    // vizs.canvas is a public property on BaseVisualizer.
-    // Null-guarded — compositor is fully decoupled from visualizer state.
-    if (vizs && vizs.canvas && vizs.canvas.width > 0) {
-        // visWrap is position:absolute bottom:-30px, centered.
-        // Read its live position relative to screenEl to place correctly.
-        const vizRect = visWrap.getBoundingClientRect();
-        const vx = (vizRect.left - screenRect.left) * scaleX;
-        const vy = (vizRect.top  - screenRect.top)  * scaleY;
-        const vw = vizRect.width  * scaleX;
-        const vh = vizRect.height * scaleY;
-        compCtx.drawImage(vizs.canvas, vx, vy, vw, vh);
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// RECORDER
-//
-// startRecording():
-//   1. Size compositorCanvas to match .screen at device pixel ratio,
-//      capped at 1920×1080 to protect legacy hardware.
-//   2. Combine compositorCanvas.captureStream(60) video track with
-//      the pre-wired recordingAudioDest audio track.
-//   3. Negotiate the best available codec (VP9+Opus → VP8+Opus → auto).
-//   4. Start MediaRecorder with 1s timeslice chunks.
-//   5. _drawCompositorFrame() is called inside displayLoop() each rAF
-//      while isRecording — no separate loop needed.
-//
-// stopRecording():
-//   1. mediaRecorder.stop() triggers onstop after final chunk.
-//   2. onstop assembles chunks into a Blob and auto-downloads as .webm.
-//   3. State and button reset.
-//
-// Design decision — .webm not .mp4:
-//   MediaRecorder's output container is always WebM in all browsers.
-//   Converting to MP4 server-side or via FFmpeg is trivial and outside
-//   scope. The .webm output plays natively in all modern players.
-// ═══════════════════════════════════════════════════════════════════
-
-function startRecording() {
-    if (!audioBuffer || !recordingAudioDest) return;
-
-    // ── Size compositor canvas to screen @ device pixel ratio ────
-    const rect  = screenEl.getBoundingClientRect();
-    const dpr   = window.devicePixelRatio || 1;
-    let recW    = (rect.width  * dpr + 0.5) | 0;
-    let recH    = (rect.height * dpr + 0.5) | 0;
-
-    // Cap at 1920×1080 — a full 4K compositor pass will crush a 2-core machine
-    if (recH > 1080) {
-        recW = (recW * 1080 / recH + 0.5) | 0;
-        recH = 1080;
-    }
-    compositorCanvas.width  = recW;
-    compositorCanvas.height = recH;
-
-    // Prime the canvas with one frame so captureStream has pixels immediately
-    _drawCompositorFrame();
-
-    // ── Build combined stream ─────────────────────────────────────
-    // captureStream(60) requests 60fps from the canvas — actual rate
-    // is limited by the rAF loop which targets display refresh rate.
-    const videoStream = compositorCanvas.captureStream(60);
-    const audioTracks = recordingAudioDest.stream.getAudioTracks();
-    const stream      = new MediaStream([
-        ...videoStream.getVideoTracks(),
-        ...audioTracks,
-    ]);
-
-    // ── Codec negotiation ─────────────────────────────────────────
-    // VP9+Opus: best quality, supported in Chrome/Firefox/Edge
-    // VP8+Opus: reliable fallback
-    // Auto:     last resort — browser chooses
-    const codecs = [
-        'video/webm;codecs=vp9,opus',
-        'video/webm;codecs=vp8,opus',
-        'video/webm',
-    ];
-    const mimeType = codecs.find(c => MediaRecorder.isTypeSupported(c)) || '';
-
-    const options = {
-        videoBitsPerSecond: 8_000_000,  // 8 Mbps — sharp at 1080p, safe on legacy hardware
-        audioBitsPerSecond:   320_000,  // 320 kbps — studio grade
-    };
-    if (mimeType) options.mimeType = mimeType;
-
-    try {
-        mediaRecorder = new MediaRecorder(stream, options);
-    } catch (_) {
-        // If high-bitrate config rejected, fall back to browser defaults
-        mediaRecorder = new MediaRecorder(stream);
-    }
-
-    recordedChunks = [];
-    mediaRecorder.ondataavailable = e => {
-        if (e.data && e.data.size > 0) recordedChunks.push(e.data);
-    };
-
-    mediaRecorder.onstop = () => {
-        const type  = mediaRecorder.mimeType || 'video/webm';
-        const blob  = new Blob(recordedChunks, { type });
-        const url   = URL.createObjectURL(blob);
-        const a     = document.createElement('a');
-        a.href      = url;
-        // Filename uses audio title stem if available via document title
-        const stem  = document.title.replace('FIZX · ', '').replace(/\s+/g, '_') || 'fizx_export';
-        a.download  = `${stem}_${Date.now()}.webm`;
-        a.click();
-        URL.revokeObjectURL(url);
-        recordedChunks = [];
-        // Zero out compositor canvas to release GPU memory after export
-        compositorCanvas.width  = 1;
-        compositorCanvas.height = 1;
-    };
-
-    // 1s chunk timeslice — keeps memory footprint bounded on long tracks
-    mediaRecorder.start(1000);
-    isRecording = true;
-    recBtn.classList.add('recording-active');
-    recBtn.setAttribute('data-tip', 'Stop recording');
-    statusMsg.innerHTML = `${icon('record')} REC`;
-}
-
-function stopRecording() {
-    if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
-    mediaRecorder.stop();
-    isRecording = false;
-    recBtn.classList.remove('recording-active');
-    recBtn.setAttribute('data-tip', 'Record video');
-    statusMsg.innerHTML = `${icon('stop')} saving\u2026`;
-}
-
-function toggleRecording() {
-    if (!audioBuffer) { statusMsg.innerHTML = `${icon('warning')} load audio first`; return; }
-    isRecording ? stopRecording() : startRecording();
-}
-
-// ── Seekbar event listeners ───────────────────────────────────────
+// ── Seekbar listeners ───────────────────────────────────────
 seekBar.addEventListener('pointerdown', () => { isSeeking = true; });
 seekBar.addEventListener('input', () => {
     if (!audioDuration) return;
     const t = (seekBar.value / 100) * audioDuration;
-    seekElapsed.textContent = fmt(t);
     timeDisplay.textContent = fmt(t);
-    // Live lyric preview while scrubbing — no beat fires
     updateLyrics(t);
 });
 seekBar.addEventListener('change', () => {
@@ -1469,27 +1074,25 @@ modeBtn.onclick   = toggleMode;
 presetBtn.onclick = togglePreset;
 arBtn.onclick     = toggleAR;
 vizBtn.onclick    = cycleVisualizer;
-recBtn.onclick    = toggleRecording;
 
 // ── Resize observer — keeps dust canvas sized to screen ──────────
 const _resizeObs = new ResizeObserver(() => {
-    resizeDustCanvas();
-    if (PRESETS[currentPreset]) initDust(PRESETS[currentPreset].dustColor);
+    resizeMasterCanvas();
+    _readPresetVars();
 });
 _resizeObs.observe(screenEl);
 
 // ── Boot ──────────────────────────────────────────────────────────
 applyPreset(PRESET_ORDER[0]);
 bpmDisplay.textContent = `${bpm} BPM`;
-resizeDustCanvas();
+resizeMasterCanvas();
 updateLyrics(0);
-displayLoop();
+requestAnimationFrame(displayLoop);
 buildVisualizer(VIZ_ORDER[vizIndex]);
 
 // ── Cleanup on unload ─────────────────────────────────────────────
 window.addEventListener('beforeunload', () => {
     Object.values(effectRemovalTimers).forEach(id => clearTimeout(id));
-    if (isRecording) { try { mediaRecorder.stop(); } catch (_) {} }
     if (animFrameId)  cancelAnimationFrame(animFrameId);
     if (sourceNode)   { try { sourceNode.stop(); } catch (_) {} }
     if (audioContext) audioContext.close();

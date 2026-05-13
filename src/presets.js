@@ -194,7 +194,7 @@ export const PRESETS = {
                 100%{ transform:translateY(0);    opacity:1; }
             }
             @keyframes kBreathe {
-                0%  { letter-spacing:0.08em; opacity:0.7; filter:blur(0.8px); }
+                0%  { letter-spacing:1px; opacity:0.7; filter:blur(0.8px); }
                 100%{ letter-spacing:normal;  opacity:1;  filter:none; }
             }
             @keyframes kEtherealAurora {
@@ -273,7 +273,7 @@ export const PRESETS = {
                 100%{ opacity:1;    filter:none; }
             }
             @keyframes kVoidShift {
-                0%  { letter-spacing:0.14em; opacity:0.6; }
+                0%  { letter-spacing:0.9px; opacity:0.6; }
                 100%{ letter-spacing:normal; opacity:1; }
             }
             @keyframes kVoidStatic {
@@ -347,7 +347,7 @@ export const PRESETS = {
                 100%{ text-shadow:0 0 4px #7ee8e8; }
             }
             @keyframes kDreamRipple {
-                0%  { letter-spacing:0.06em; opacity:0.6; }
+                0%  { letter-spacing:1px; opacity:0.6; }
                 100%{ letter-spacing:normal; opacity:1;   }
             }
             .fx-dream-fade   { animation:kDreamFade   0.22s ease-out; }
@@ -486,7 +486,7 @@ export const PRESETS = {
                 100%{ opacity:1;   filter:none; }
             }
             @keyframes kEmberSmolder {
-                0%  { letter-spacing:0.04em; text-shadow:0 0 18px #ff6020; }
+                0%  { letter-spacing:0.5px; text-shadow:0 0 18px #ff6020; }
                 100%{ letter-spacing:normal; text-shadow:none; }
             }
             @keyframes kEmberHeat {

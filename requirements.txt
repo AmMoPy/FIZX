@@ -11,8 +11,8 @@ librosa<=0.11.0
 
 # If you still need automated lyrics extraction
 # but fighting with Aeneas Installation
-# ctc_forced_aligner 
-# sherpa-onnx 
-# onnxruntime 
-# Unidecode 
-# nltk
+# ctc_forced_aligner==1.0.2
+# sherpa-onnx==1.13.1
+# onnxruntime==1.26.0
+# Unidecode==1.4.0
+# nltk==3.9.4
