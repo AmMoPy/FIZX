@@ -2,7 +2,14 @@
 
 <img width="50%" src="https://raw.githubusercontent.com/AmMoPy/FIZX/main/assets/fizx.svg">
 
-# FREE LYRICS VISUALIZER THAT ACTUALLY SYNCS
+<details>
+<summary><h3>DEMO</h3></summary>
+
+https://github.com/user-attachments/assets/ac9c5e81-f307-40eb-a1b8-cc8a6499083a
+
+</details>
+
+# FREE LYRICS VISUALIZER THAT ACTUALLY SYNX
 
 </div>
 
