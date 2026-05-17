@@ -5,7 +5,7 @@
 <details>
 <summary><h3>DEMO</h3></summary>
 
-https://github.com/user-attachments/assets/ac9c5e81-f307-40eb-a1b8-cc8a6499083a
+https://github.com/user-attachments/assets/8e62d32e-957e-40eb-a873-f56fd58b9ac5
 
 </details>
 
@@ -53,24 +53,24 @@ Here I am, making a video bragging about my broken [RAG](https://github.com/AmMo
 **So I built my own.**
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                    THE FIZX UNIVERSE                             │
-│                                                                  │
-│   TECHNICAL PATH              NON-TECHNICAL PATH                 │
-│   (You have Python)           (You have a browser)              │
-│                                                                  │
-│   compile.py                  studio.html                        │
-│       │                           │                             │
-│       ├── --beats    (librosa)     ├── Drop audio               │
-│       ├── --lyrics   (ONNX/aeneas) ├── Paste lyrics             │
-│       ├── --both     (one pass)    ├── Tap spacebar             │
-│       └── --out fizx.html          ├── Auto-populate            │
-│                │                   └── Edit in preview          │
-│                └──────────────────────────┘                     │
-│                              │                                  │
-│                        fizx.html                                │
-│                    120KB. Works offline.                        │
-└──────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    THE FIZX UNIVERSE                        │
+│                                                             │
+│   TECHNICAL PATH              NON-TECHNICAL PATH            │
+│   (You have Python)           (You have a browser)          │
+│                                                             │
+│   compile.py                  studio.html                   │
+│       │                           │                         │
+│       ├── --beats    (librosa)     ├── Drop audio           │
+│       ├── --lyrics   (ONNX/aeneas) ├── Paste lyrics         │
+│       ├── --both     (one pass)    ├── Tap spacebar         │
+│       └── --out fizx.html          ├── Auto-populate        │
+│                │                   └── Edit in preview      │
+│                └──────────────────────────┘                 │
+│                              │                              │
+│                        fizx.html                            │
+│                    120KB. Works offline.                    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
