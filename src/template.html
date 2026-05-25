@@ -95,21 +95,42 @@
             content: "";
             position: absolute;
             inset: 0;
+            pointer-events: none;
+            z-index: 4;
             background: repeating-linear-gradient(
                 0deg,
-                rgba(0,255,0,0.04) 0px, rgba(0,255,0,0.04) 2px,
+                var(--crt-color, transparent) 0px, 
+                var(--crt-color, transparent) 2px,
                 transparent 2px, transparent 5px
             );
-            pointer-events: none;
-            z-index: 5;
         }
+        /* Active Scanline */
+        .screen.crt-on.scan-active::before {
+            background:
+                repeating-linear-gradient(
+                    0deg,
+                    var(--crt-color, transparent) 0px, 
+                    var(--crt-color, transparent) 2px,
+                    transparent 2px,transparent 5px
+                ),
+                linear-gradient(
+                    to bottom,
+                    transparent 0%, 
+                    var(--scan-color, transparent) 50%, 
+                    transparent 100%
+                );
+            background-size:100% 100%,100% 30%;
+            animation:var(--scan-anim, none);
+            will-change: background-position;
+        }
+        /* Permanent Vignette Shadow */
         .screen.crt-on::after {
             content: "";
             position: absolute;
             inset: 0;
-            background: radial-gradient(circle at 50% 40%, transparent 50%, rgba(0,0,0,0.5) 100%);
             pointer-events: none;
             z-index: 5;
+            background: radial-gradient(circle at 50% 40%, transparent 50%, rgba(0,0,0,0.5) 100%);
         }
 
         /* Screen flash — animates box-shadow via CSS keyframe.
@@ -162,6 +183,7 @@
             line-height: 1.4;
             will-change: transform, opacity, filter;
             transition: color 0.5s, text-shadow 0.5s;
+            white-space: pre-line; /* Supports Line Breaks, \n renders as <br> zero JS change required */
         }
 
         .next-line {
