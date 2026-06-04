@@ -5,7 +5,7 @@
 <details>
 <summary><h3>DEMO</h3></summary>
 
-https://github.com/user-attachments/assets/8e62d32e-957e-40eb-a873-f56fd58b9ac5
+https://github.com/user-attachments/assets/f845dc27-33e8-4abb-a70a-69a9bf96acfb
 
 </details>
 
