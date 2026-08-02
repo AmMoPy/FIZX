@@ -60,7 +60,7 @@ Here I am, making a video bragging about my broken [RAG](https://github.com/AmMo
 │   (You have Python)           (You have a browser)          │
 │                                                             │
 │   compile.py                  studio.html                   │
-│       │                           │                         │
+│       │                            │                        │
 │       ├── --beats    (librosa)     ├── Drop audio           │
 │       ├── --lyrics   (ONNX/aeneas) ├── Paste lyrics         │
 │       ├── --both     (one pass)    ├── Tap spacebar         │
@@ -115,22 +115,22 @@ Open studio.html > paste lyrics > drop audio > select mode > start session > tap
 python compile.py path_to_audio --out fizx.html 
 
 # Single preset, single visualizer (smallest output)
-python compile.py path_to_audio --p void --v ring
+python compile.py path_to_audio -p void -v ring
 
 # Multiple presets, all visualizers
-python compile.py path_to_audio --p rap,ethereal,void
+python compile.py path_to_audio -p rap,ethereal,void
 
 # Everything (maximum bloat, maximum flexibility)
 python compile.py path_to_audio --all
 
 # Extract beats only (librosa)
-python compile.py path_to_audio --e --b
+python compile.py path_to_audio -e -b
 
 # Align lyrics only (aeneas on full mix, the accurate one)
-python compile.py path_to_audio --e --l # --onnx for ONNX forced alignment: Spleeter and wav2vec2 CTC
+python compile.py path_to_audio -e -l # --onnx for ONNX forced alignment: Spleeter and wav2vec2 CTC
 
 # Force re-extraction even if data is fresh
-python compile.py track.mp3 --e --b --f
+python compile.py track.mp3 -e -b -f
 
 # All CLI commands defaults to rebuilding the studio unless --out is explicitly stated
 # Extracted beats and lyrics are written to beats.js and lyrics.js in src directory
