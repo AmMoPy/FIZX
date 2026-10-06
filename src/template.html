@@ -82,8 +82,8 @@
             background: var(--bg-screen);
             border-radius: 10px;
             box-shadow: var(--shadow-screen);
-            position: relative;
-            overflow: hidden;
+            position: relative; /* works with current circle drag math without extra work */
+            overflow: hidden;   /* hidden enables circle dragging to naturally clips at the screen edge rather than escaping it, no extra clamping needed */
             border: 1px solid var(--border-screen);
             margin-bottom: 6px;
             transition: background 0.5s, border-color 0.5s, box-shadow 0.5s;
@@ -141,6 +141,14 @@
             100%{ box-shadow: var(--shadow-screen); }
         }
         .screen.screen-flash { animation: kScreenFlash 0.12s ease-out forwards; }
+        /* own screen-flash-LUT class rather than reusing .screen-flash — reusing .screen-flash 
+        for LUT directly would mean setting animation-direction:reverse on the same class discrete 
+        mode uses for its normal forward one-shot flash, breaking that instead. */
+        .screen.screen-flash-LUT {
+            animation: kScreenFlash 1000ms linear paused;
+            animation-direction: reverse;  /* kScreenFlash is bright(0%) -> neutral(100%) */
+            animation-fill-mode: both;
+        }
 
         /* ── MASTER CANVAS ───────────────────────────────────────────── */
         /* Renders: background fill, CRT (canvas version when crt-on),
@@ -178,12 +186,33 @@
             font-size: clamp(2.5rem, 6vw, 2.8rem);
             font-weight: bold;
             color: var(--color-primary);
-            text-shadow: 0 0 5px var(--color-dim), 0 0 8px var(--color-faint);
             margin-bottom: 16px;
             line-height: 1.4;
             will-change: transform, opacity, filter;
-            transition: color 0.5s, text-shadow 0.5s;
+            transition: color 0.5s;
             white-space: pre-line; /* Supports Line Breaks, \n renders as <br> zero JS change required */
+        }
+
+        /* continuous vocal-driven breathing scale lives on the wrapper so it
+           composes with whatever transform animation on #currentLine itself */
+        .lyric-breathe {
+            will-change: transform;
+        }
+        
+        #lineIO{
+            position: relative
+        }
+
+        #lineGlow{
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            color: var(--viz-glow,#fff);
+            filter: blur(10px);
+            opacity: 0;
+            will-change: opacity;
+            font: inherit;
+            text-align: inherit
         }
 
         .next-line {
@@ -209,6 +238,35 @@
             pointer-events: none;
             z-index: 2;
         }
+
+        /* ── SPECTRUM CIRCLE ─────────────────────────────────────────── */
+        /* Visible, positioned, draggable canvas*/
+        .spectrum-circle-outer {
+            position: absolute;
+            left: 50%; top: 55%;
+            transform: translate(-50%, -50%);
+            width: 280px; height: 280px;
+            z-index: 3;
+            cursor: grab;
+            touch-action: none;
+        }        
+        .spectrum-circle-outer.dragging { cursor: grabbing; }
+        .spectrum-circle-wrap {
+            position: relative; /* positioning context for the visualizer's own canvas */
+            /* inner wrap's rendered size changes whenever the outer's does */
+            width: 100%;
+            height: 100%;
+        }
+        .spectrum-circle-wrap canvas { pointer-events: none; } /* drag handled on the wrap, not the canvas */
+        .circle-resize-handle {
+            position: absolute; right: -6px; bottom: -6px;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: var(--viz-color, #fff);
+            opacity: 0; cursor: nwse-resize; touch-action: none;
+        }
+        /* Reveal when the pointer is anywhere over the container */
+        #spectrumCircleOuter:hover .circle-resize-handle,
+        .circle-resize-handle:hover { opacity: 1; pointer-events: auto; }            
 
         /* ── SEEKBAR ─────────────────────────────────────────────────── */
         .seekbar-container {
@@ -342,12 +400,24 @@
 
             <!-- DOM lyric layer: CSS engine handles text rendering + animation -->
             <div class="lyric-area">
-                <div class="current-line" id="currentLine"></div>
+                <div class="lyric-breathe" id="lyricBreathe">
+                    <div id="lineIO">
+                        <div id="lineGlow" class="current-line" aria-hidden="true"></div>
+                        <div class="current-line" id="currentLine"></div>
+                    </div>
+                </div>
                 <div class="next-line"    id="nextLine"></div>
             </div>
 
             <!-- Invisible anchor for visualizer getBoundingClientRect() -->
             <div class="visualizer-wrap" id="visualizerWrap"></div>
+            <!-- outer: draggable/resizable, owns the handle, never touched 
+            by canvas rebuilds. Inner: owned entirely by the visualizer, free 
+            to wipe/rebuild its own children -->
+            <div class="spectrum-circle-outer" id="spectrumCircleOuter">
+                <div class="spectrum-circle-wrap" id="spectrumCircleWrap"></div> 
+                <div class="circle-resize-handle" id="circleResizeHandle"></div>
+            </div>    
         </div>
 
         <div class="seekbar-container">
@@ -368,6 +438,7 @@
                 <button id="modeBtn"   data-tip="Sync mode A/B"></button>
                 <button id="presetBtn" data-tip="Switch preset"></button>
                 <button class="btn-util" id="vizBtn"   data-tip="Visualizer"></button>
+                <button class="btn-util" id="lcBtn"    data-tip="Lyrics / Circle"></button>
             </div>
         </div>
         <div class="status-text" id="statusText"></div>
@@ -375,16 +446,41 @@
 </div>
 
 <script>
+
+// ═══════════════════════════════════════════════════════════════════
+// Default cached palette values read once per 
+// preset change via _readPresetVars() and _readVizVars()
+// Zero getComputedStyle calls inside rAF
+// ═══════════════════════════════════════════════════════════════════
+const PV = {
+    bgScreen:  '#0a0e0a',
+    colorDim:  '#3c9e3c',
+    dustColor: '#1eff00',
+    label:     '',
+};
+
+const VV = { // `primary` is a hex string; `glow` and `secondary` are strings because they get passed through wa() for alpha rewriting
+    primary:   '#ffffff',
+    glow:      'rgba(255,255,255,0.4)',
+    secondary: 'rgba(255,255,255,0.2)',
+};
+
 // ═══════════════════════════════════════════════════════════════════
 // INJECTED BLOCKS
 // compile.py replaces each block
 // ═══════════════════════════════════════════════════════════════════
 
-/* @@VISUALIZERS@@ */
-/* @@END_VISUALIZERS@@ */
-
 /* @@PRESETS@@ */
 /* @@END_PRESETS@@ */
+
+/* @@STYLEKIT@@ */ 
+/* @@END_STYLEKIT@@ */
+
+/* @@RENDERCORE@@ */ 
+/* @@END_RENDERCORE@@ */
+
+/* @@VISUALIZERS@@ */
+/* @@END_VISUALIZERS@@ */
 
 /* @@LYRICS@@ */
 /* @@END_LYRICS@@ */
@@ -392,14 +488,22 @@
 /* @@BEATS@@ */
 /* @@END_BEATS@@ */
 
+/* @@ANIM@@ */
+/* @@END_ANIM@@ */
+
 // ═══════════════════════════════════════════════════════════════════
 // DOM REFS
 // ═══════════════════════════════════════════════════════════════════
-const stageEl      = document.getElementById('stage');
-const screenEl     = document.getElementById('screen');
-const masterCanvas = document.getElementById('masterCanvas');
-const mCtx         = masterCanvas.getContext('2d');
-const visWrap      = document.getElementById('visualizerWrap');
+const stageEl       = document.getElementById('stage');
+const screenEl      = document.getElementById('screen');
+const masterCanvas  = document.getElementById('masterCanvas');
+const mCtx          = masterCanvas.getContext('2d');
+const visWrap       = document.getElementById('visualizerWrap');
+const circleOuter   = document.getElementById('spectrumCircleOuter'); // dragged/resized
+const circleWrap    = document.getElementById('spectrumCircleWrap');  // passed to the visualizer, untouched by drag/resize code
+const textFx        = document.getElementById('lyricBreathe'); // CSS transform the text FX (breath/shake/wobble) are applied to
+const textIO        = document.getElementById('lineIO'); // receives WAAPI entry/exit animations (swipe, fade, etc.)
+const glow          = document.getElementById('lineGlow'); // opacity is driven by the vocal envelope (glow effect)
 const currentLineEl = document.getElementById('currentLine');
 const nextLineEl    = document.getElementById('nextLine');
 const timeDisplay  = document.getElementById('timeDisplay');
@@ -412,11 +516,19 @@ const presetBtn    = document.getElementById('presetBtn');
 const arBtn        = document.getElementById('arBtn');
 const vizBtn       = document.getElementById('vizBtn');
 const seekBar      = document.getElementById('seekBar');
+const lyricAreaEl  = document.querySelector('.lyric-area');
+const lcBtn        = document.getElementById('lcBtn');
+const ROOT_STYLE   = document.documentElement; // Cached reference to :root for CSS var reads — avoids repeated DOM lookup.
 
 // ═══════════════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════════════
-let beatTimestamps   = [...BEAT_DATA.beats];  // Copy to allow modification
+// single configuration switch — BEAT_DATA.step_ms > 0 means beats.json
+// was extracted in LUT mode; 0.0 is the discrete sentinel.
+const LUT_MODE       = BEAT_DATA.step_ms > 0;
+
+let beatTimestamps   = LUT_MODE ? [] : [...BEAT_DATA.beats];  // skip copying a 20k-float array we won't use. TODO: wire to Onsets for a new mode ?
+let activeLutEffect  = null;
 let bpm              = BEAT_DATA.bpm;
 let currentMode      = 'A'; // 'A' = beat triggers, 'B' = lyric start triggers
 let currentPreset    = PRESET_ORDER[0];
@@ -434,6 +546,44 @@ const VIZ_ORDER = (typeof VISUALIZER_ORDER !== 'undefined')
     ? VISUALIZER_ORDER : ['off'];
 let vizIndex = 0;    // current position in VIZ_ORDER
 let vizs     = null; // active BaseVisualizer instance or null
+
+// dedicated lyrics/circle toggle — independent of vizs/VIZ_ORDER.
+let lyricsCircleMode = 'both'; // 'both' | 'lyrics' | 'circle'
+const LC_ORDER       = ['both', 'lyrics', 'circle'];
+
+// Construct the animation core for this visualizer instance.
+// Host object wires the core to the DOM elements it needs to render into.
+const core = new AnimCore(
+    {   // host
+        circleContainer: circleWrap,
+        textFxContainer: textFx,
+        textIoContainer: textIO,
+        textLine: currentLineEl,
+        textGlow: glow,
+        // Optional: color palette provider. Called each frame by AnimCore.renderFrame.
+        // reads current CSS custom properties (e.g. --viz-color) and returns
+        // { color, secondary, glow }. If _readVizVars returns undefined,
+        // AnimCore falls back to DEFAULT_COLORS.
+        getColors: () => VV // cached
+    },
+
+    // Config: prefer a global ANIM_CONFIG if one was defined here,
+    // otherwise fall back to the built-in defaults ANIM_CONFIG injected 
+    // by compile.py from stylekit.js.
+    (typeof ANIM_CONFIG !== 'undefined') ? ANIM_CONFIG : DEFAULT_ANIM_CONFIG
+);
+
+core.setLutData(
+    {
+        stepMs: BEAT_DATA.step_ms,
+        bass: BEAT_DATA.beats,
+        vocal: BEAT_DATA.vocal_env,
+        treble: BEAT_DATA.treble_env
+    }
+);
+
+let _lastFrame = performance.now();
+let _exited = false;
 
 // ── Effect class removal debounce ─────────────────────────────────
 // Short-lived CSS cleanup timers only — beat scheduling is rAF-driven.
@@ -495,24 +645,22 @@ function resizeMasterCanvas() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// PRESET VARS CACHE
-// Read once per preset change via _readPresetVars().
-// Zero getComputedStyle calls inside rAF.
+// CACHED PALETTE INJECTORS
 // ═══════════════════════════════════════════════════════════════════
-const PV = {
-    bgScreen:  '#0a0e0a',
-    colorDim:  '#3c9e3c',
-    dustColor: '#1eff00',
-    label:     '',
-};
-
 function _readPresetVars() {
-    const root    = getComputedStyle(document.documentElement);
-    PV.bgScreen   = root.getPropertyValue('--bg-screen').trim();
-    PV.colorDim   = root.getPropertyValue('--color-dim').trim();
+    const s       = getComputedStyle(ROOT_STYLE);
+    PV.bgScreen   = s.getPropertyValue('--bg-screen').trim();
+    PV.colorDim   = s.getPropertyValue('--color-dim').trim();
     const p       = PRESETS[currentPreset];
     PV.dustColor  = p.dustColor;
     PV.label      = p.label;
+}
+
+function _readVizVars() {
+    const s      = getComputedStyle(ROOT_STYLE);
+    VV.primary   = s.getPropertyValue('--viz-color').trim()     || '#ffffff';
+    VV.glow      = s.getPropertyValue('--viz-glow').trim()      || 'rgba(255,255,255,0.4)';
+    VV.secondary = s.getPropertyValue('--viz-secondary').trim() || 'rgba(255,255,255,0.2)';
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -640,6 +788,7 @@ function icon(name) { return ICONS[name] || ''; }
     arBtn.innerHTML     = icon('grid');
     vizBtn.innerHTML    = icon('record');
     statusMsg.innerHTML = `click ${icon('play')} to load audio`;
+    lcBtn.innerHTML     = icon('star');
 })();
 
 // ═══════════════════════════════════════════════════════════════════
@@ -662,10 +811,53 @@ function cycleVisualizer() {
     buildVisualizer(VIZ_ORDER[vizIndex]);
 }
 
+// dedicated lyrics/circle toggle
+function setLyricsCircleMode(mode) {
+    lyricsCircleMode = mode;
+    lcBtn.setAttribute('data-tip', mode);
+
+    const showLyrics = mode === 'both' || mode === 'lyrics';
+    const showCircle = mode === 'both' || mode === 'circle';
+
+    core.setVisibility(
+        {
+            circle:showCircle,
+            text:showLyrics
+        }
+    ); 
+
+    lyricAreaEl.style.display = showLyrics ? '' : 'none';
+}
+
+function cycleLyricsCircle() {
+    const idx = (LC_ORDER.indexOf(lyricsCircleMode) + 1) % LC_ORDER.length;
+    setLyricsCircleMode(LC_ORDER[idx]);
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // PRESET APPLICATION
 // Injects CSS vars, sets flash color var, toggles CRT class,
 // ═══════════════════════════════════════════════════════════════════
+// Resolve the active preset's LUT entry once per preset switch, not per frame
+function _resolveLutEffect(presetKey) {
+    [...currentLineEl.classList].forEach(c => { if (c.endsWith('-LUT')) currentLineEl.classList.remove(c); });
+    screenEl.classList.remove('screen-flash-LUT', 'scan-active');
+    screenEl.style.removeProperty('animation-duration');
+    screenEl.style.removeProperty('animation-delay');
+    screenEl.style.removeProperty('animation-play-state');
+    _scanUntil = 0;
+
+    const p = PRESETS[presetKey];
+    const entry = p && p.effects && p.effects.find(fx => fx.className.endsWith('-LUT'));
+    activeLutEffect = entry ? {
+        className: entry.className,
+        useFlash: !!entry.useFlash,
+        useScan: !!entry.useScan,
+        scrubMs: entry.duration || 1000, // must be 1000ms for the mapping to be direct, If the intent is to scrub the full timeline
+    } : null;
+    if (activeLutEffect) currentLineEl.classList.add(activeLutEffect.className);
+}
+
 function applyPreset(key) {
     const p = PRESETS[key];
     if (!p) return;
@@ -675,15 +867,24 @@ function applyPreset(key) {
     // CSS custom properties are injected via
     // root.style.setProperty() which overrides any existing inline styles.
     // This is intentional — presets fully own the visual theme.  
-    const root = document.documentElement;
-    Object.entries(p.cssVars).forEach(([k, v]) => root.style.setProperty(k, v));
+    // const root = document.documentElement;
+    Object.entries(p.cssVars).forEach(([k, v]) => ROOT_STYLE.style.setProperty(k, v));
     // --flash-color drives @keyframes kScreenFlash — set here so the
     // flash is always theme-correct with no JS branching in triggerVisual.    
-    root.style.setProperty('--flash-color', p.flashColor);
+    ROOT_STYLE.style.setProperty('--flash-color', p.flashColor);
     // The '--crt-on' property is read as a string, not a boolean.    
     screenEl.classList.toggle('crt-on', p.cssVars['--crt-on'] === '1');
 
+    // intensity tier — presets inherit 'medium' unless they set
+    // intensityTier explicitly. See INTENSITY_TIERS in presets.js.
+    const tier = (typeof INTENSITY_TIERS !== 'undefined')
+        ? (INTENSITY_TIERS[p.intensityTier] || INTENSITY_TIERS[DEFAULT_INTENSITY_TIER])
+        : null;
+    if (tier) Object.entries(tier).forEach(([k, v]) => ROOT_STYLE.style.setProperty(k, v));
+
     _readPresetVars();
+    _readVizVars();
+    _resolveLutEffect(key);
 
     // Do NOT rebuild the visualizer here. CSS vars are now injected above,
     // and the running visualizer reads them on its next draw frame automatically.
@@ -709,7 +910,11 @@ function applyPreset(key) {
 // ═══════════════════════════════════════════════════════════════════
 function triggerVisual() {
     const p      = PRESETS[currentPreset];
-    const effect = p.effects[(Math.random() * p.effects.length) | 0];
+    // random discrete-pick must exclude the -LUT entry 
+    // a paused animation toggled on/off in the remove/re-add/timeout 
+    // cycle plays nothing — it would silently no-op as a "discrete" trigger otherwise    
+    const pool = p.effects.filter(fx => !fx.className.endsWith('-LUT')); // TODO: filter call costly?
+    const effect = pool[(Math.random() * pool.length) | 0];
 
     // Cancel stale removal timer so a fast re-trigger doesn't cut the
     // new animation short with the old timer's expiry callback.
@@ -730,7 +935,7 @@ function triggerVisual() {
     if (effect.useFlash) {
         if (p.flashCycle && p.flashCycleColors && p.flashCycleColors.length) {
             flashCycleIdx = (flashCycleIdx + 1) % p.flashCycleColors.length;
-            document.documentElement.style.setProperty(
+            ROOT_STYLE.style.setProperty(
                 '--flash-color', p.flashCycleColors[flashCycleIdx]
             );
         }
@@ -757,9 +962,22 @@ function triggerVisual() {
 // Updates DOM text content only when the lyric index changes.
 // ═══════════════════════════════════════════════════════════════════
 function updateLyrics(t) {
+
+    const lastLyric = LYRICS[LYRICS.length - 1];
+
+    if (currentLyricIdx === -3) {
+        if (t < lastLyric.start + 5) {
+            // Fell out of the credit window via seek — recover to real lyrics.
+            currentLyricIdx = LYRICS.length - 1;  // re-enter at last lyric
+            // fall through so normal processing resumes below
+        } else {
+            return;   // stay in credit state, do nothing
+        }
+    }
+
     if (!LYRICS.length) {
         currentLineEl.innerHTML = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
-        nextLineEl.innerHTML    = !beatTimestamps.length
+        nextLineEl.innerHTML    = !beatTimestamps.length && !LUT_MODE
             ? `${icon('warning')} No lyrics or beats detected`
             : `${icon('warning')} No lyrics detected`;
         return;
@@ -783,16 +1001,17 @@ function updateLyrics(t) {
     // Update DOM only when the index actually changes
     if (newIdx !== currentLyricIdx) {
         currentLyricIdx = newIdx;
-        currentLineEl.textContent = LYRICS[currentLyricIdx].text;
+        core.setLyricText(LYRICS[currentLyricIdx].text); 
+        _exited = false;
         const next = LYRICS[currentLyricIdx + 1];
         nextLineEl.textContent = next ? `\u27a1 ${next.text}` : 'Audit Complete';
     }
 
     // Post-Song Credits
     // Trigger 5 seconds after the final lyric starts
-    const lastLyric = LYRICS[LYRICS.length - 1];
     if (t > lastLyric.start + 5 && currentLyricIdx !== -3) { // -3 as unique state for "Credits"
-        currentLineEl.textContent = '@AmMoPy';
+        core.setLyricText('@AmMoPy');
+        _exited = false;
         nextLineEl.innerHTML      = `${icon('star')} SHOW SOME LOVE ${icon('star')}`;
         currentLyricIdx = -3;
     }
@@ -806,7 +1025,7 @@ function _updateSeekBarVisual(t) {
     const pct = (t / audioDuration) * 100;
     seekBar.value = pct;
     // Gradient fill — painted once per rAF, not on every input event
-    const col = getComputedStyle(document.documentElement)
+    const col = getComputedStyle(ROOT_STYLE)
                     .getPropertyValue('--color-primary').trim();
     seekBar.style.background =
         `linear-gradient(to right, ${col} ${pct}%, var(--bg-btn) ${pct}%)`;
@@ -845,6 +1064,24 @@ function seekTo(pct) {
 // cost. A single integer pointer advances monotonically; on seek it
 // is reset and fast-forwarded in a tight while loop (no rAF cost).
 // ═══════════════════════════════════════════════════════════════════
+// scan lives on a ::before pseudo-element — JS can't set
+// inline style on a pseudo-element, neither custom property (opacity)
+// nor scrubbing would drives intensity via a the keyframe directly and
+// will cause freeze, thus retrigger on bass rise, the same onset-synthesis 
+// idea already used for the event-based visualizers (Particles/Ripple/Heartbeat)
+let _scanUntil = 0;
+const SCAN_MS = 280; 
+
+function triggerLutScan(bass) {
+    if (!activeLutEffect || !activeLutEffect.useScan || !screenEl.classList.contains('crt-on') || now < _scanUntil) return;   // never restart mid-sweep
+    _scanUntil = now + SCAN_MS + 60;
+    screenEl.classList.remove('scan-active');
+    requestAnimationFrame(() => {
+        screenEl.classList.add('scan-active');
+        setTimeout(() => screenEl.classList.remove('scan-active') , SCAN_MS)
+    });  // no forced reflow, and never left frozen
+}
+
 function displayLoop() {
     // Current playback position derived from AudioContext wall clock.
     // Accurate to ~1ms — tied to sound card driver, not JS event queue.
@@ -853,20 +1090,54 @@ function displayLoop() {
         : startOffset;
 
     if (isPlaying && !isSeeking) {
-        timeDisplay.textContent = fmt(t);
+        timeDisplay.textContent = t.toFixed(3);
         _updateSeekBarVisual(t);
         updateLyrics(t);
 
-        // ── Inline beat scheduler ─────────────────────────────────
-        // Mode A: fire against beatTimestamps (pre-sorted by compile.py).
-        // Mode B: fire against lyric start times.
-        // Pointer only moves forward — wrap-around handled by seekTo().
-        const src = currentMode === 'A'
-            ? beatTimestamps
-            : LYRICS.map(l => l.start);
-        while (src[lastFiredBeatIdx] !== undefined && t >= src[lastFiredBeatIdx]) {
-            triggerVisual();
-            lastFiredBeatIdx++;
+        if (LUT_MODE) {
+            // continuous path — no scheduler pointer, direct index every frame
+            const now = performance.now();
+            const dt = Math.min(50, now - _lastFrame);
+            _lastFrame = now;
+            const f = core.renderFrame(t, dt, now);
+            const nl = LYRICS[currentLyricIdx + 1]; 
+            
+            if (nl && !_exited && core.getExitDurationSec() && t >= nl.start - core.getExitDurationSec()) {
+                core.playTextExit();
+                _exited=true;
+            }
+            
+            if (vizs) vizs.setLutFrame(f.bass, f.vocal); 
+            if (f.hitDetected) triggerLutScan(now);
+
+            // JS scrubs LUT animation into position via animation-delay (negative delay seeks
+            // into a paused animation's timeline without playing it)
+            if (activeLutEffect) {
+                // Text: driven by vocal — matches the "breathing" character already established
+                currentLineEl.style.animationPlayState = 'paused';
+                currentLineEl.style.animationDelay = `${-(f.vocal * activeLutEffect.scrubMs)}ms`;
+
+                if (activeLutEffect.useFlash) {
+                    // Bass drives flash — reads as a hit, not a breath. Duration overridden
+                    // to decouple from the discrete flash's own 120ms.
+                    screenEl.style.animationDuration  = `${activeLutEffect.scrubMs}ms`;
+                    screenEl.style.animationPlayState = 'paused';
+                    screenEl.style.animationDelay     = `${-(f.bass * activeLutEffect.scrubMs)}ms`;
+                    if (!screenEl.classList.contains('screen-flash-LUT')) screenEl.classList.add('screen-flash-LUT');
+                }
+            }
+        } else {
+            // ── Inline beat scheduler ─────────────────────────────────
+            // Mode A: fire against beatTimestamps (pre-sorted by compile.py).
+            // Mode B: fire against lyric start times.
+            // Pointer only moves forward — wrap-around handled by seekTo().
+            const src = currentMode === 'A'
+                ? beatTimestamps
+                : LYRICS.map(l => l.start);
+            while (src[lastFiredBeatIdx] !== undefined && t >= src[lastFiredBeatIdx]) {
+                triggerVisual();
+                lastFiredBeatIdx++;
+            }
         }
     }
 
@@ -949,7 +1220,9 @@ function selectAudio() {
         updateLyrics(0);
         timeDisplay.textContent = fmt(0);
         _updateSeekBarVisual(0);
-        statusMsg.textContent = `${beatTimestamps.length} beats \u00b7 ${LYRICS.length} lines`;
+        statusMsg.textContent = LUT_MODE
+            ? `LUT \u00b7 ${BEAT_DATA.beats.length} frames \u00b7 ${LYRICS.length} lines`
+            : `${beatTimestamps.length} beats \u00b7 ${LYRICS.length} lines`;
     };
     input.click();
 }
@@ -1059,7 +1332,7 @@ function toggleAR() {
     stageEl.classList.toggle('ar-landscape', isLandscape);
     arBtn.setAttribute('data-tip', isLandscape ? '9:16' : '16:9');
     // Resize dust canvas on next paint after layout settles
-    requestAnimationFrame(() => { resizeMasterCanvas(); _readPresetVars(); });
+    requestAnimationFrame(() => { resizeMasterCanvas(); _readPresetVars(); _readVizVars(); });
 }
 
 // ── Utilities ─────────────────────────────────────────────────────
@@ -1096,13 +1369,133 @@ modeBtn.onclick   = toggleMode;
 presetBtn.onclick = togglePreset;
 arBtn.onclick     = toggleAR;
 vizBtn.onclick    = cycleVisualizer;
+lcBtn.onclick     = cycleLyricsCircle;
 
 // ── Resize observer — keeps dust canvas sized to screen ──────────
 const _resizeObs = new ResizeObserver(() => {
     resizeMasterCanvas();
     _readPresetVars();
+    _readVizVars();
 });
 _resizeObs.observe(screenEl);
+
+// ── Spectrum Circle Drag handlers ─────────────────────────────────────────
+// free-floating drag — position persists across lyrics/circle toggles
+// within the session (destroy() only clears the canvas child, not the wrap's
+// own inline position).
+(function enableCircleDrag() {
+    let dragging = false, offX = 0, offY = 0;
+    circleOuter.addEventListener('pointerdown', (e) => {
+        dragging = true;
+        circleOuter.classList.add('dragging');
+        circleOuter.setPointerCapture(e.pointerId);
+        const rect = circleOuter.getBoundingClientRect();
+        offX = e.clientX - rect.left;
+        offY = e.clientY - rect.top;
+        circleOuter.style.left = rect.left + 'px';
+        circleOuter.style.top  = rect.top + 'px';
+        circleOuter.style.transform = 'none';
+    });
+    circleOuter.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const pr = screenEl.getBoundingClientRect();
+        circleOuter.style.left = (e.clientX - pr.left - offX) + 'px';
+        circleOuter.style.top  = (e.clientY - pr.top  - offY) + 'px';
+    });
+    const endDrag = () => { dragging = false; circleOuter.classList.remove('dragging'); };
+    circleOuter.addEventListener('pointerup', endDrag);
+    circleOuter.addEventListener('pointercancel', endDrag);
+})();
+
+(function enableCircleResize() {
+    const MIN_SIZE = 60, MAX_SIZE = 1620;
+    const ZOOM_SENSITIVITY = 0.0015;   // wheel: size *= 1 + deltaY * sensitivity
+    const PINCH_MIN_STEP   = 0.5;      // ignore pinch changes smaller than this
+    const handle = document.getElementById('circleResizeHandle'); // static HTML, not created/destroyed dynamically
+    let resizing = false, startSize = 280, startX = 0, startY = 0;
+    let pinchStartDist = 0, pinchStartSize = 280;
+    // Shared clamp + apply. Every input path routes through here so
+    // MIN_SIZE/MAX_SIZE are enforced in one place.
+    function applySize(px) {
+        const next = Math.max(MIN_SIZE, Math.min(MAX_SIZE, px));
+        circleOuter.style.width  = next + 'px';
+        circleOuter.style.height = next + 'px';
+        return next;
+    }
+    // ── Drag (corner handle) ─────────────────────────────────────
+    handle.addEventListener('pointerdown', (e) => {
+        e.stopPropagation(); // don't also trigger the wrap's own drag handler
+        resizing = true;
+        handle.setPointerCapture(e.pointerId);
+        startSize = circleOuter.getBoundingClientRect().width;
+        startX = e.clientX; 
+        startY = e.clientY;
+    });
+    handle.addEventListener('pointermove', (e) => {
+        if (!resizing) return;
+        const delta = Math.max(e.clientX - startX, e.clientY - startY);
+        // const next = Math.min(MAX_SIZE, Math.max(MIN_SIZE, startSize + delta));
+        // circleOuter.style.width = next + 'px';
+        // circleOuter.style.height = next + 'px';
+        applySize(startSize + delta);
+    });
+    const end = () => { resizing = false; };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+    // ── Wheel zoom ───────────────────────────────────────────────
+    // Attached to the container (the whole circle area), not the handle,
+    // so the user can scroll anywhere over the circle to zoom.
+    // deltaY > 0 = scroll down = shrink; deltaY < 0 = scroll up = grow.
+    // Exponential form (size *= factor) is smoother over a range than
+    // additive (size += delta), and symmetric: equal scroll in either
+    // direction produces equal reciprocal scaling.
+    circleOuter.addEventListener('wheel', (e) => {
+        e.preventDefault();   // stop page scroll
+        const current = circleOuter.getBoundingClientRect().width;
+        const factor  = 1 - e.deltaY * ZOOM_SENSITIVITY;
+        applySize(current * factor);
+    }, { passive: false });   // passive:false required for preventDefault
+
+    // ── Pinch zoom ───────────────────────────────────────────────
+    // Two-finger touch. On pointerdown we record the distance between
+    // the two touches and the current size; on move we scale the size
+    // by the ratio of current distance to start distance.
+    // Uses touch events (not pointer events) because pointer events
+    // don't give a clean "which pointers are down" state across browsers.
+    let pinchActive = false;
+
+    circleOuter.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 2) return;
+        pinchActive = true;
+        pinchStartDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+        );
+        pinchStartSize = circleOuter.getBoundingClientRect().width;
+        e.preventDefault();   // prevent browser's own pinch-zoom of the page
+    }, { passive: false });
+
+    circleOuter.addEventListener('touchmove', (e) => {
+        if (!pinchActive || e.touches.length !== 2) return;
+        e.preventDefault();
+        const dist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+        );
+        if (pinchStartDist < PINCH_MIN_STEP) return;   // guard divide-by-near-zero
+        const ratio = dist / pinchStartDist;
+        applySize(pinchStartSize * ratio);
+    }, { passive: false });
+
+    const endPinch = (e) => {
+        if (e.touches.length < 2) {
+            pinchActive = false;
+            pinchStartDist = 0;
+        }
+    };
+    circleOuter.addEventListener('touchend', endPinch);
+    circleOuter.addEventListener('touchcancel', endPinch);
+})();
 
 // ── Boot ──────────────────────────────────────────────────────────
 applyPreset(PRESET_ORDER[0]);
@@ -1111,14 +1504,15 @@ resizeMasterCanvas();
 updateLyrics(0);
 requestAnimationFrame(displayLoop);
 buildVisualizer(VIZ_ORDER[vizIndex]);
+setLyricsCircleMode(lyricsCircleMode);
 
 // ── Cleanup on unload ─────────────────────────────────────────────
 window.addEventListener('beforeunload', () => {
     Object.values(effectRemovalTimers).forEach(id => clearTimeout(id));
-    if (animFrameId)  cancelAnimationFrame(animFrameId);
-    if (sourceNode)   { try { sourceNode.stop(); } catch (_) {} }
-    if (audioContext) audioContext.close();
-    if (vizs)         vizs.destroy();
+    if (animFrameId)    cancelAnimationFrame(animFrameId);
+    if (sourceNode)     { try { sourceNode.stop(); } catch (_) {} }
+    if (audioContext)   audioContext.close();
+    if (vizs)           vizs.destroy();
     _resizeObs.disconnect();
 });
 </script>

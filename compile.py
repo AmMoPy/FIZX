@@ -104,11 +104,26 @@ def _replace_tag(match:str, data_map:dict, is_studio_prep:bool):
     return f"/* @@{tag}@@ */\n{content}\n/* @@END_{tag}@@ */"
 
 def _format_beats_json(data: dict) -> str:
-    """Keep beats array on one line for readability."""
-    beats_line = json.dumps(data.get('beats', []))
+    """
+    Keep beats array on one line for readability.
+    
+    unified schema — 'beats' is polymorphic (discrete timestamps or
+    continuous LUT bass envelope), 'vocal_env' populated only in LUT mode.
+    step_ms=0.0 is the discrete-mode sentinel.
+    """
+    beats_lines  = json.dumps(data.get('beats', []))
+    vocal_lines  = json.dumps(data.get('vocal_env', []))
+    treble_lines = json.dumps(data.get('treble_env', []))
+    onsets = json.dumps(data.get('onsets', []))
+    vocal_onsets = json.dumps(data.get('vocal_onsets', []))
     return (
         f"const BEAT_DATA = {{\n"
-        f"  \"beats\": {beats_line},\n"
+        f"  \"step_ms\": {data.get('step_ms', 0.0)},\n"
+        f"  \"beats\": {beats_lines},\n"
+        f"  \"vocal_env\": {vocal_lines},\n"
+        f"  \"treble_env\": {treble_lines},\n"
+        f"  \"onsets\": {onsets},\n"
+        f"  \"vocal_onsets\": {vocal_onsets},\n"
         f"  \"bpm\": {data.get('bpm', 0)}\n"
         f"}};"
     )
@@ -278,7 +293,7 @@ def build_visualizers_block(src: str, viz_keys: list[str], fltr: bool) -> str:
 
     # Concrete classes, filtered map, and order
     entries = []
-    for key in viz_keys:
+    for key in keys_to_build:
         if key == 'off':
             continue
         # Attempt auto-derive: key → Key + Visualizer
@@ -295,6 +310,8 @@ def build_visualizers_block(src: str, viz_keys: list[str], fltr: bool) -> str:
 
     # VISUALIZER_ORDER — all requested keys + 'off' sentinel
     # 'off' is always appended so the user can always disable the visualizer.
+    # built from viz_keys — 'circle' stays out
+    # of the button cycle unless explicitly requested via --visualizer.
     order = ['off'] + [k for k in viz_keys if k != 'off']
     parts.append(f"const VISUALIZER_ORDER = {json.dumps(order)};")
 
@@ -359,8 +376,12 @@ def build_fonts(font_names: list[str]):
 def build_studio(
     fizx_template: str,
     fonts_block: str,
+    stylekit_block: str,
+    rendercore_block: str,
     template_marker: str = '/* @@FIZX_TEMPLATE@@ */',
-    fonts_marker: str = '/* @@FONTS@@ */'
+    fonts_marker: str = '/* @@FONTS@@ */',
+    stylekit_marker: str = '/* @@STYLEKIT@@ */',
+    rendercore_marker: str = '/* @@RENDERCORE@@ */'
     ) -> str:
     """
     Produce studio.html by injecting into template_studio.html:
@@ -393,6 +414,18 @@ def build_studio(
         logger.warning(f"{fonts_marker} not found in template_studio.html — skipping fonts injection")
     else:
         studio = studio.replace(fonts_marker, fonts_block)
+
+    # ── Inject Stylekit ─────────────────────────────────
+    if stylekit_marker not in studio:
+        logger.warning(f"{stylekit_marker} not found in template_studio.html — skipping styleki injection")
+    else:
+        studio = studio.replace(stylekit_marker, stylekit_block)
+
+    # ── Inject Rendercore ───────────────────────────────
+    if rendercore_marker not in studio:
+        logger.warning(f"{rendercore_marker} not found in template_studio.html — skipping rendercore injection")
+    else:
+        studio = studio.replace(rendercore_marker, rendercore_block)
 
     return studio
 
@@ -472,9 +505,11 @@ def main():
 
 
     # ── Read JS sources ─────────────────────────────────────────
-    presets_src  = (SRC / "presets.js").read_text()
-    viz_src      = (SRC / "visualizers.js").read_text()
-    template     = (SRC / "template.html").read_text()
+    presets_src     = (SRC / "presets.js").read_text()
+    viz_src         = (SRC / "visualizers.js").read_text()
+    stylekit_src    = (SRC / "stylekit.js").read_text()
+    rendercore_src  = (SRC / "rendercore.js").read_text()
+    template        = (SRC / "template.html").read_text()
 
     all_preset_keys     = extract_array_values(presets_src, 'PRESET_ORDER')
     default_preset_keys = extract_array_values(presets_src, 'DEFAULT_PRESETS')
@@ -526,10 +561,12 @@ def main():
 
     # ── Build injection blocks ────────────────────────────────────
     styles_block, presets_block = extract_preset_data(presets_src, preset_keys)
-    viz_block     = build_visualizers_block(viz_src, viz_keys, fltr)
-    fonts_block   = build_fonts(['merri', 'deja'])
-    beats_block   = _format_beats_json(beats_data)
-    lyrics_block  = _format_lyrics_json(lyrics_data)
+    viz_block        = build_visualizers_block(viz_src, viz_keys, fltr)
+    fonts_block      = build_fonts(['merri', 'deja'])
+    beats_block      = _format_beats_json(beats_data)
+    lyrics_block     = _format_lyrics_json(lyrics_data)
+    stylekit_block   = _strip(stylekit_src) # will break any // inside a string literal  (e.g. regex like /\/\//). TODO: ignore if not an issue
+    rendercore_block = _strip(rendercore_src)
 
     # ── Compile FIZIX template ──────────────────────────────────────
     out = template
@@ -539,8 +576,10 @@ def main():
         'STYLES': styles_block,
         'VISUALIZERS': viz_block,
         'PRESETS': presets_block,
-        'BEATS': beats_block, 
-        'LYRICS': lyrics_block
+        'BEATS': beats_block,
+        'LYRICS': lyrics_block,
+        'STYLEKIT': stylekit_block,
+        'RENDERCORE': rendercore_block
     }
     out = inline_blocks(out, inj_blocks)
     # Update title
@@ -564,18 +603,20 @@ def main():
     # ── Compile studio template ─────────────────────────────────────
     # The template injected into the studio is the bare template.html
     # with all blocks populated but WITHOUT audio-specific data (beats/lyrics)
-    # so the Quine strategy works correctly.Studio will substitute 
-    # [[LYRICS_DATA]], [[BEATS_DATA]] and [[BPM_DATA]] at export time
-    # using its own session results.
+    # so the Quine strategy works correctly. Studio will substitute all tags 
+    # (e.g.: [[STEP_MS_DATA]]) at export time using its own session results via
+    # buildFizxHtml()
     logger.info(f"\n{'*'*20}Building studio{'*'*20}")
     studio_template = out
     # Assembl
     placeholders = {
-        'BEATS':  'const BEAT_DATA = { beats: [[BEATS_DATA]], bpm: [[BPM_DATA]] };',
+        'ANIM':   'const ANIM_CONFIG = [[ANIM_CONFIG_DATA]];', # Only studio path allows editing exported template, python path gets the hardcoded defaults
+        'BEATS':  'const BEAT_DATA = { step_ms: [[STEP_MS_DATA]], beats: [[BEATS_DATA]], vocal_env: [[VOCAL_ENV_DATA]], '
+                  'treble_env: [[TREBLE_ENV_DATA]], onsets: [[ONSETS_DATA]], vocal_onsets: [[VOCAL_ONSETS_DATA]], bpm: [[BPM_DATA]] };',
         'LYRICS': 'const LYRICS = [[LYRICS_DATA]];'
     }
     studio_template = inline_blocks(studio_template, placeholders)
-    studio_html = build_studio(studio_template, fonts_block)
+    studio_html = build_studio(studio_template, fonts_block, stylekit_block, rendercore_block)
 
     # ── Write Studio output ────────────────────────────────────────
     studio_out  = ROOT / "studio.html"

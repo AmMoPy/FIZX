@@ -22,69 +22,9 @@
 //   Visualizers own their own size/timing defaults. No preset config
 //   is needed to construct a visualizer — just pass (wrap).
 //
-// READING CSS VARS:
-//   _readVars() is called at the start of every _draw()/_loop() call,
-//   not at construction time. This is the key to zero-coupling:
-//   the visualizer never caches colors from construction, so a preset
-//   switch takes effect on the very next frame.
-//   Cost: one getComputedStyle call per frame per active visualizer.
-//   getComputedStyle is O(1) for custom properties — negligible vs
-//   the canvas draw operations that follow.
-//
-// GPU MEMORY RELEASE:
-//   BaseVisualizer.destroy() handles the common GPU memory release:
-//     1. Cancel any pending rAF via this._rafId
-//     2. clearRect the full canvas
-//     3. Set canvas.width = canvas.height = 0  → forces GPU buffer release
-//     4. Remove canvas from DOM
-//     5. Null all references → GC eligible
-//
-//   This is the only reliable cross-browser mechanism to immediately
-//   release the GPU framebuffer. DOM removal alone is insufficient —
-//   the browser holds the buffer until GC, which is non-deterministic.
-//
-// CYCLING:
-//   VISUALIZER_ORDER defines the button cycle sequence.
-//   The engine calls destroys the current instance before constructing
-//   the next, so GPU memory is always released before allocation.
-//
-// DENSE BEAT HANDLING:
-//   pulse() on a decaying visualizer resets state to MAX immediately.
-//   No lock flags needed (except HeartbeatVisualizer where waveform
-//   shape integrity requires completion).
-//
-// BEAT RESPONSIVENESS MODEL:
-//
-//   The brain perceives a beat at the moment of the audio transient.
-//   The scheduler fires the callback at that exact moment. But if the
-//   visual spends the first 50-100ms "ramping up" to peak (sin curve),
-//   the user sees nothing for one full display frame after the beat —
-//   perceived as lag even though the timer was precise.
-//
-//   Correct model:
-//     pulse() → INSTANTLY set state to maximum
-//     _loop() → decay from maximum toward rest over time
-//
-//   Wrong model:
-//     pulse() → start a ramp-up animation from 0 → peak → 0
-//     Peak arrives at 50% of duration = perceivable latency
-//
-//   LATENCY PRE-COMPENSATION:
-//   The display pipeline (canvas compositing + vsync) adds ~1 frame
-//   (~16ms) of visual latency after the JS callback fires. We absorb
-//   this by making the visual state MAX at t=0 of pulse() — the user's
-//   first frame after the beat shows the peak, not the ramp.
-//
-//   DECAY SHAPE:
-//   Exponential decay (state *= factor) is used everywhere because:
-//     - It reaches perceivable zero faster than linear for the same
-//       total duration, leaving the canvas "clean" before the next beat
-//     - It never fully reaches zero (no hard cutoff artifact)
-//     - It's a single multiply per frame — cheaper than sin/ease math
-//
 // TO ADD A NEW VISUALIZER (zero HTML or compile.py changes required):
 //   1. Extend BaseVisualizer, implement _init() and pulse().
-//   2. Use _readVars() in every draw to get current colors.
+//   2. Use VV (cached colors) in every draw to get current colors.
 //   3. Add to VISUALIZERS map and VISUALIZER_ORDER.
 //   4. No preset or HTML changes needed.
 //   5. Run compile.py — done.
@@ -93,23 +33,7 @@
 // Canvas is larger than the visual content to give glow/expansion room.
 const CANVAS_SCALE = 2.6;
 
-// Cached reference to :root for CSS var reads — avoids repeated DOM lookup.
-const ROOT_STYLE = document.documentElement;
-
-
 // ── SHARED UTILITIES ──────────────────────────────────────────────
-
-// Read the three visualizer color vars from the active preset's CSS vars.
-// Called per-frame so preset switches take effect immediately.
-// Returns plain strings ready for ctx.strokeStyle / ctx.shadowColor.
-function readVizVars() {
-    const s = getComputedStyle(ROOT_STYLE);
-    return {
-        color:     s.getPropertyValue('--viz-color').trim()     || '#ffffff',
-        glow:      s.getPropertyValue('--viz-glow').trim()      || 'rgba(255,255,255,0.4)',
-        secondary: s.getPropertyValue('--viz-secondary').trim() || 'rgba(255,255,255,0.2)',
-    };
-}
 
 // easeOutExpo: extremely fast start, long soft tail.
 // Used for DECAY animations — gives instant visual confirmation then
@@ -134,6 +58,8 @@ class BaseVisualizer {
         this.canvas = null;
         this.ctx    = null;
         this._rafId = null;
+        this._lutFed = false;
+        this._lastLutBass = 0;
         this._init();
     }
 
@@ -194,6 +120,26 @@ class BaseVisualizer {
         this.ctx    = canvas.getContext('2d');
         return canvas;
     }
+
+    // LUT-mode entry point, called every rAF frame from template.html
+    // when LUT_MODE is active. Continuous-state visualizers (Ring, Bloom,
+    // Waveform, DNA) implement _applyLutFrame() to map bass/vocal directly.
+    // Event/spawn-based ones (Particles, Ripple, Heartbeat) don't — they
+    // fall back to pulse()-synthesis: a rise in bass triggers pulse(), same
+    // as a discrete beat would. Their whole rendering model is "play one
+    // spike/burst per event", which doesn't have a meaningful continuous
+    // form without a real redesign — this gets them reacting in LUT mode
+    // without pretending they're now continuous.
+    setLutFrame(bass, vocal, treble) {
+        this._lutFed = true;
+        if (typeof this._applyLutFrame === 'function') {
+            this._applyLutFrame(bass, vocal, treble);
+        } else {
+            const rising = bass > this._lastLutBass + 0.08 && bass > 0.25;
+            if (rising) this.pulse();
+        }
+        this._lastLutBass = bass;
+    }
 }
 
 
@@ -223,14 +169,18 @@ class RingVisualizer extends BaseVisualizer {
 
     _loop() {
         if (!this.canvas) return;
-        this.scale = 1 + (this.scale - 1) * this.DECAY;
+        if (!this._lutFed) this.scale = 1 + (this.scale - 1) * this.DECAY;
         this._draw();
         this._rafId = requestAnimationFrame(() => this._loop());
     }
 
+    _applyLutFrame(bass) { 
+        this.scale = 1 + bass * (this.MAX - 1); 
+    }
+
     _draw() {
         const { canvas, ctx, scale, BASE, RING_W } = this;
-        const { color, glow } = readVizVars();
+        const { color, glow } = VV;
         const cx = canvas.width / 2, cy = canvas.height / 2;
         const r  = (BASE / 2) * scale;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -271,16 +221,21 @@ class BloomVisualizer extends BaseVisualizer {
 
     _loop() {
         if (!this.canvas) return;
-        this.intensity *= this.DECAY;
+        if (!this._lutFed) this.intensity *= this.DECAY;
         this._draw();
         this._rafId = requestAnimationFrame(() => this._loop());
+    }
+
+    _applyLutFrame(bass, vocal) {
+        this.intensity = bass;
+        this._cycleIdx = Math.floor(vocal * 4) % 4;
     }
 
     _draw() {
         if (!this.canvas) return;
         const { canvas, ctx, BASE, intensity } = this;
         if (intensity < 0.005) { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
-        const { glow } = readVizVars();
+        const { glow } = VV;
         const cx = canvas.width / 2, cy = canvas.height / 2;
         // Scale grows slightly with intensity for a "breath" feel
         const r  = (BASE / 2) * (1 + intensity * 0.5);
@@ -355,7 +310,7 @@ class HeartbeatVisualizer extends BaseVisualizer {
     _draw(env) {
         if (!this.canvas) return;
         const { ctx, w, h } = this;
-        const { color, glow } = readVizVars();
+        const { color, glow } = VV;
         ctx.clearRect(0, 0, w, h);
         const cy  = h / 2;
         const amp = (h * 0.38) * env;
@@ -418,7 +373,7 @@ class RippleVisualizer extends BaseVisualizer {
     _loop() {
         if (!this.canvas) return;
         const { ctx, sz, BASE } = this;
-        const { color, glow } = readVizVars();
+        const { color, glow } = VV;
         const cx = sz / 2, cy = sz / 2;
         const maxR = (BASE / 2) * 2.2;
         ctx.clearRect(0, 0, sz, sz);
@@ -472,10 +427,10 @@ class WaveformVisualizer extends BaseVisualizer {
     _loop() {
         if (!this.canvas) return;
         const { ctx, w, h } = this;
-        const { color, glow } = readVizVars();
+        const { color, glow } = VV;
         const cy = h / 2;
 
-        this._amp   *= this.DECAY;
+        if (!this._lutFed) this._amp *= this.DECAY;
         this._phase += 0.05; // slightly faster scroll than before
 
         ctx.clearRect(0, 0, w, h);
@@ -497,6 +452,8 @@ class WaveformVisualizer extends BaseVisualizer {
 
         this._rafId = requestAnimationFrame(() => this._loop());
     }
+
+    _applyLutFrame(bass) { this._amp = bass * this.MAX_AMP; }  
 }
 
 
@@ -544,7 +501,7 @@ class ParticlesVisualizer extends BaseVisualizer {
     _loop() {
         if (!this.canvas) return;
         const { ctx, sz } = this;
-        const { color, glow } = readVizVars();
+        const { color, glow } = VV;
         ctx.clearRect(0, 0, sz, sz);
         this._particles = this._particles.filter(p => {
             p.x += p.vx; p.y += p.vy;
@@ -594,13 +551,13 @@ class DNAVisualizer extends BaseVisualizer {
     _loop() {
         if (!this.canvas) return;
         const { ctx, w, h } = this;
-        const { color, glow, secondary } = readVizVars();
+        const { color, glow, secondary } = VV;
         const cy    = h / 2;
         const freq  = 2.5;
         const rungs = 8;
 
         // Exponential decay toward resting amplitude
-        this._amp   = this._restAmp + (this._amp - this._restAmp) * this.DECAY;
+        if (!this._lutFed) this._amp = this._restAmp + (this._amp - this._restAmp) * this.DECAY;
         this._phase += 0.03;
 
         ctx.clearRect(0, 0, w, h);
@@ -630,6 +587,8 @@ class DNAVisualizer extends BaseVisualizer {
         this._rafId = requestAnimationFrame(() => this._loop());
     }
 
+    _applyLutFrame(bass) { this._amp = this._restAmp + bass * (this._maxAmp - this._restAmp); }
+    
     _strand(ctx, w, cy, freq, offset, strokeColor, glowBlur, alpha, shadowColor) {
         ctx.beginPath();
         for (let px = 0; px <= w; px++) {
@@ -652,7 +611,7 @@ class DNAVisualizer extends BaseVisualizer {
 // Keys must match values used in VISUALIZER_ORDER.
 // compile.py reads this map to know which classes to inline.
 // ═══════════════════════════════════════════════════════════════════
-export const VISUALIZERS = {
+const VISUALIZERS = {
     ring:      RingVisualizer,
     bloom:     BloomVisualizer,
     heartbeat: HeartbeatVisualizer,
@@ -668,4 +627,4 @@ export const VISUALIZERS = {
 // order must include all available visualizers, 
 // filtering happens inside compile.py if required.
 // ─────────────────────────────────────────────────────────────────
-export const VISUALIZER_ORDER = ['off', 'particles', 'waveform', 'dna', 'heartbeat', 'ripple', 'ring', 'bloom'];
+const VISUALIZER_ORDER = ['off', 'particles', 'waveform', 'dna', 'heartbeat', 'ripple', 'ring', 'bloom'];

@@ -139,6 +139,11 @@ export const PRESETS = {
             .fx-chroma  { animation:kChroma  0.18s ease-out; }
             .fx-flicker { animation:kFlicker 0.20s linear; }
             .fx-zoom    { animation:kZoom    0.15s ease-out; }
+            .fx-flicker-LUT  {
+                animation: kFlicker 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }            
         `,
 
         dustColor:  'rgba(30,255,0,0.25)',
@@ -151,6 +156,7 @@ export const PRESETS = {
             { className:'fx-chroma',  duration:200, useFlash:false, useScan:true  },
             { className:'fx-flicker', duration:220, useFlash:false, useScan:false },
             { className:'fx-zoom',    duration:160, useFlash:true,  useScan:false },
+            { className:'fx-flicker-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -212,6 +218,11 @@ export const PRESETS = {
             .fx-aurora   { animation:kEtherealDepth  0.32s ease-out; }
             .fx-dissolve { animation:kDissolve       0.28s ease-out; }
             .fx-float    { animation:kFloat          0.22s ease-out; }
+            .fx-breathe-LUT  {
+                animation: kEtherealCycle 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(160,100,255,0.15)',
@@ -224,6 +235,7 @@ export const PRESETS = {
             { className:'fx-aurora',   duration:350, useFlash:true,  useScan:false },
             { className:'fx-dissolve', duration:280, useFlash:true,  useScan:false },
             { className:'fx-float',    duration:220, useFlash:false, useScan:false },
+            { className:'fx-breathe-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -332,6 +344,11 @@ export const PRESETS = {
             .fx-e2-bloom   { animation:kE2Bloom   0.26s ease-out; }
             .fx-e2-orbit   { animation:kE2Orbit   0.32s ease-out; }
             .fx-e2-outline { animation:kE2Outline 0.38s ease-out; }
+            .fx-e2-outline-LUT  {
+                animation: kE2Outline 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
  
         dustColor:  'rgba(160,100,255,0.15)',
@@ -343,6 +360,7 @@ export const PRESETS = {
             { className:'fx-e2-bloom',   duration:260, useFlash:true,  useScan:false },
             { className:'fx-e2-orbit',   duration:320, useFlash:false, useScan:false },
             { className:'fx-e2-outline', duration:380, useFlash:true,  useScan:false },
+            { className:'fx-e2-outline-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -401,6 +419,11 @@ export const PRESETS = {
             .fx-void-dim    { animation:kVoidDiff   0.18s ease-out; }
             .fx-void-shift  { animation:kVoidShift  0.16s ease-out; }
             .fx-void-static { animation:kVoidStatic 0.15s ease-out; }
+            .fx-void-slice-LUT  {
+                animation: kVoidSlice 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(160,180,255,0.07)',
@@ -413,6 +436,7 @@ export const PRESETS = {
             { className:'fx-void-dim',    duration:180, useFlash:true,  useScan:false },
             { className:'fx-void-shift',  duration:160, useFlash:false, useScan:false },
             { className:'fx-void-static', duration:150, useFlash:true,  useScan:false },
+            { className:'fx-void-slice-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -521,6 +545,11 @@ export const PRESETS = {
             .fx-v2-outline { animation:kV2Outline 0.17s ease-out; }
             .fx-v2-pinch   { animation:kV2Pinch   0.15s ease-out; }
             .fx-v2-dropout { animation:kV2Dropout 0.16s ease-out; }
+            .fx-v2-outline-LUT  {
+                animation: kV2Outline 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
  
         dustColor:  'rgba(160,180,255,0.07)',
@@ -532,6 +561,7 @@ export const PRESETS = {
             { className:'fx-v2-outline', duration:170, useFlash:true,  useScan:false },
             { className:'fx-v2-pinch',   duration:150, useFlash:false, useScan:false },
             { className:'fx-v2-dropout', duration:160, useFlash:true,  useScan:false },
+            { className:'fx-v2-outline-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -592,6 +622,11 @@ export const PRESETS = {
             .fx-dream-pulse  { animation:kDreamLean   0.22s ease-out; }
             .fx-dream-glow   { animation:kDreamGlow   0.30s ease-out; }
             .fx-dream-ripple { animation:kDreamRipple 0.20s ease-out; }
+            .fx-dream-glow-LUT  {
+                animation: kDreamGlow 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(100,220,220,0.10)',
@@ -604,6 +639,7 @@ export const PRESETS = {
             { className:'fx-dream-pulse',  duration:180, useFlash:true,  useScan:false },
             { className:'fx-dream-glow',   duration:300, useFlash:false, useScan:false },
             { className:'fx-dream-ripple', duration:200, useFlash:true,  useScan:false },
+            { className:'fx-dream-glow-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -699,6 +735,11 @@ export const PRESETS = {
             .fx-d2-lean   { animation:kD2Lean   0.24s ease-out; }
             .fx-d2-settle { animation:kD2Settle 0.28s ease-out; }
             .fx-d2-drain  { animation:kD2Drain  0.26s ease-out; }
+            .fx-d2-drain-LUT  {
+                animation: kD2Drain 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
  
         dustColor:  'rgba(100,220,220,0.10)',
@@ -710,6 +751,7 @@ export const PRESETS = {
             { className:'fx-d2-lean',   duration:240, useFlash:false, useScan:false },
             { className:'fx-d2-settle', duration:280, useFlash:true,  useScan:false },
             { className:'fx-d2-drain',  duration:260, useFlash:true,  useScan:false },
+            { className:'fx-d2-drain-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -772,6 +814,11 @@ export const PRESETS = {
             .fx-aurora-swell   { animation:kAuroraInvert  0.28s ease-out; }
             .fx-aurora-shimmer { animation:kAuroraOrbit   0.26s ease-out; }
             .fx-aurora-haze    { animation:kAuroraHaze    0.28s ease-out; }
+            .fx-aurora-shimmer-LUT  {
+                animation: kAuroraOrbit 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(120,100,255,0.10)',
@@ -792,6 +839,7 @@ export const PRESETS = {
             // LAYER text-shadow — safe to stack
             { className:'fx-aurora-swell',   duration:350, useFlash:false, useScan:false },
             { className:'fx-aurora-haze',    duration:280, useFlash:false, useScan:false },
+            { className:'fx-aurora-shimmer-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -850,6 +898,11 @@ export const PRESETS = {
             .fx-ember-smolder { animation:kEmberSmolder 0.22s ease-out; }
             .fx-ember-heat    { animation:kEmberHeat    0.25s ease-out; }
             .fx-ember-pulse   { animation:kEmberPulse   0.16s ease-out; }
+            .fx-ember-pulse-LUT  {
+                animation: kEmberPulse 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(255,120,20,0.16)',
@@ -863,6 +916,7 @@ export const PRESETS = {
             { className:'fx-ember-pulse',   duration:160, useFlash:true,  useScan:false },
             // LAYER — warm filter swell
             { className:'fx-ember-heat',    duration:250, useFlash:false, useScan:false },
+            { className:'fx-ember-pulse-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -929,6 +983,11 @@ export const PRESETS = {
             .fx-neon-buzz   { animation:kNeonBuzz   0.12s linear; }
             .fx-neon-flat   { animation:kNeonFlat   0.13s ease-out; }
             .fx-neon-ghost  { animation:kNeonGhost  0.15s ease-out; }
+            // .fx-neon-buzz-LUT  {
+            //     animation: kNeonBuzz 1000ms linear paused;
+            //     animation-direction: reverse;
+            //     animation-fill-mode: both;
+            // }
         `,
         dustColor:  'rgba(255,40,120,0.20)',
         flashColor: 'rgba(255,20,100,0.35)',
@@ -938,6 +997,7 @@ export const PRESETS = {
             { className:'fx-neon-buzz',   duration:120, useFlash:true,  useScan:false },
             { className:'fx-neon-flat',   duration:130, useFlash:true,  useScan:false },
             { className:'fx-neon-ghost',  duration:150, useFlash:false, useScan:false },
+            // { className:'fx-neon-buzz-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -997,6 +1057,11 @@ export const PRESETS = {
             .fx-midnight-blue  { animation:kMidnightBlue  0.20s ease-out; }
             .fx-midnight-waver { animation:kMidnightWaver 0.26s ease-out; }
             .fx-midnight-cool  { animation:kMidnightCool  0.32s ease-out; }
+            .fx-midnight-blue-LUT  {
+                animation: kMidnightBlue 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
         dustColor:  'rgba(60,120,220,0.10)',
         flashColor: 'rgba(40,100,200,0.18)',
@@ -1006,6 +1071,7 @@ export const PRESETS = {
             { className:'fx-midnight-blue',  duration:200, useFlash:true,  useScan:false },
             { className:'fx-midnight-waver', duration:260, useFlash:false, useScan:false },
             { className:'fx-midnight-cool',  duration:320, useFlash:true,  useScan:false },
+            { className:'fx-midnight-blue-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -1074,6 +1140,11 @@ export const PRESETS = {
             .fx-acid-strobe { animation:kAcidStrobe 0.15s linear; }
             .fx-acid-twitch { animation:kAcidTwitch 0.16s ease-out; }
             .fx-acid-burn   { animation:kAcidBurn   0.20s ease-out; }
+            .fx-acid-twitch-LUT  {
+                animation: kAcidTwitch 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
         dustColor:  'rgba(160,255,0,0.18)',
         flashColor: 'rgba(140,220,0,0.30)',
@@ -1083,6 +1154,7 @@ export const PRESETS = {
             { className:'fx-acid-strobe', duration:150, useFlash:true,  useScan:false },
             { className:'fx-acid-twitch', duration:160, useFlash:false, useScan:true  },
             { className:'fx-acid-burn',   duration:200, useFlash:false, useScan:false },
+            { className:'fx-acid-twitch-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -1142,6 +1214,11 @@ export const PRESETS = {
             .fx-chrome-cut   { animation:kChromeCut   0.18s ease-out; }
             .fx-chrome-pulse { animation:kChromePulse 0.16s ease-out; }
             .fx-chrome-flat  { animation:kChromeFlat  0.14s ease-out; }
+            .fx-chrome-pulse-LUT  {
+                animation: kChromePulse 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
         dustColor:  'rgba(160,170,220,0.07)',
         flashColor: 'rgba(200,210,240,0.18)',
@@ -1151,6 +1228,7 @@ export const PRESETS = {
             { className:'fx-chrome-cut',   duration:180, useFlash:true,  useScan:false },
             { className:'fx-chrome-pulse', duration:160, useFlash:false, useScan:false },
             { className:'fx-chrome-flat',  duration:140, useFlash:true,  useScan:false },
+            { className:'fx-chrome-pulse-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -1225,6 +1303,10 @@ export const PRESETS = {
             .fx-term-glow   { animation:kTermGlow   0.32s ease-out; }
             .fx-term-fade   { animation:kTermFade   0.28s ease-out; }
             .fx-term-pulse  { animation:kTermPulse  0.22s ease-out; }
+            .fx-term-blink-LUT  {
+                animation: kTermBlink 1000ms linear paused;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(255,160,20,0.14)',
@@ -1238,6 +1320,7 @@ export const PRESETS = {
             // { className:'fx-term-glow',  duration:320, useFlash:false, useScan:false },
             { className:'fx-term-fade',  duration:280, useFlash:true,  useScan:false },
             { className:'fx-term-pulse', duration:220, useFlash:false, useScan:false  },
+            { className:'fx-term-blink-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -1309,6 +1392,11 @@ export const PRESETS = {
             .fx-static-dim   { animation:kStaticDim    0.30s ease-out; }
             .fx-static-ghost { animation:kStaticGhost  0.26s ease-out; }
             .fx-static-flat  { animation:kStaticFlat   0.12s ease-out; }
+            .fx-static-noise-LUT  {
+                animation: kStaticNoise 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(200,200,180,0.05)',
@@ -1322,6 +1410,7 @@ export const PRESETS = {
             // LAYER: signal fade — spoken sections
             { className:'fx-static-dim',   duration:300, useFlash:false, useScan:false },
             { className:'fx-static-ghost', duration:260, useFlash:true,  useScan:false },
+            { className:'fx-static-noise-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -1386,6 +1475,11 @@ export const PRESETS = {
             .fx-dusk-blush  { animation:kDuskBlush  0.24s ease-out; }
             .fx-dusk-pulse  { animation:kDuskPulse  0.32s ease-out; }
             .fx-dusk-breath { animation:kDuskBreath 0.28s ease-out; }
+            .fx-dusk-pulse-LUT  {
+                animation: kDuskPulse 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(220,90,60,0.12)',
@@ -1398,6 +1492,7 @@ export const PRESETS = {
             { className:'fx-dusk-blush',  duration:240, useFlash:true,  useScan:false },
             { className:'fx-dusk-pulse',  duration:320, useFlash:true,  useScan:false },
             { className:'fx-dusk-breath', duration:280, useFlash:false, useScan:false },
+            { className:'fx-dusk-pulse-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -1500,17 +1595,30 @@ export const PRESETS = {
             .fx-dusk-tilt      { animation:kDuskTilt     0.28s ease-out; }
             .fx-dusk-outline   { animation:kDuskOutline  0.36s ease-out; }
             .fx-dusk-step      { animation:kDuskStep     0.24s steps(1,end); }
+            /* Reuses kDuskDrop, scrubbed via animation-delay instead of played 
+               once per beat. No new keyframes. duration here (1000ms) must match 
+               the effects-array entry below — it's the scrub range, 
+               not a playback length. */            
+            .fx-dusk-drop-LUT  {
+                animation: kDuskDrop 1000ms linear paused;
+                /* kDuskDrop is peak(0%) -> rest(100%); reversed so low LUT value = rest, high = peak
+                rule of thumb for all presets: if a keyframe is written peak -> rest (most "flash"/"drop" style ones are), 
+                add this line to its -LUT variant. If it's rest -> peak -> rest, leave it as-is. */
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(220,90,60,0.12)',
         flashColor: 'rgba(200,70,40,0.18)',
 
         effects: [
-            { className:'fx-dusk-word-pull', duration:320, useFlash:false, useScan:false },
-            { className:'fx-dusk-drop',      duration:300, useFlash:true,  useScan:false },
-            { className:'fx-dusk-tilt',      duration:280, useFlash:false, useScan:false },
-            { className:'fx-dusk-outline',   duration:360, useFlash:true,  useScan:false },
-            { className:'fx-dusk-step',      duration:240, useFlash:false, useScan:false },
+            { className:'fx-dusk-word-pull', duration:320,  useFlash:false, useScan:false },
+            { className:'fx-dusk-drop',      duration:300,  useFlash:true,  useScan:false },
+            { className:'fx-dusk-tilt',      duration:280,  useFlash:false, useScan:false },
+            { className:'fx-dusk-outline',   duration:360,  useFlash:true,  useScan:false },
+            { className:'fx-dusk-step',      duration:240,  useFlash:false, useScan:false },
+            { className:'fx-dusk-drop-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -1622,6 +1730,11 @@ export const PRESETS = {
             .fx-dusk-pinch    { animation:kDuskPinch    0.26s ease-out; }
             .fx-dusk-contrast { animation:kDuskContrast 0.28s ease-out; }
             .fx-dusk-doubt    { animation:kDuskDoubt    0.42s ease-in-out; }
+            .fx-dusk-pinch-LUT  {
+                animation: kDuskPinch 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(180,80,110,0.10)',
@@ -1633,6 +1746,7 @@ export const PRESETS = {
             { className:'fx-dusk-pinch',    duration:260, useFlash:false, useScan:false },
             { className:'fx-dusk-contrast', duration:280, useFlash:true,  useScan:false },
             { className:'fx-dusk-doubt',    duration:420, useFlash:false, useScan:false },
+            { className:'fx-dusk-pinch-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -1739,6 +1853,11 @@ export const PRESETS = {
             .fx-dusk-slide    { animation:kDuskSlide    0.28s ease-out; }
             .fx-dusk-unsteady { animation:kDuskUnsteady 0.32s linear; }
             .fx-dusk-spread   { animation:kDuskSpread   0.30s ease-out; }
+            .fx-dusk-slide-LUT  {
+                animation: kDuskSlide 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(210,130,20,0.13)',
@@ -1750,6 +1869,7 @@ export const PRESETS = {
             { className:'fx-dusk-slide',    duration:280, useFlash:false, useScan:false },
             { className:'fx-dusk-unsteady', duration:320, useFlash:true,  useScan:false },
             { className:'fx-dusk-spread',   duration:300, useFlash:false, useScan:false },
+            { className:'fx-dusk-slide-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -1860,6 +1980,11 @@ export const PRESETS = {
             .fx-dusk-drain       { animation:kDuskDrain      0.36s ease-out; }
             .fx-dusk-breaking    { animation:kDuskBreaking   0.38s ease-out; }
             .fx-dusk-hold        { animation:kDuskHold       0.48s ease-in-out; }
+            .fx-dusk-hold-LUT  {
+                animation: kDuskHold 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(160,50,35,0.10)',
@@ -1871,6 +1996,7 @@ export const PRESETS = {
             { className:'fx-dusk-drain',       duration:360, useFlash:false, useScan:false },
             // { className:'fx-dusk-breaking',    duration:380, useFlash:true,  useScan:false },
             { className:'fx-dusk-hold',        duration:480, useFlash:false, useScan:false },
+            { className:'fx-dusk-hold-LUT',    duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
@@ -1946,6 +2072,11 @@ export const PRESETS = {
             .fx-ghost-drift  { animation:kGhostDrift  0.32s ease-out; }
             .fx-ghost-shiver { animation:kGhostShiver 0.28s ease-out; }
             .fx-ghost-linger { animation:kGhostLinger 0.45s ease-out; }
+            .fx-ghost-shiver-LUT  {
+                animation: kGhostShiver 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
 
         dustColor:  'rgba(80,120,200,0.06)',
@@ -1958,9 +2089,27 @@ export const PRESETS = {
             { className:'fx-ghost-drift',  duration:320, useFlash:false, useScan:false },
             { className:'fx-ghost-shiver', duration:280, useFlash:true,  useScan:false },
             { className:'fx-ghost-linger', duration:450, useFlash:false, useScan:false },
+            { className:'fx-ghost-shiver-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 };
+
+// ═══════════════════════════════════════════════════════════════════
+// INTENSITY TIERS — default --preset-shake-x/--preset-max-glow/etc.
+// for the continuous LUT typography model. Presets don't need these
+// individually — they inherit DEFAULT_INTENSITY_TIER unless they set
+// `intensityTier: 'subtle' | 'aggressive'` on their own object.
+// (Uncertainty flag: this assumes compile.py's preset extraction preserves
+// arbitrary keys on the preset object, same as it already does for
+// dustColor/flashCycle/etc. — if it whitelists fields instead, this one
+// field needs adding there too.)
+// ═══════════════════════════════════════════════════════════════════
+export const INTENSITY_TIERS = {
+    subtle:     { '--preset-shake-x': '1px', '--preset-max-glow': '10px', '--preset-max-zoom': '0.02', '--preset-max-flash': '0.25' },
+    medium:     { '--preset-shake-x': '2px', '--preset-max-glow': '16px', '--preset-max-zoom': '0.04', '--preset-max-flash': '0.45' },
+    aggressive: { '--preset-shake-x': '4px', '--preset-max-glow': '24px', '--preset-max-zoom': '0.07', '--preset-max-flash': '0.70' },
+};
+export const DEFAULT_INTENSITY_TIER = 'medium';
 
 // ─────────────────────────────────────────────────────────────────
 // PRESET_ORDER — controls the in-app toggle cycle sequence.
@@ -1968,10 +2117,10 @@ export const PRESETS = {
 // flag selects which are included in output.
 // ─────────────────────────────────────────────────────────────────
 export const PRESET_ORDER = [
-                             "dusk", "dusk_ii", "dusk_iii", "dusk_iv", "dusk_v",
+                             "neon", "rap", "dusk_ii", "dream", "aurora",
                              "terminal", "static", "ghost", "void", 'void_ii', 
-                             "ember", "neon", "chrome", "rap", "ethereal", 'ethereal_ii', 
-                             "dream", 'dream_ii', "aurora", "midnight", "acid"
+                             "ember", "dusk", "chrome", "dusk_iii", "ethereal", 'ethereal_ii', 
+                             "dusk_iv", 'dream_ii', "dusk_v", "midnight", "acid"
                             ];
 
 // ─────────────────────────────────────────────────────────────────

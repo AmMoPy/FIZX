@@ -84,7 +84,16 @@ class Extractor:
     # ── Private helpers ───────────────────────────────────────────
 
     def _load_full_mix(self, sr: int = None, mono: bool = True):
-        """Load and cache full mix"""
+        """
+        Load and cache full mix
+        
+        Note: cache is per-run only (single Extractor instance, single script
+        invocation) — extract_beats() is the only call site, and both modes now
+        request sr=None, so there's no live path where this gets called twice
+        with different sr values. If that ever changes, this silently returns
+        audio resampled for the first caller — worth a real guard at that point,
+        not before.
+        """
         if self._y_full is not None:
             return self._y_full, self._sr
         import librosa
@@ -445,63 +454,302 @@ class Extractor:
 
         return lyrics_list
 
-    def extract_beats(self) -> dict:
+    def extract_beats(self, bass_mode: str = 'fft') -> dict:
         """
-        Extract onsets from the full mix.
-        Returns dict matching beats.json schema: { beats, bpm, source }.
+        Continuous bass/vocal automation envelope — single streaming pass.
+          - native SR (sr=None), not forced 44100; bin boundaries below are 
+            computed from whatever sr actually comes back, so correctness 
+            doesn't depend on hitting 44100.
+          - frame-by-frame streaming FFT instead of librosa.stft's full matrix 
+            which at n_fft=16384 was allocate over a GB before slicing on a
+            4-minute track. Non-centered (starts at t=0), unlike librosa's
+            default centered STFT — deliberate, avoids padding overhead.
+          - windowed (block + interpolated) percentile normalization instead of
+            one global floor/ceiling — a quiet verse no longer reads as flat
+            silence next to a loud chorus. WINDOW_SEC must match the JS worker's
+            equivalent constant for cross-path parity.
+          - asymmetric attack/release smoothing instead of one symmetric factor —
+            preserves the sharp edge of a transient in the exported data itself.
+            Fixes the compounding-flatten problem: Sharp Drum Hit -> symmetric
+            Python smoothing -> JSON -> symmetric JS LERP -> soft animation. With
+            fast attack here AND instant-snap-on-rise at render time (see
+            template.html), the transient survives both stages.
+        """
 
-        Design notes:
-          sr=None       : native SR prevents 48kHz timestamp drift
-          aggregate=median: robust median smooths rap transients
-          backtrack=True: timestamps land on attack transient, not peak
-          delta=0.07    : threshold above local mean; tune if needed
-          wait=8        : ~85ms minimum gap at 48kHz/512-hop
-          MIN_GAP=0.12  : secondary 120ms de-dupe pass on timestamps
-          BPM           : autocorrelation (NOT inter-onset median which
-                          returns ~2x BPM on rap due to hi-hat density)
+        import numpy as np
+        import os
+        from scipy import fft # numpy has no native API controls and must manage threads via environment variables
+        
+        # Noise tracking parameters
+        KICK_LP  = 120.0
+        KICK_HP  = 35.0
+        KICK_REJ = 1.0
+        # The Short-Time Fourier Transform: instead of analyzing an entire 4-minute 
+        # song all at once; we look at it through a magnifying glass, moving forward 
+        # a few milliseconds at a time. 
+        # N_FFT "Window Size": tells the code to grab a tiny chunks/buckets of n (e.g.: 1,024) 
+        # audio samples to analyze at any given single moment (~46 milliseconds of sound for 1,024 FFT window at 48kHz - SR/N_FFT) 
+        # higher values (e.g.: 2,048) provides better low-end frequency resolution than lower ones (e.g.: 1,024).
+        # Inside that "Window Size", the FFT mathematical calculation executes acting like a prism separating a 
+        # beam of light. It takes a messy chunk of audio and separates it into individual pitches/frequencies. 
+        # for an FFT 1024, it splits the audio into 512 distinct "frequency buckets" (N/2) 
+        # spanning from 0 Hz (lowest possible bass) to 11,025 Hz (highest possible treble). To clean up the data,
+        # we group those 512 pitch buckets into fewer, n channels (beats/vocals/treble) that form the core of 
+        # visualizer animations
+        # Limitation: The 16384-point window is a bleed and merge source. 
+        # It spans about 371ms, and every LUT value is a Hann-weighted 
+        # average over that span. Kicks 250ms apart merge into one hump, 
+        # and any sustained bass note or low instrument adds a slow hump of its own.
+        # this is addressed via hybrid approach _kick_channel to keep the visualizer
+        # truly audio generic and low-end device friendly compared to a multi-resolution engine
+        N_FFT = 16384
+        # HOP "step size": Instead of moving over by a whole n samples (e.g.: 1,024), 
+        # the window slides forward by only n HOP samples (e.g.: 256) to analyze the next chunk. 
+        # Because the HOP is smaller than N_FFT, the analysis windows heavily overlap. This ensures
+        # that a fast drum hi-hat landing right on the edge of a window doesn't get missed.
+        # 512 HOP at 48kHz results in 10.7ms frames where code checks for audio changes
+        # every (ms) resulting from this calculation (nyquist bins), If a drum hit landed between frames
+        # being checked, the timestamp could be off by up to (ms) causing noticable delays
+        # 256 HOP at 48kHz cuts frame size to ~5.3ms (256/48k) while 512 HOP ~10.6ms
+        # double the timing resolution. Visual sync does not require ~5.3ms. 
+        # Doubling the hop length halves the RAM and CPU cost.
+        HOP = 512 # balanced extraction time and accuracy, lower for more checks but slower costly extraction
+        WINDOW_SEC = 8.0 # keep in sync with LUT_WINDOW_SEC in the JS worker
+        CHUNK_FRAMES = 256  # bounds peak memory to ~CHUNK_FRAMES*N_FFT*8 bytes (~33MB), regardless of track length Without touching N_FFT
+        N_CORES = max(1, os.cpu_count() or 1) # for scipy real fft multi-threading
+
+        # Sampling Rate (sr): slice up every 1 second of audio into n (e.g.: 22,050)  
+        # tiny measurement points. Higher numbers mean smoother audio but require 
+        # more memory. "None" preserves the original sampling frequency of the input 
+        # file, prevents 48kHz timestamp drift
+        y, sr = self._load_full_mix(sr=None, mono=True)
+        logger.info(f"Extracting audio channels from full mix. Mode: {bass_mode}")
+
+        step_ms = HOP / sr * 1000 # timeline drift solved, step_ms uses the true sr.
+        # Number of blocks/frames, the total window steps across the timeline.
+        nb = len(y) // HOP if len(y) >= N_FFT else 0 #  only works with center-paded array (y_pad)
+        if nb <= 0:
+            logger.warning("Audio shorter than one FFT window, no envelope produced")
+            return {"step_ms": round(step_ms, 4), "beats": [], "vocal_env": [], "treble_env": [], 
+                    "onsets": [], "vocal_onsets": [], "bass_mode": bass_mode, "bpm": 0, "source": self.audio_path.name}
+        
+        # Physical upper structural limits of a Real FFT matrix transformation pass
+        bin_hz = sr / N_FFT # bin boundaries from the actual sr, one-time computation, not a per-frame cost.
+
+        # Channels to for different animation interactions with Secure boundary points 
+        # to completely rule out Subscript Index Out of Range crashes with higher sr (96kHz)
+        # FFT already computes the entire spectrum every frame regardless of how many 
+        # narrow bands we slice out of it afterward — bass, vocal, treble aren't three 
+        # separate FFT passes, they're two slices of one. So adding bands costs a couple 
+        # more summation loops over data we already have, not another FFT.
+        bass_start, bass_end = int(43/bin_hz), int(258/bin_hz) + 1 # only read when bass_mode=='fft', # 30Hz–110Hz
+        vocal_start, vocal_end = int(300/bin_hz), int(4000/bin_hz) + 1 # 500Hz–3500Hz
+        treble_start, treble_end = int(4000/bin_hz), int(11000/bin_hz) + 1
+
+        # copies the entire array to add center padding, not just the edges for a 4-minute track that's a
+        # second ~84MB copy sitting in memory alongside y itself. A version that only zero-fills the 
+        # handful of frames near the very start/end would avoid that, but the code gets meaningfully 
+        # messier (special-casing edge frames outside the vectorized sliding-window path) to save memory 
+        # that was never actually close to being a problem at ~168MB total. worth revisiting only if there  
+        # were noticable memory pressure.
+        y_pad = np.pad(y, (N_FFT//2, N_FFT//2))
+
+        win = np.hanning(N_FFT)
+        bass_energy = np.empty(nb, dtype=np.float64) if bass_mode == 'fft' else None  # only allocated when needed
+        vocal_energy = np.empty(nb, dtype=np.float64)
+        treble_energy = np.empty(nb, dtype=np.float64)
+
+        # chunked, batched FFT — one rfft() call per CHUNK_FRAMES instead
+        # of one per frame (~81 calls instead of ~20,672 on a 4-min track), plus
+        # multi-threading via scipy's workers= param. sliding_window_view builds
+        # each chunk's frames as a zero-copy strided view of y; only the
+        # windowed copy (~33MB @ 256 frames) is ever materialized.        
+        with fft.set_workers(N_CORES):
+            for chunk_start in range(0, nb, CHUNK_FRAMES):
+                chunk_end = min(chunk_start + CHUNK_FRAMES, nb)
+                n_in_chunk = chunk_end - chunk_start
+                sample_start = chunk_start * HOP
+
+                frames_view = np.lib.stride_tricks.sliding_window_view(
+                    y_pad[sample_start : sample_start + (n_in_chunk-1) * HOP + N_FFT], N_FFT)[::HOP][:n_in_chunk]
+
+                windowed = frames_view * win            # (n_in_chunk, N_FFT), the only real allocation
+                spectrum = fft.rfft(windowed, axis=1)   # no np.abs(), see below
+                
+                if bass_mode == 'fft': # same spectrum, one more slice, near-free.
+                    bass_slice = spectrum[:, bass_start:bass_end]
+                    # skip abs(), work with power (re²+im²) directly,
+                    # only on the slices we use (not all 8193 bins).
+                    bass_energy[chunk_start:chunk_end] = np.sqrt(np.mean(bass_slice.real**2 + bass_slice.imag**2, axis=1))
+                
+                vocal_slice  = spectrum[:, vocal_start:vocal_end]
+                treble_slice = spectrum[:, treble_start:treble_end]
+                vocal_energy[chunk_start:chunk_end] = np.sqrt(np.mean(vocal_slice.real**2 + vocal_slice.imag**2, axis=1))
+                treble_energy[chunk_start:chunk_end] = np.sqrt(np.mean(treble_slice.real**2 + treble_slice.imag**2, axis=1))
+
+        fps = sr / HOP
+        vocal_db = 20 * np.log10(vocal_energy + 1e-6)
+        treble_db = 20 * np.log10(treble_energy + 1e-6)
+
+        if bass_mode == 'kick':
+            bass_env = self._kick_channel(y, sr, KICK_LP, KICK_HP, KICK_REJ, HOP) # returns array only, see below
+        else:
+            bass_db = 20 * np.log10(bass_energy + 1e-6)
+            bass_env = self._windowed_normalize_and_smooth(bass_db, fps, WINDOW_SEC, 0.6, 0.25)
+
+        vocal_env  = self._windowed_normalize_and_smooth(vocal_db, fps, WINDOW_SEC, 0.14, 0.10)
+        treble_env = self._windowed_normalize_and_smooth(treble_db, fps, WINDOW_SEC, 0.20, 0.12)
+        bass_out   = [round(float(x), 3) for x in bass_env]  # works whether bass_env is ndarray (kick) or list (fft)
+        
+        # BPM for reference (not used by the scheduler but useful
+        # for manually checking if the extraction looks reasonable)
+        bpm = self._bpm(bass_env, step_ms)
+
+        # Onsets currently only needed in studio for lyrics snapping
+        # not wired in python path, maybe later, who knows!
+        onsets = self._onsets(bass_env, step_ms, 0.06)
+        vocal_onsets = self._onsets(vocal_env, step_ms, 0.08, 0.15, 150)
+
+        return {
+            "step_ms": round(step_ms, 4),
+            "beats": bass_out, 
+            "vocal_env": vocal_env,
+            "treble_env": treble_env,
+            "onsets": onsets,
+            "vocal_onsets": vocal_onsets,
+            "bpm": bpm,
+            "bass_mode": bass_mode,
+            "source": self.audio_path.name
+        }
+    
+    def _windowed_normalize_and_smooth(self, db_array, frames_per_sec, window_sec, attack, release):
+        # 5th/95th percentile floor/ceiling per block, linearly interpolated
+        # between block centers — smooths block-boundary seams without the
+        # cost of a true sliding-window percentile.
+        import numpy as np
+        
+        n = len(db_array)
+        block = max(1, int(window_sec * frames_per_sec))
+        n_blocks = int(np.ceil(n / block))
+        b_floor = np.empty(n_blocks)
+        b_ceil = np.empty(n_blocks)
+
+        for b in range(n_blocks):
+            seg = db_array[b * block: min((b + 1) * block, n)]
+            b_floor[b] = np.percentile(seg, 5)
+            b_ceil[b] = np.percentile(seg, 95)
+        
+        centers = (np.arange(n_blocks) + 0.5) * block
+        idx = np.arange(n)
+        floor_db = np.interp(idx, centers, b_floor)
+        ceil_db = np.interp(idx, centers, b_ceil)
+        span = np.maximum(ceil_db - floor_db, 1e-6)
+        env = np.clip((db_array - floor_db) / span, 0.0, 1.0)
+        
+        # Envelope follower with separate attack/release time constants
+        # fast attack preserves the transient edge in the exported data;
+        # slower release keeps the decay clean.
+        out = np.empty_like(env)
+        current = env[0]
+        
+        for i, v in enumerate(env):
+            current += (v - current) * (attack if v > current else release)
+            out[i] = current
+
+        return np.round(out, 3).tolist()
+
+    def _onsets(self, env, step_ms, thr, floor=0.15, cd_ms=70):
+        out = [] 
+        prev = 0.0 
+        cd = 0.0
+
+        for i, v in enumerate(env):
+            cd = max(0.0, cd - step_ms) 
+            r = v - prev 
+            prev = v
+            if r > thr and v > floor and cd <= 0:
+                out.append(round(i * step_ms / 1000, 3)) 
+                cd = cd_ms
+
+        return out  # monotonic by construction
+
+    def _bpm(self, env, step_ms): # 60-200 range + log-gaussian prior @120, no upward octave bump
+        import numpy as np
+        
+        fr = 1000.0 / step_ms 
+        x = np.asarray(env) - np.mean(env)
+        best = None 
+        bs = -1e18
+
+        for lag in range(int(fr*60/200), min(int(np.ceil(fr*60/60)), len(x)-1) + 1):
+            c = float(np.dot(x[:-lag], x[lag:])) / (len(x) - lag)
+            bpm = fr * 60 / lag 
+            s = c * np.exp(-0.5 * (np.log2(bpm/120)) ** 2)
+            if s > bs: 
+                bs = s
+                best = bpm
+        while best > 175: best /= 2
+        while best < 70:  best *= 2
+        
+        return round(best)
+
+    def _kick_channel(self, y, sr, kick_lp, kick_hp, kick_rej, hop):
         """
-        import librosa
+        Hybrid time-Domain Kick Extractor for bleeds in N_FFT
+        processing raw audio samples sequentially through sharp 
+        Infinite Impulse Response (IIR) filters (butter, sosfilt)
+        """
+        import numpy as np
+        # from scipy.signal import butter, sosfilt
+        from scipy.signal import sosfilt
+
+        # z = sosfilt(butter(4, kick_lp, 'lp', fs=sr, output='sos'), sosfilt(butter(2, kick_hp, 'hp', fs=sr, output='sos'), y))
+        sos = np.array([self._rbj_sos('hp', kick_hp, sr), self._rbj_sos('lp', kick_lp, sr), self._rbj_sos('lp', kick_lp, sr)])
+        z = sosfilt(sos, y.astype(np.float64)) # identical topology/coefficients to the JS side
+
+        nb = len(z) // hop
+        step_ms = hop / sr * 1000
+        blk = (z[:nb*hop].astype(np.float64) ** 2).reshape(nb, hop).mean(axis=1) # downsamples the timeline
+        env = np.sqrt((blk + np.concatenate(([blk[0]], blk[:-1]))) / 2)
+        aA = 1 - np.exp(-step_ms/120) 
+        aR = 1 - np.exp(-step_ms/250)
+        tr = np.empty(nb)
+        
+        # Adaptive envelope tracking
+        slow = 0.0
+        for i in range(nb): # sustained bass raises `slow` too -> cancelled; a kick spikes above it
+            e = env[i]
+            slow += (e - slow) * (aA if e > slow else aR)
+            tr[i] = max(0.0, e - kick_rej * slow) # subtract out long, sustained background hum in the slow tracker
+        W = max(1, int(round(8000 / step_ms)))
+        nB = -(-nb // W)
+        gmax = float(tr.max()) if nb else 0.0
+        # ce = np.array([max(np.percentile(tr[k * W:(k + 1) * W], 97), gmax * 0.15, 1e-9) for k in range(nB)])
+        ce = np.array([max(self._p97(tr[k * W:(k + 1) * W]), gmax * 0.15, 1e-9) for k in range(nB)])
+        ceil = np.interp(np.arange(nb), (np.arange(nB) + .5) * W, ce)
+        
+        return np.clip(tr / ceil, 0, 1)
+
+    # same RBJ biquad as the JS worker's bq()
+    def _rbj_sos(self, kind, f0, sr, Q = 0.707):
+        import numpy as np
+        
+        w = 2 * np.pi * f0 / sr 
+        co, a = np.cos(w), np.sin(w) / (2 * Q)
+        b = ((1 - co) / 2, 1 - co, (1 - co) / 2) if kind == 'lp' else ((1 + co) / 2, -(1 + co), (1 + co) /2)
+        a0 = 1 + a
+
+        return [b[0] / a0, b[1] / a0, b[2] / a0, 1.0, -2 * co / a0, (1 - a) / a0]
+
+    # JS uses sorted[floor(len*.97)], not numpy's interpolated percentile
+    def _p97(self, seg):
         import numpy as np
 
-        # sr=None: native SR prevents 48kHz timestamp drift
-        y, sr = self._load_full_mix(sr=None, mono=True)
-        logger.info("Extracting beats from full mix…")
-        # Use a combined spectral flux onset envelope.
-        # aggregate=np.median smooths out noise better than np.mean for rap
-        # which has dense percussive transients that can cause false positives.
-        onset_env    = librosa.onset.onset_strength(y=y, sr=sr, aggregate=np.median)
-        # onset_detect with backtrack=True snaps each detected onset back to
-        # the nearest preceding local minimum in the envelope — this aligns
-        # the timestamp to the actual attack transient rather than the peak.
-        onset_frames = librosa.onset.onset_detect(
-            onset_envelope=onset_env, 
-            sr=sr,
-            backtrack=True, 
-            # delta controls sensitivity. 0.07 is a reasonable starting point
-            # for rap mixes; increase if you get too many false positives,
-            # decrease if strong hits are being missed.
-            delta=0.07, 
-            # wait: minimum gap between onsets in frames (~512 samples each).
-            # 8 frames at 48kHz ≈ 85ms — prevents double-triggers on a single hit.
-            wait=8,
-        )
-        onset_times = librosa.frames_to_time(onset_frames, sr=sr)
+        s = np.sort(seg)
 
-        # Secondary 120ms de-dupe — catches edge cases the frame-based
-        # wait parameter misses after non-maximum suppression.
-        MIN_GAP, filtered = 0.12, []
-        for t in onset_times:
-            if not filtered or (t - filtered[-1]) >= MIN_GAP:
-                filtered.append(round(float(t), 3))
+        return s[int(len(s) * .97)]
 
-        # Also pull BPM for reference (not used by the scheduler but useful
-        # for manually checking if the extraction looks reasonable).
-        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-        bpm = round(float(tempo[0]) if hasattr(tempo, '__len__') else float(tempo))
-
-        return {"beats": filtered, "bpm": bpm, "source": self.audio_path.name}
-
-    def run(self, do_beats: bool, do_lyrics: bool, default: bool) -> tuple[dict, list]:
+    def run(self, do_beats: bool, do_lyrics: bool, default: bool, bass_mode: str = 'fft') -> tuple[dict, list]:
         """
         Execute requested extraction in a single audio pass. _separate()
         runs at most once even when both beats and lyrics are requested
@@ -519,7 +767,7 @@ class Extractor:
             self._separate()
 
         if do_beats:
-            beats_data = self.extract_beats()
+            beats_data = self.extract_beats(bass_mode=bass_mode)
             self.beats_path.write_text(json.dumps(beats_data))
             logger.info(f"  Beats → {self.beats_path.name}")
 
@@ -594,6 +842,11 @@ def main(cli_args=None, **kwargs):
                              "default is DTW via aeneas on the full mix.")
     parser.add_argument("--force",    "-f",      action="store_true",
                         help="Re-extract even if beats/lyrics data is fresh")
+    parser.add_argument("--bass-mode", "-bm", choices=["kick", "fft"], default="fft",
+                        help="'kick' isolates percussive transients via time-domain " 
+                             "filtering (sharper, less bleed). "
+                             "'fft' slices from the same spectrum as vocal/treble " 
+                             "(more bleed-prone.")
 
     # cli_args accept list of strings from caller
     args = parser.parse_args(cli_args)
@@ -628,7 +881,7 @@ def main(cli_args=None, **kwargs):
     if do_beats or do_lyrics:
         extractor = Extractor(audio_path, beats_json, lyrics_json)
         # writes files + return dict/list
-        beats_data, lyrics_data = extractor.run(do_beats=do_beats, do_lyrics=do_lyrics, default=default)
+        beats_data, lyrics_data = extractor.run(do_beats=do_beats, do_lyrics=do_lyrics, default=default, bass_mode=args.bass_mode)
   
     # ── Load data (fresh or pre-existing) ────────────────────────
     _, beats_data  = needs_extraction('beats',  beats_json,  audio_path)
@@ -636,7 +889,7 @@ def main(cli_args=None, **kwargs):
 
     logger.info(
         f"Extraction Complete\n"
-        f"{'*'*20}\n- Onsets (filtered): {len(beats_data['beats'])}\n"
+        f"{'*'*20}\n- beats array length: {len(beats_data['beats'])}\n" # poly
         f"- Estimated BPM: {beats_data['bpm']}\n"
         f"- Lyrics Count: {len(lyrics_data['LYRICS'])}\n{'*'*20}"
     )
