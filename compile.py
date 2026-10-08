@@ -68,11 +68,19 @@ logger = logging.getLogger("[FIZX]")
 ROOT = Path(__file__).parent
 SRC  = ROOT / "src"
 FD   = ROOT / 'assets' / 'fonts' # fonts directory, base64 subsets
+WD   = ROOT / 'assets' / 'wasm'  # wasm directory, base64 subsets
 
 # @font-face configs
 FONT_MAP = {
     'merri': {'p': FD / 'Merriweather.b64', 'w': 'normal', 's': 'normal'}, # path, weight, style
     'deja': {'p': FD / 'DejaVuSans.b64', 'w': 'normal', 's': 'normal'}, # arabic support
+}
+
+# @font-face configs
+WASM_MAP = {
+    'glue': {'p': WD / 'pffft-glue.js.b64'}, # identical between simd/non-simd builds — only one copy needed
+    'nosimd': {'p': WD / 'pffft-nosimd.b64'},
+    'simd': {'p': WD / 'pffft-simd.b64'},
 }
 
 
@@ -321,6 +329,12 @@ def build_visualizers_block(src: str, viz_keys: list[str], fltr: bool) -> str:
 # BLOCK INJECTION AND REWRITE
 # ═══════════════════════════════════════════════════════════════════
 
+def load_b64(path: Path) -> str:
+    """load b64 strings"""
+    b64 = path.read_text().strip()
+    
+    return b64
+
 def inline_blocks(template: str, data_map: dict[str, str], is_studio_prep: bool = False) -> str:
     """
     Replace all /* @@TAG@@ */ ... /* @@END_TAG@@ */ blocks in one pass.
@@ -345,10 +359,11 @@ def build_fonts(font_names: list[str]):
             continue
         path = cfg.get('p')
         if not path or not path.exists():
-            logger.warning(f'Font file missing: {name} — skipping')
+            logger.warning(f'{name} font missing — skipping')
             continue
-        # read encoding from path
-        b64 = path.read_text().strip()
+        b64 = load_b64(path)
+        if not b64:
+            continue
         # build font style
         data_uri = f"url('data:font/woff2;base64,{b64}') format('woff2')"
         # font-display: block prevents Flash of Unstyled Text (FOUT) for consistent layout
@@ -368,20 +383,51 @@ def build_fonts(font_names: list[str]):
     
     return replacement
 
-
 # ═══════════════════════════════════════════════════════════════════
 # STUDIO BUILD
 # ═══════════════════════════════════════════════════════════════════
+def build_wasm(wasm_files: list[str]):
+    """Build WASM injection block from WASM_MAP-listed source files."""
+    replacement = ""
+    wasm_available = True
+    for file in wasm_files:
+        f = WASM_MAP.get(file)
+        if not f:
+            continue
+        path = f.get('p')
+        if not path or not path.exists():
+            logger.warning(f'{file} WASM missing — exiting')
+            wasm_available = False
+            break
+        suffix = path.suffix.lstrip('.')
+        f_in = load_b64(path)         
+        r = f'"{f_in}";' # remember that "" nasty bug
+        if not f_in:
+            continue    
+        replacement += f"""
+        const {file.upper()}_{suffix.upper()} = {r}
+        """
+    if not wasm_available:
+        logger.warning(f'No WASM detected, ensure WASM file exists and are correctly mapped in WASM_MAP')
+        replacement = "/* WASM files not available — using JS path fallback */ \n const WASM_AVAILABLE = false"
+    else:
+        replacement += f"""
+        const WASM_AVAILABLE = true
+        """
+    
+    return replacement
 
 def build_studio(
     fizx_template: str,
     fonts_block: str,
     stylekit_block: str,
     rendercore_block: str,
+    wasm_block: str,
     template_marker: str = '/* @@FIZX_TEMPLATE@@ */',
     fonts_marker: str = '/* @@FONTS@@ */',
     stylekit_marker: str = '/* @@STYLEKIT@@ */',
-    rendercore_marker: str = '/* @@RENDERCORE@@ */'
+    rendercore_marker: str = '/* @@RENDERCORE@@ */',
+    wasm_marker: str = '/* @@WASM@@ */'
     ) -> str:
     """
     Produce studio.html by injecting into template_studio.html:
@@ -426,6 +472,12 @@ def build_studio(
         logger.warning(f"{rendercore_marker} not found in template_studio.html — skipping rendercore injection")
     else:
         studio = studio.replace(rendercore_marker, rendercore_block)
+
+    # ── Inject Rendercore ───────────────────────────────
+    if wasm_marker not in studio:
+        logger.warning(f"{wasm_marker} not found in template_studio.html — skipping wasm injection")
+    else:
+        studio = studio.replace(wasm_marker, wasm_block)
 
     return studio
 
@@ -562,6 +614,7 @@ def main():
     # ── Build injection blocks ────────────────────────────────────
     styles_block, presets_block = extract_preset_data(presets_src, preset_keys)
     viz_block        = build_visualizers_block(viz_src, viz_keys, fltr)
+    wasm_block       = build_wasm(['glue', 'nosimd', 'simd'])
     fonts_block      = build_fonts(['merri', 'deja'])
     beats_block      = _format_beats_json(beats_data)
     lyrics_block     = _format_lyrics_json(lyrics_data)
@@ -616,7 +669,7 @@ def main():
         'LYRICS': 'const LYRICS = [[LYRICS_DATA]];'
     }
     studio_template = inline_blocks(studio_template, placeholders)
-    studio_html = build_studio(studio_template, fonts_block, stylekit_block, rendercore_block)
+    studio_html = build_studio(studio_template, fonts_block, stylekit_block, rendercore_block, wasm_block)
 
     # ── Write Studio output ────────────────────────────────────────
     studio_out  = ROOT / "studio.html"

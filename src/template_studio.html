@@ -924,7 +924,9 @@ const FIZX_TEMPLATE = decodeURIComponent("/* @@FIZX_TEMPLATE@@ */");
 //           { type:'done', onsets, bpm }
 //           { type:'error', message }
 // ═══════════════════════════════════════════════════════════════════
-const RADIX_WORKER_SRC = `
+/* @@WASM@@ */
+
+const RADIX_WORKER_SRC_HEAD = `
 'use strict';
 
 // LUT engine's table built lazily, only when 'lut' actually runs —
@@ -959,6 +961,83 @@ let cachedSampleDataForPreview = null;
 // ─────────────────────────────────────────────────────────────────
 const WAVEFORM_COLS = 400;
 const waveform = new Float32Array(WAVEFORM_COLS); // reused across runs, reset by dispatcher
+
+// ── WASM MODULE ──────────────────────────────────────────────────
+const PFFFT_REAL = 0;
+const PFFFT_FORWARD = 0;
+
+let pffftModulePromise = null; // cached across every frame and every 'analyze' call this worker instance handles
+
+function base64ToArrayBuffer(base64String) {
+    const binaryString = atob(base64String);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+    return bytes.buffer;
+}
+
+// Canonical WASM SIMD feature-detection module, verified against the
+// wasm-feature-detect package (GoogleChromeLabs) rather than hand-rolled —
+// a single wrong byte here would make this silently always report false.
+function supportsWasmSimd() {
+    const simdTestModule = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]);
+    try {
+        return WebAssembly.validate(simdTestModule);
+    } catch {
+        return false;
+    }
+}
+
+// Loads and instantiates PFFFT exactly once per worker instance, picking
+// the SIMD build when supported. Returns a small wrapper exposing just
+// what this worker needs — setup/transform/cleanup — not the raw
+// Emscripten Module object.
+async function getPffftEngine(fftSize) {
+    if (pffftModulePromise) return pffftModulePromise;
+
+    pffftModulePromise = (async () => {
+        const useSimd = supportsWasmSimd();
+        console.log('[worker] WASM SIMD supported:', useSimd);
+        const wasmBinary = base64ToArrayBuffer(useSimd ? WASM_SIMD_B64 : WASM_NOSIMD_B64);
+        const Module = await PFFFT({ 
+            wasmBinary,
+            locateFile: (path) => path,   // dummy; unused because wasmBinary is set
+        }); // PFFFT declared directly by the spliced-in glue code above
+
+        const transformSize = fftSize; // 16384 — fixed for this project, setup only ever built for this one size
+        const setupHandle = Module._pffft_new_setup(transformSize, PFFFT_REAL);
+        if (!setupHandle) throw new Error('PFFFT setup failed for size ' + transformSize);
+
+        // Buffers allocated once, reused for every frame — mirrors how
+        // spectrumBuffer/packedBuffer were already allocated once and
+        // reused in the pure-JS path, same reasoning: avoid a
+        // malloc/free pair 20,000+ times per track.
+        const inputPtr = Module._pffft_aligned_malloc(transformSize * 4);
+        const outputPtr = Module._pffft_aligned_malloc(transformSize * 4);
+        const workPtr = Module._pffft_aligned_malloc(transformSize * 4);
+        const inputView = new Float32Array(Module.HEAPF32.buffer, inputPtr, transformSize);
+        const outputView = new Float32Array(Module.HEAPF32.buffer, outputPtr, transformSize);
+
+        return {
+            usingSimd: useSimd,
+
+            /** Runs one forward real FFT on windowedFrame (length transformSize), returns the interleaved output view (reused — copy out before the next call). */
+            transform(windowedFrame) {
+                inputView.set(windowedFrame);
+                Module._pffft_transform_ordered(setupHandle, inputPtr, outputPtr, workPtr, PFFFT_FORWARD);
+                return outputView;
+            },
+
+            destroy() {
+                Module._pffft_destroy_setup(setupHandle);
+                Module._pffft_aligned_free(inputPtr);
+                Module._pffft_aligned_free(outputPtr);
+                Module._pffft_aligned_free(workPtr);
+            },
+        };
+    })();
+
+    return pffftModulePromise;
+}
 
 // ── Twiddle factor table ──────────────────────────────────────────
 // Precomputed once for FFT_N. The butterfly loop reads wRe[len] and
@@ -1410,14 +1489,16 @@ function detectOnsets(a, stepMs, thr, floor = 0.15, cd = 70) {
     
     return o;
 }
+`;
 
+const RADIX_WORKER_SRC_TAIL = `
 // ── Main onmessage ────────────────────────────────────────────────
 // Worker message handler receives audio samples and analysis parameters
 // Sends progress updates and a final result back to the main thread
 // ─────────────────────────────────────────────────────────────────
-self.onmessage = function(e) {
+self.onmessage = async function(e) {
     const messageType = e.data.type || 'analyze'; // setting defaults so payload works unmodified
-
+    
     if (messageType === 'load-samples') {
         // sent once when the Design view's preview worker starts up.
         // Transferred in, so this worker now owns the buffer — the main
@@ -1454,6 +1535,7 @@ self.onmessage = function(e) {
         kickLp: kickLowpassHz = 120,
         kickRej: kickSustainRejection = 1.0,
         kickBass = false,
+        turbo   = true,       // false for 'js' (safe) | true for 'wasm'
         engine   = 'lut'
     } = e.data;
 
@@ -1463,13 +1545,13 @@ self.onmessage = function(e) {
     // Reset waveform before every run — engines fill it lazily,
     // so stale data from a previous run must be cleared.
     waveform.fill(0);
-
+    const analyzeStart = performance.now();
     if (engine === 'lut') {
         const HOP = 512;                                  // hop size in samples
         const stepMs = HOP / sr * 1000;                   // hop size in milliseconds
         const sampleCount = samples.length;               // total input sample count
         const frameCount = Math.floor(sampleCount / HOP); // independent of kickBass
-
+  
         // Kick envelope extraction
         prog(3, 'KICK CHANNEL');
         
@@ -1490,6 +1572,25 @@ self.onmessage = function(e) {
 
         // size of the real-input sub-FFT, see note below
         const HALF_N = LUT_FFT_N / 2;
+
+        let pffft = null;
+        if (turbo && WASM_AVAILABLE) {
+            const t0 = performance.now();
+            try {
+                pffft = await getPffftEngine(LUT_FFT_N);
+                prog(8, pffft.usingSimd ? 'WASM FFT (SIMD)' : 'WASM FFT');
+                const t1 = performance.now();
+                console.log('[worker] PFFFT init:', (t1 - t0).toFixed(1), 'ms |', pffft.usingSimd ? 'SIMD' : 'nosimd');
+            } catch (err) {
+                // falls back to the JS path rather than failing the whole
+                // analysis run — a WASM instantiation failure (old engine, CSP,
+                // out-of-memory) shouldn't take down extraction entirely.
+                prog(8, 'WASM FFT unavailable, using JS');
+                console.error('[worker] PFFFT init failed:', err);
+                pffft = null;
+            }
+        }
+        console.log('[worker] fftEngine requested:', turbo, '| pffft after init:', pffft ? 'wasm' : 'js');
 
         // FFT twiddle table (lazily built once, cached on the worker global)
         if (!lutTwRe) ({ tRe: lutTwRe, tIm: lutTwIm } = buildTwiddles(LUT_FFT_N));
@@ -1566,58 +1667,78 @@ self.onmessage = function(e) {
         // half the size
         const packedBuffer = new Float32Array(HALF_N * 2);
 
+        // Reused scratch buffer, wasm path
+        const windowedFrameScratch = pffft ? new Float32Array(LN) : null;
+
         // Progress update every ~2% of frames
         const TICK = Math.max(1, Math.floor(frameCount / 50));
-        
+        let fftTimeAccum = 0;
+        const loopStart = performance.now();
         // Per-frame analysis
         for (let f = 0; f < frameCount; f++) {
             // Centered frame (zero-padded edges): frame f spans samples [f*HOP - LN/2, f*HOP + LN/2)
             const s0 = f * HOP - LN / 2;
 
-            // pack windowed even/odd samples into one half-length
-            // complex buffer, instead of filling a full-length real one
-            for (let n = 0; n < HALF_N; n++) {
-                const evenIndex = s0 + n * 2;
-                const oddIndex  = evenIndex + 1;
-                const evenSample = (evenIndex >= 0 && evenIndex < sampleCount) ? samples[evenIndex] : 0;
-                const oddSample  = (oddIndex  >= 0 && oddIndex  < sampleCount) ? samples[oddIndex]  : 0;
-                packedBuffer[n * 2]     = evenSample * win[n * 2];
-                packedBuffer[n * 2 + 1] = oddSample  * win[n * 2 + 1];
-            }
-
-            // One HALF_N-point complex FFT now does the work the old
-            // LN-point one did
-            fft(packedBuffer, lutTwRe, lutTwIm);
-
             let vb = 0, tb = 0, bb = 0; // band energy accumulators
 
-            // one combined pass over k, instead of three separate
-            // per-band loops — the bands don't overlap (or overlap by at
-            // most one bin, unchanged from before), so this also avoids
-            // redundant unpack+recombine work at that shared edge
-            for (let k = 0; k <= maxNeededBin; k++) {
-                const mirrorIndex = (HALF_N - k) % HALF_N; // k=0 wraps to 0 — Z has period HALF_N
+            if (pffft) {
+                // WASM path — window the frame into a plain real array,
+                // one call does the whole N=16384 real FFT, no packing trick.
+                for (let i = 0; i < LN; i++) {
+                    const k = s0 + i;
+                    windowedFrameScratch[i] = (k >= 0 && k < sampleCount ? samples[k] : 0) * win[i];
+                }
+                const fftT0 = performance.now();
+                const spectrum = pffft.transform(windowedFrameScratch); // interleaved [re,im,...], ordered — matches our bin indices directly
+                fftTimeAccum += performance.now() - fftT0;
+                for (let k = v0; k < v1; k++) { const re = spectrum[k * 2], im = spectrum[k * 2 + 1]; vb += re * re + im * im; }
+                for (let k = t0; k < t1; k++) { const re = spectrum[k * 2], im = spectrum[k * 2 + 1]; tb += re * re + im * im; }
+                for (let k = b0; k < b1; k++) { const re = spectrum[k * 2], im = spectrum[k * 2 + 1]; bb += re * re + im * im; }
+            } else {
+                // pack windowed even/odd samples into one half-length
+                // complex buffer, instead of filling a full-length real one
+                for (let n = 0; n < HALF_N; n++) {
+                    const evenIndex = s0 + n * 2;
+                    const oddIndex  = evenIndex + 1;
+                    const evenSample = (evenIndex >= 0 && evenIndex < sampleCount) ? samples[evenIndex] : 0;
+                    const oddSample  = (oddIndex  >= 0 && oddIndex  < sampleCount) ? samples[oddIndex]  : 0;
+                    packedBuffer[n * 2]     = evenSample * win[n * 2];
+                    packedBuffer[n * 2 + 1] = oddSample  * win[n * 2 + 1];
+                }
 
-                const zRe = packedBuffer[k * 2];
-                const zIm = packedBuffer[k * 2 + 1];
-                const mRe = packedBuffer[mirrorIndex * 2];
-                const mIm = packedBuffer[mirrorIndex * 2 + 1];
+                // One HALF_N-point complex FFT now does the work the old
+                // LN-point one did
+                const fftT0 = performance.now();
+                fft(packedBuffer, lutTwRe, lutTwIm);
+                fftTimeAccum += performance.now() - fftT0;
+                // one combined pass over k, instead of three separate
+                // per-band loops — the bands don't overlap (or overlap by at
+                // most one bin, unchanged from before), so this also avoids
+                // redundant unpack+recombine work at that shared edge
+                for (let k = 0; k <= maxNeededBin; k++) {
+                    const mirrorIndex = (HALF_N - k) % HALF_N; // k=0 wraps to 0 — Z has period HALF_N
 
-                // Separate the even/odd sub-spectra the packing step mixed together
-                const evenRe = (zRe + mRe) / 2;
-                const evenIm = (zIm - mIm) / 2;
-                const oddRe  = (zIm + mIm) / 2;
-                const oddIm  = (mRe - zRe) / 2;
+                    const zRe = packedBuffer[k * 2];
+                    const zIm = packedBuffer[k * 2 + 1];
+                    const mRe = packedBuffer[mirrorIndex * 2];
+                    const mIm = packedBuffer[mirrorIndex * 2 + 1];
 
-                // Recombine into bin k of the full-length transform
-                const wRe = unpackTwRe[k], wIm = unpackTwIm[k];
-                const xRe = evenRe + (wRe * oddRe - wIm * oddIm);
-                const xIm = evenIm + (wRe * oddIm + wIm * oddRe);
-                const magnitudeSquared = xRe * xRe + xIm * xIm;
+                    // Separate the even/odd sub-spectra the packing step mixed together
+                    const evenRe = (zRe + mRe) / 2;
+                    const evenIm = (zIm - mIm) / 2;
+                    const oddRe  = (zIm + mIm) / 2;
+                    const oddIm  = (mRe - zRe) / 2;
 
-                if (k >= v0 && k < v1) vb += magnitudeSquared;
-                if (k >= t0 && k < t1) tb += magnitudeSquared;
-                if (k >= b0 && k < b1) bb += magnitudeSquared;
+                    // Recombine into bin k of the full-length transform
+                    const wRe = unpackTwRe[k], wIm = unpackTwIm[k];
+                    const xRe = evenRe + (wRe * oddRe - wIm * oddIm);
+                    const xIm = evenIm + (wRe * oddIm + wIm * oddRe);
+                    const magnitudeSquared = xRe * xRe + xIm * xIm;
+
+                    if (k >= v0 && k < v1) vb += magnitudeSquared;
+                    if (k >= t0 && k < t1) tb += magnitudeSquared;
+                    if (k >= b0 && k < b1) bb += magnitudeSquared;
+                }
             }
 
             // Store RMS-like band amplitude per frame
@@ -1630,7 +1751,21 @@ self.onmessage = function(e) {
                 prog(10 + Math.round(f / frameCount * 85), 'BASS / VOCAL / TREBLE');
             }
         }
-        
+
+        const loopEnd = performance.now();
+        console.log('[worker] frame loop:', (loopEnd - loopStart).toFixed(1), 'ms for', frameCount, 'frames |',
+                    ((loopEnd - loopStart) / frameCount).toFixed(3), 'ms/frame | engine:', pffft ? 'wasm' : 'js');
+
+        console.log('[worker] FFT-only time:', fftTimeAccum.toFixed(1), 'ms |',
+                    (fftTimeAccum / frameCount).toFixed(3), 'ms/frame');
+
+        // // Destroy and clear cache (force re-init on next call) if the 
+        // // same worker runs multiple analyses with different FFT sizes        
+        // if (pffft) {
+        //     pffft.destroy();
+        //     pffftModulePromise = null;   // re-instantiating the WASM module is not cheap
+        // }
+
         // Convert linear amplitude array to decibels (with small epsilon to avoid log(0))
         const db = x => {
             const len = x.length;
@@ -1657,6 +1792,7 @@ self.onmessage = function(e) {
         // Do not insert anything between these that could throw and skip the
         // second post; the main thread would hang waiting for 'done'.
         self.postMessage({ type: 'waveform', data: waveform }, [waveform.buffer]);
+        console.log('[worker] analyze total:', (performance.now() - analyzeStart).toFixed(1), 'ms | engine:', pffft ? 'wasm' : 'js');        
         self.postMessage({
             type: 'done',
             step_ms: Math.round(stepMs * 1e4) / 1e4,                         // step in ms, rounded to 4 decimals
@@ -1682,6 +1818,26 @@ self.onmessage = function(e) {
 };
 `;
 
+// assembled once, here, on the Studio's main thread — not inside
+// the worker. This is the one place atob() runs on the glue: by the time
+// its decoded text lands in this concatenation, it's a runtime string
+// value, not literal source text inside a template literal, so its own
+// backticks are just inert characters in a string from here on. The two
+// wasm b64 consts get re-declared here too (safe — template-literal
+// interpolation inserts a value, it doesn't re-parse it for delimiters),
+// so the worker's own scope has them available when getPffftEngine() runs.
+const RADIX_WORKER_SRC = // TODO: 2x copies in and out worker
+    (WASM_AVAILABLE    
+        ? `const WASM_AVAILABLE = true;\n` +    
+          `const WASM_NOSIMD_B64 = "${NOSIMD_B64}";\n` +
+          `const WASM_SIMD_B64 = "${SIMD_B64}";\n` +
+          atob(GLUE_B64) + '\n' 
+        : `const WASM_AVAILABLE = false;\n`) +
+    RADIX_WORKER_SRC_HEAD +
+    RADIX_WORKER_SRC_TAIL;
+
+const workerBlob = new Blob([RADIX_WORKER_SRC], { type: 'application/javascript' });
+
 // ═══════════════════════════════════════════════════════════════════
 // ENGINE_REGISTRY — single source of truth for all engines.
 // Adding a new engine: one entry here, one entry in PARAMS for
@@ -1704,6 +1860,7 @@ const ENGINE_MAP = Object.fromEntries(ENGINE_REGISTRY.map(e => [e.id, e]));
 // inputs via renderParamPanel() event listeners.
 // ═══════════════════════════════════════════════════════════════════
 const PARAMS = { // passed to Worker via postMessage
+    turbo: true,
     // peak-picking kick-detection params
     kickBass: false, // false = FFT band analysis ("lut" model), true = time-domain bass kick
     kickLp: 120,    // lpHz: low-pass cutoff frequency for kick detection (Hz)
@@ -1769,6 +1926,15 @@ const PARAM_SPECS = {
                        'Off: full FFT vocal/treble band analysis. ' +
                        'Turn on for faster, bass-focused results.',
             },
+            {
+                // Toggles FFT band pipeline between JS and WASM pipeline
+                id:    'turbo',
+                label: 'Turbo',
+                type:  'toggle',
+                hint:  'On: WASM path, faster extraction. ' +
+                       'Off: pure-JS rFFT extraction, slower. ' +
+                       'Turn on for faster, balanced results.',
+            },            
         ],
     },
 
@@ -2841,7 +3007,8 @@ let _radixWorkerUrl = null;
 
 function getRadixWorkerUrl() {
     // Blob URL created once and reused across sessions — creating per-call would leak
-    if (!_radixWorkerUrl) _radixWorkerUrl = URL.createObjectURL(new Blob([RADIX_WORKER_SRC], { type: 'text/javascript' }));
+    // if (!_radixWorkerUrl) _radixWorkerUrl = URL.createObjectURL(new Blob([RADIX_WORKER_SRC], { type: 'text/javascript' }));
+    if (!_radixWorkerUrl) _radixWorkerUrl = URL.createObjectURL(workerBlob);
     return _radixWorkerUrl;
 }
 
@@ -2946,6 +3113,7 @@ function extractRadix(audioFile, onProgress) {
                 kickLp:PARAMS.kickLp, 
                 kickRej:PARAMS.kickRej,
                 kickBass: PARAMS.kickBass,
+                turbo: PARAMS.turbo,
                 engine: state.engine
             },
             [samples.buffer]
