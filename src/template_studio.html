@@ -67,7 +67,7 @@
         .header-line { flex: 1; height: 1px; background: linear-gradient(to right, var(--border-accent), transparent); }
 
         /* ── Panels ──────────────────────────────────────────────── */
-        .panel { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+        .panel { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
         .panel-label { font-family: var(--prim); font-size: 0.8rem; letter-spacing: 0.18em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 14px; }
 
         /* ── Drop Zone ───────────────────────────────────────────── */
@@ -145,7 +145,7 @@
             transition: 0.15s; }
         .mode-card:hover { border-color: #8ea2ff; transform: translateY(-2px); }
 
-        .control-group { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 10px 12px; }
+        .control-group { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px 10px; }
         .control-group summary { cursor: pointer; font-weight: 600; font-size: 0.8rem; }
 
         .slider-control {
@@ -194,8 +194,7 @@
         /* ── Playback bar ────────────────────────────────────────── */
         .playback-bar {
             display: flex; align-items: center; gap: 12px;
-            margin-top: 20px; padding-top: 16px;
-            border-top: 1px solid var(--border);
+            padding: 16px; border-top: 1px solid var(--border);
         }
         .pb-btn {
             background: none; border: 1px solid var(--border-accent);
@@ -382,7 +381,7 @@
         /* Stage: previously had inline styles (position, height, background,
            radius, overflow). Kept identical here, just relocated to the sheet. */
         #design-stage {
-            position: relative; height: 56vh; background: #08080d;
+            position: relative; height: 60vh; background: #08080d;
             border-radius: 14px; overflow: hidden;
         }
 
@@ -401,7 +400,7 @@
         #design-text-layer {
             position: relative;
             font-size: 2rem;
-            bottom: 70px;
+            bottom: 100px;
 
         }
 
@@ -415,28 +414,41 @@
             bottom: 0; height: 72px; width: 100%;
         }
 
-        /* Audio element spans the column width */
-        #design-audio {
-            width: 100%;
-        }
-
         /* Frame stats readout — monospace, dim, small */
         #design-frame-stats {
             margin: 0; font-family: var(--prim);
             font-size: 0.75rem; color: var(--text-dim);
             white-space: pre-wrap;
+            padding: 10px;
         }
 
         .design-controls-column {
             /* Sticky so the controls stay in view while the user scrolls a
                tall control list, without needing to scroll the whole page. */
-            position: sticky; top: 16px; max-height: calc(100vh - 32px);
-            overflow-y: auto;
+            position: sticky; top: 16px; max-height: calc(100vh - 20px);
+            overflow: hidden; display: flex; flex-direction: column; gap: 8px;
             /* Thin scrollbar to match the rest of the studio's chrome */
             scrollbar-width: thin; scrollbar-color: var(--border-accent) transparent;
         }
         .design-controls-column::-webkit-scrollbar { width: 6px; }
         .design-controls-column::-webkit-scrollbar-thumb {
+            background: var(--border-accent);
+            border-radius: 3px;
+        }
+        .design-controls-column > .output-header,
+        .design-controls-column > audio {
+            flex-shrink: 0;   /* header and audio stay their natural size */
+        }
+        #design-controls {
+            flex: 1 1 auto;
+            overflow-y: auto;   /* only the controls list scrolls */
+            min-height: 0;      /* required for flex children to shrink below content size */
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-accent) transparent;
+        }
+
+        #design-controls::-webkit-scrollbar { width: 6px; }
+        #design-controls::-webkit-scrollbar-thumb {
             background: var(--border-accent);
             border-radius: 3px;
         }
@@ -461,6 +473,16 @@
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             box-shadow: 0 0 10px var(--accent-glow);
+        }
+        /* Studio Spinner — shown when no switching bass mode */
+        .mini-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(0,255,136,0.15);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            float: right;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         #analysis-spinner-wrap, #analysis-bar-wrap { display: none; }
@@ -671,6 +693,16 @@
         <div class="header-line"></div>
     </div>
 
+    <!-- Playback bar: play/pause toggles, stop resets position to 0 -->
+    <div id="playback-bar-shared" class="playback-bar">
+        <button class="pb-btn" id="pb-play" title="Play / Pause"></button>
+        <button class="pb-btn" id="pb-stop" title="Stop"></button>
+        <div class="seek-track" id="seek-track">
+            <div class="seek-fill" id="seek-fill"></div>
+        </div>
+        <span class="pb-time" id="time-display">0:00 / 0:00</span>
+    </div>
+
     <div id="setup-view">
         <textarea class="input-text lyrics" id="lyrics-input" placeholder="Paste lyrics here (Optional), one line per entry:&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;QUICK START: drop audio > select mode > start session > tap spacebar > preview > export"></textarea>
         
@@ -729,21 +761,10 @@
     <!-- Design step. Hidden until that mode/step is reached. -->
     <div id="design-view" style="display:none">
         <div class="panel">
-            <div class="output-header">
-                <h2>DESIGN ANIMATIONS</h2>
-                <label class="switch" data-tip="Master switch for all preview animation. Off automatically while this view isn't showing.">
-                    <input type="checkbox" id="animation-toggle" checked> Preview
-                </label>
-            </div>
-
-            <!-- Two-column layout: preview on the left, controls on the right.
-                 Collapses to a single column on narrow viewports (see CSS). -->
             <div class="design-layout">
-
-                <!-- LEFT: preview stage, audio, and diagnostics -->
-                <div class="design-preview-column">
-
+                <div id="design-preview-column">
                     <div id="design-stage">
+                        <pre id="design-frame-stats" class="readout"></pre>
                         <div id="design-circle-container"></div>
                         <div id="design-text-transition-container">
                             <div id="design-text-layer">
@@ -753,29 +774,22 @@
                         </div>
                         <canvas id="design-diagnostic-canvas"></canvas>
                     </div>
+                    <div class="export-controls">
+                        <button id="design-back-btn" class="btn btn-nav">CANCEL</button>
+                        <button id="design-export-btn" class="btn btn-primary">EXPORT DESIGN</button>
+                    </div> 
+                </div>
 
-                    <audio id="design-audio" controls></audio>
-
-                    <pre id="design-frame-stats" class="readout"></pre>
-
+                <div class="design-controls-column">
+                    <div class="output-header">
+                        <h2>DESIGN ANIMATIONS</h2>
+                    </div>
                     <textarea class="input-text design"
                               id="design-block-text"
-                              placeholder="Text block to animate (Beats-only mode)"
-                              hidden></textarea>
-
-                </div>
-
-                <!-- RIGHT: control panel -->
-                <div class="design-controls-column">
+                              placeholder="Text block to animate"
+                              ></textarea>
                     <div id="design-controls"></div>
                 </div>
-
-            </div>
-
-            <div class="divider"></div>
-            <div class="export-controls">
-                <button id="design-back-btn" class="btn btn-nav">BACK</button>
-                <button id="design-export-btn" class="btn btn-primary">EXPORT DESIGN → TEMPLATE</button>
             </div>
         </div>
     </div>
@@ -787,16 +801,6 @@
                 <span class="kb-hint">TAP <kbd>SPACE</kbd></span>
                 <span class="touch-hint">TAP <kbd>SCREEN</kbd></span>
                 ON EACH LYRIC · <kbd>FINISH</kbd> WHEN DONE
-            </div>
-
-            <!-- Playback bar: play/pause toggles, stop resets position to 0 -->
-            <div class="playback-bar">
-                <button class="pb-btn" id="pb-play" title="Play / Pause"></button>
-                <button class="pb-btn" id="pb-stop" title="Stop"></button>
-                <div class="seek-track" id="seek-track">
-                    <div class="seek-fill" id="seek-fill"></div>
-                </div>
-                <span class="pb-time" id="time-display">0:00 / 0:00</span>
             </div>
 
             <!-- Tap progress: separate from seek, tracks lyric lines tapped -->
@@ -926,7 +930,7 @@ const FIZX_TEMPLATE = decodeURIComponent("/* @@FIZX_TEMPLATE@@ */");
 // ═══════════════════════════════════════════════════════════════════
 /* @@WASM@@ */
 
-const RADIX_WORKER_SRC_HEAD = `
+const RADIX_WORKER_RAW = `
 'use strict';
 
 // LUT engine's table built lazily, only when 'lut' actually runs —
@@ -944,6 +948,16 @@ let unpackTwRe = null, unpackTwIm = null;
 // instance that only ever receives 'analyze' messages never touches this
 // at all — no interference between the two worker roles.
 let cachedSampleDataForPreview = null;
+
+// Preview cache: the expensive stage is reused while only the 
+// sustain-reject slider moves.
+let cachedKickEnvelope = null;
+
+// Module-scope scratch for the rise histogram. 256 bins is finer than the
+// envelope's own precision (values are quantized to 3 decimals upstream),
+// so the threshold derived from it is indistinguishable from the exact
+// percentile. Reused across calls to avoid a per-call allocation.
+const _riseHistogram = new Uint32Array(256);
 
 // ── WAVEFORM CONTRACT ─────────────────────────────────────────────
 // A single Float32Array lives at worker scope (waveform). It is allocated
@@ -1336,120 +1350,128 @@ function run(f, x) {
 
 // ─────────────────────────────────────────────────────────────────
 // kick channel: band-pass -> 23ms RMS -> subtract slow envelope -> windowed ceiling
-// d0 = channel 0
-// sr = sample rate
-// stepMs = analysis step size in milliseconds (hop size)
-// lpHz = low-pass cutoff frequency for kick detection
-// rej = rejection factor for the adaptive slow envelope (noise floor)
 // ─────────────────────────────────────────────────────────────────
-function extractKick(d0, sr, stepMs, lpHz, rej) {
-    const hop = Math.round(sr * stepMs / 1000);
-    const n = d0.length;
-    const nb = Math.floor(n / hop);
-    
-    // Allocate performance-tuned typed arrays instead of standard Float64
-    const blk = new Float32Array(nb);
-    const env = new Float32Array(nb);
-    const tr  = new Float32Array(nb);
-    
+// Stage 1 (expensive, depends only on the cutoff): band-pass the signal and
+// measure its RMS level once per hop.
+function computeKickEnvelope(samples, sampleRate, stepMs, lowpassHz) {
+    const hopSize = Math.round(sampleRate * stepMs / 1000);
+    const frameCount = Math.floor(samples.length / hopSize);
     // Create filter chain: high-pass at 35 Hz, then two cascaded low-passes at lpHz
     // (cascaded low-passes = steeper rolloff, isolates kick body frequencies)
-    // Note: the three biquad filter objects (hp, l1, l2) carry their state across 
-    // all samples in the loop. This is correct for continuous processing but means 
-    // the function is not safe to call concurrently on the same buffer.
-    const hp = bq('hp', 35, sr);
-    const l1 = bq('lp', lpHz, sr);
-    const l2 = bq('lp', lpHz, sr);
-    
+    // Note: the three biquad filter objects (highpass, lowpassStage1, lowpassStage2)  
+    // carry their state across all samples in the loop. This is correct for continuous 
+    // processing but means the function is not safe to call concurrently on the same buffer.    
+    const highpass = bq('hp', 35, sampleRate);
+    const lowpassStage1 = bq('lp', lowpassHz, sampleRate);
+    const lowpassStage2 = bq('lp', lowpassHz, sampleRate);
+
     // Process each block: filter the samples and compute mean-square energy
-    for (let k = 0; k < nb; k++) {
-        let s = 0.0;
-        const o = k * hop;
-        for (let i = 0; i < hop; i++) {
+    const meanSquarePerHop = new Float32Array(frameCount);
+    for (let frame = 0; frame < frameCount; frame++) {
+        const hopStart = frame * hopSize;
+        let sumOfSquares = 0;
+        for (let i = 0; i < hopSize; i++) {
             // Average L+R channels (or duplicate mono) then filter
-            const sampleInput = d0[o + i]; 
-            const y = run(l2, run(l1, run(hp, sampleInput)));
-            s += y * y; // accumulate squared samples
+            const filtered = run(lowpassStage2, run(lowpassStage1, run(highpass, samples[hopStart + i])));
+            sumOfSquares += filtered * filtered; // accumulate squared samples
         }
-        blk[k] = s / hop; // mean square per block
+        meanSquarePerHop[frame] = sumOfSquares / hopSize; // mean square per block
     }
-    
+
     // Compute envelope: sqrt of a 2-point moving average of the block energies
-    // Note: the first block averages blk[0] with itself (k is falsy, so blk[k-1] 
-    // is replaced by blk[k]) this yields a slightly different smoothing at the start
-    for (let k = 0; k < nb; k++) {
-        env[k] = Math.sqrt((blk[k] + (k ? blk[k - 1] : blk[k])) / 2);
+    // Note: the first block averages meanSquarePerHop[0] with itself (frame is falsy, 
+    // so meanSquarePerHop[frame-1] is replaced by meanSquarePerHop[frame]) this yields a slightly 
+    // different smoothing at the start
+    const envelope = new Float32Array(frameCount);
+    for (let frame = 0; frame < frameCount; frame++) {
+        const previous = frame > 0 ? meanSquarePerHop[frame - 1] : meanSquarePerHop[frame];
+        envelope[frame] = Math.sqrt((meanSquarePerHop[frame] + previous) / 2);
     }
-    
+    return envelope;
+}
+
+// Stage 2 (cheap, about one operation per frame): subtract the slow level so
+// held notes cancel, then normalise against a per-8-second ceiling.
+function shapeKickChannel(envelope, stepMs, sustainRejection) {
+    const frameCount = envelope.length;
     // Attack/release smoothing coefficients for the "slow" adaptive envelope
     // Attack time constant ~120 ms, release time constant ~250 ms
-    const aA = 1 - Math.exp(-stepMs / 120);
-    const aR = 1 - Math.exp(-stepMs / 250);
-    
-    // tr = transient/onset signal; slow = slowly-tracking envelope
-    let slow = 0;
-    let gmax = 0;
-    
-    for (let k = 0; k < nb; k++) {
+    const attackCoefficient = 1 - Math.exp(-stepMs / 120);
+    const releaseCoefficient = 1 - Math.exp(-stepMs / 250);
+
+    const transient = new Float32Array(frameCount);
+    let slowLevel = 0, largestTransient = 0;
+    for (let frame = 0; frame < frameCount; frame++) {
         // Slow envelope tracks upward fast (attack) and downward slowly (release)
-        const currentEnv = env[k];
-        slow += (currentEnv - slow) * (currentEnv > slow ? aA : aR);
-        
-        // Transient = how much the envelope exceeds the slow envelope by rej factor
-        // Clamped to 0 (only positive transients count as kicks)
-        const transient = Math.max(0.0, currentEnv - rej * slow);
-        tr[k] = transient;
-        
-        // Track global max of transient signal (used as a floor for thresholds)
-        if (transient > gmax) gmax = transient;
+        slowLevel += (envelope[frame] - slowLevel) * (envelope[frame] > slowLevel ? attackCoefficient : releaseCoefficient);
+        transient[frame] = Math.max(0, envelope[frame] - sustainRejection * slowLevel);
+        // Track largest transient signal (used as a floor for thresholds)
+        if (transient[frame] > largestTransient) largestTransient = transient[frame];
     }
-    
-    // Window size: ~8 seconds worth of blocks (W blocks per window)
-    const W = Math.max(1, Math.round(8000 / stepMs));
-    const nB = Math.ceil(nb / W); // number of windows
-    const ce = new Float32Array(nB); // ceiling/threshold per window
+
+    // blockLength: ~8 seconds worth of blocks (per window)
+    const blockLength = Math.max(1, Math.round(8000 / stepMs));
+    const blockCount = Math.ceil(frameCount / blockLength); // number of windows
+    const blockCeiling = new Float32Array(blockCount); // ceiling/threshold per window
 
     // Reuse a static sortable buffer workspace to eliminate GC allocation thrashing
-    const scratchSort = new Float32Array(W);
-    
+    const scratchSort = new Float32Array(blockLength);
+
     // Compute per-window adaptive threshold using 97th percentile
-    for (let k = 0; k < nB; k++) {
-        const startIdx = k * W;
-        const endIdx = Math.min(nb, (k + 1) * W);
+    for (let block = 0; block < blockCount; block++) {
+        const startIdx = block * blockLength;
+        const endIdx = Math.min(blockCount, (block + 1) * blockLength);
         const len = endIdx - startIdx;
 
         // Fast buffer alignment copy
         for (let i = 0; i < len; i++) {
-            scratchSort[i] = tr[startIdx + i];
+            scratchSort[i] = transient[startIdx + i];
         }
 
         const activeSlice = scratchSort.subarray(0, len);
         activeSlice.sort(); // High-speed typed array in-place sort
-        
+
         const percentileIndex = Math.floor(len * 0.97);
         const p97 = activeSlice[percentileIndex] || 0.0;
 
         // Threshold = 97th percentile, but at least 15% of global max, and at least 1e-9
-        ce[k] = Math.max(p97, gmax * 0.15, 1e-9);
+        blockCeiling[block] = Math.max(p97, largestTransient * 0.15, 1e-9);
+
+        // const sorted = Array.from(transient.subarray(block * blockLength, Math.min(frameCount, (block + 1) * blockLength))).sort((a, b) => a - b);
+        // blockCeiling[block] = Math.max(sorted[Math.floor(sorted.length * 0.97)] || 0, largestTransient * 0.15, 1e-9);
     }
-    
+
     // Normalize transient signal against window thresholds with linear interpolation
-    const out = new Float32Array(nb);
-    for (let k = 0; k < nb; k++) {
-        // p = window index as a fractional position (centered: -0.5 offset)
-        const p = k / W - 0.5; // shifts window centers so that the interpolation between thresholds is centered on each window
-        const b0 = Math.max(0, Math.min(nB - 1, Math.floor(p)));
-        const b1 = Math.min(nB - 1, b0 + 1);
-        const t = Math.max(0.0, Math.min(1.0, p - b0)); // interpolation factor
-        
+    const channel = new Float32Array(frameCount);
+    for (let frame = 0; frame < frameCount; frame++) {
+        // position = window index as a fractional position (centered: -0.5 offset)
+        const position = frame / blockLength - 0.5; // shifts window centers so that the interpolation between thresholds is centered on each window
+        const left = Math.max(0, Math.min(blockCount - 1, Math.floor(position)));
+        const right = Math.min(blockCount - 1, left + 1);
+        const blend = Math.max(0, Math.min(1, position - left)); // interpolation factor
+
         // Interpolated threshold between adjacent windows
         // Output = transient / threshold, clamped to [0, 1]
-        const ceil = ce[b0] + (ce[b1] - ce[b0]) * t;
-        out[k] = Math.min(1.0, tr[k] / ceil);
+        channel[frame] = Math.min(1, transient[frame] / (blockCeiling[left] + (blockCeiling[right] - blockCeiling[left]) * blend));
     }
-    
-    return out;
+    return channel;
 }
+
+function extractKick(samples, sampleRate, stepMs, lowpassHz, sustainRejection) {
+    return shapeKickChannel(computeKickEnvelope(samples, sampleRate, stepMs, lowpassHz), stepMs, sustainRejection);
+}
+
+function getKickEnvelope(samples, sampleRate, stepMs, lowpassHz) {
+    const cache = cachedKickEnvelope;
+    if (cache && cache.samples === samples && cache.sampleRate === sampleRate && cache.stepMs === stepMs && cache.lowpassHz === lowpassHz) {
+        return cache.envelope;
+    }
+    const envelope = computeKickEnvelope(samples, sampleRate, stepMs, lowpassHz);
+    cachedKickEnvelope = { samples, sampleRate, stepMs, lowpassHz, envelope };
+    return envelope;
+}
+
+const roundToThousandths = (value) => Math.round(value * 1000) / 1000;
 
 // ─────────────────────────────────────────────────────────────────
 // Convert onset-strength envelope (output of extractKick) into a list of 
@@ -1460,11 +1482,78 @@ function extractKick(d0, sr, stepMs, lpHz, rej) {
 // floor = minimum absolute strength required to count as an onset (default 0.15)
 // cd = cooldown in milliseconds between detected onsets (default 70 ms)
 // ─────────────────────────────────────────────────────────────────
-function detectOnsets(a, stepMs, thr, floor = 0.15, cd = 70) {    
+
+// Derives onset-detection thresholds from the envelope's own statistics,
+// so the detector adapts to the track's dynamics instead of using
+// hardcoded values that only fit one genre.
+//
+// Returns:
+//   thr   — rise threshold: the 80th-percentile positive rise.
+//           Keeps the sharpest ~20% of rises as candidate onsets; the
+//           long tail of gentle rises (decays, sustains) is filtered out.
+//   floor — absolute floor: 20% of the envelope's max.
+//           Rejects onsets during quiet passages.
+//   cd    — cooldown: three frames worth of time.
+//           Prevents a single transient from producing multiple onsets
+//           when the envelope wobbles around the peak.
+//
+// Cost: O(n) over the envelope with a fixed 256-entry scratch buffer.
+// No sort, no dynamic allocation, no arithmetic beyond a subtract and a
+// bounds-checked histogram increment. On a 5,633-frame envelope this is
+// ~0.1ms per call.
+function autoTuneOnsets(envelope, stepMs) {
+    const n = envelope.length;
+    if (n === 0) return { thr: 0, floor: 0, cd: stepMs * 3 };
+
+    _riseHistogram.fill(0);
+    let maxVal = 0;
+    let riseCount = 0;
+    let prev = 0;
+
+    // Single pass: track max, bucket each positive rise by magnitude.
+    for (let i = 0; i < n; i++) {
+        const v = envelope[i];
+        if (v > maxVal) maxVal = v;
+        const r = v - prev;
+        if (r > 0) {
+            // r is in [0, 1] after windowedNormalize; clamp defensively so
+            // a stray value above 1 doesn't index out of the histogram.
+            const bin = r >= 1 ? 255 : (r * 256) | 0;
+            _riseHistogram[bin]++;
+            riseCount++;
+        }
+        prev = v;
+    }
+
+    // 80th percentile of positive rises, read off the histogram.
+    // Walk bins from low to high, accumulate counts, stop when the running
+    // total crosses 80% of all rises. That bin's midpoint is the threshold.
+    let thr = 0;
+    if (riseCount > 0) {
+        const target = riseCount * 0.80;
+        let acc = 0;
+        for (let b = 0; b < 256; b++) {
+            acc += _riseHistogram[b];
+            if (acc >= target) {
+                thr = (b + 0.5) / 256;
+                break;
+            }
+        }
+    }
+
+    const floor = maxVal * 0.20;
+    const cd    = stepMs * 3;
+
+    return { thr, floor, cd };
+}
+
+// function detectOnsets(a, stepMs, thr, floor = 0.15, cd = 70) {  
+function detectOnsets(a, stepMs) {    
+    const {thr, floor, cd} = autoTuneOnsets(a, stepMs);
     const o = [];        // output list of onset times (seconds)
     let p = 0.0;           // previous sample value (for rise detection)
     let c = 0.0;           // remaining cooldown time in milliseconds
-    
+
     for (let i = 0; i < a.length; i++) {
         // Tick the cooldown down by one step, clamped at 0
         c = Math.max(0.0, c - stepMs);
@@ -1489,9 +1578,157 @@ function detectOnsets(a, stepMs, thr, floor = 0.15, cd = 70) {
     
     return o;
 }
-`;
 
-const RADIX_WORKER_SRC_TAIL = `
+
+// The per-frame work lives in small functions on purpose: the onmessage
+// handler is a large async function that runs once per analysis, so a hot
+// loop inlined in it is optimized less well than the same work in a small
+// function called once per frame.
+// Sum of |X[k]|^2 over bins [firstBin, endBin) of an interleaved
+// [re0, im0, re1, im1, ...] spectrum. The energy of a bin range is just
+// the sum of squares of the matching flat float range, so re/im pairs
+// don't need to be handled separately.
+function sumBinEnergy(interleavedSpectrum, firstBin, endBin) {
+    let energy = 0;
+    for (let i = firstBin * 2; i < endBin * 2; i++) {
+        const value = interleavedSpectrum[i];
+        energy += value * value;
+    }
+    return energy;
+}
+
+// WASM path: window one frame, run PFFFT, store the three band amplitudes.
+function analyzeFrameWasm(frameIndex, analysis) {
+    const { samples, sampleCount, hannWindow, fftSize, hopSize, windowedFrame, pffft, bands, profile } = analysis;
+    const frameStart = frameIndex * hopSize - fftSize / 2;       // centered frame, edges zero-padded
+
+    for (let i = 0; i < fftSize; i++) {
+        const sampleIndex = frameStart + i;
+        windowedFrame[i] = (sampleIndex >= 0 && sampleIndex < sampleCount ? samples[sampleIndex] : 0) * hannWindow[i];
+    }
+
+    const fftStart = performance.now();
+    const spectrum = pffft.transform(windowedFrame);             // interleaved [re, im, ...], ordered
+    profile.fftMs += performance.now() - fftStart;
+
+    analysis.vocalEnergy[frameIndex]  = Math.sqrt(sumBinEnergy(spectrum, bands.vocalStart,  bands.vocalEnd)  / (bands.vocalEnd  - bands.vocalStart));
+    analysis.trebleEnergy[frameIndex] = Math.sqrt(sumBinEnergy(spectrum, bands.trebleStart, bands.trebleEnd) / (bands.trebleEnd - bands.trebleStart));
+    analysis.bassEnergy[frameIndex]   = Math.sqrt(sumBinEnergy(spectrum, bands.bassStart,   bands.bassEnd)   / (bands.bassEnd   - bands.bassStart));
+}
+
+
+// JS fallback path: real-input FFT via a half-size complex FFT plus an unpack step.
+//   1. Pack x[2n] as the real part and x[2n+1] as the imaginary
+//      part of a half-length (N/2) complex sequence z[n]. One
+//      N/2-point complex FFT on z gives Z[0..N/2-1].
+//
+//   2. Z is Even[k] + i*Odd[k], where Even/Odd are the DFTs of
+//      x's even- and odd-indexed samples. Because x is real,
+//      Even and Odd are each conjugate-symmetric — which is
+//      exactly what lets them be separated back out of Z:
+//        Even[k] = (Z[k] + conj(Z[mirror])) / 2
+//        Odd[k]  = -i * (Z[k] - conj(Z[mirror])) / 2,  mirror = (N/2 - k) mod (N/2)
+//      (k=0 needs no special case: mirror naturally wraps to 0,
+//      since Z has period N/2, and the formula degenerates
+//      correctly on its own.)
+//
+//   3. Recombine via the standard radix-2 butterfly to get the
+//      bin of the FULL N-point transform:
+//        X[k] = Even[k] + W_N^k * Odd[k],   W_N^k = e^(-2*pi*i*k/N)
+//
+// Steps 2-3 only need to run up to the highest bin any band
+// actually reads (treble's upper edge) — nothing past that is
+// ever used, so the unpack loop is bounded well below N/2 too.
+//
+// The lutTwRe/lutTwIm table built above for LUT_FFT_N already
+// contains every stage-size entry a HALF_N-point FFT needs
+// (buildTwiddles fills every power-of-two stage up to its
+// argument), so no second stage-twiddle table is needed — only
+// the small per-bin unpack table below is new.
+function analyzeFrameJs(frameIndex, analysis) {
+    const { samples, sampleCount, hannWindow, fftSize, hopSize, halfSize, packedBuffer,
+            twiddleReal, twiddleImag, unpackReal, unpackImag, maxNeededBin, bands, profile } = analysis;
+    const frameStart = frameIndex * hopSize - fftSize / 2;
+
+    // Pack even samples into the real part and odd samples into the imaginary part
+    for (let n = 0; n < halfSize; n++) {
+        const evenIndex = frameStart + n * 2;
+        const oddIndex = evenIndex + 1;
+        const evenSample = (evenIndex >= 0 && evenIndex < sampleCount) ? samples[evenIndex] : 0;
+        const oddSample  = (oddIndex  >= 0 && oddIndex  < sampleCount) ? samples[oddIndex]  : 0;
+        packedBuffer[n * 2]     = evenSample * hannWindow[n * 2];
+        packedBuffer[n * 2 + 1] = oddSample  * hannWindow[n * 2 + 1];
+    }
+
+    const fftStart = performance.now();
+    fft(packedBuffer, twiddleReal, twiddleImag);
+    profile.fftMs += performance.now() - fftStart;
+
+    let vocalPower = 0, treblePower = 0, bassPower = 0;
+    for (let k = 0; k <= maxNeededBin; k++) {
+        const mirrorIndex = (halfSize - k) % halfSize;           // k = 0 wraps to 0 (the transform has period halfSize)
+
+        const zRe = packedBuffer[k * 2],           zIm = packedBuffer[k * 2 + 1];
+        const mRe = packedBuffer[mirrorIndex * 2], mIm = packedBuffer[mirrorIndex * 2 + 1];
+
+        // Separate the even/odd sub-spectra that the packing step mixed together
+        const evenRe = (zRe + mRe) / 2, evenIm = (zIm - mIm) / 2;
+        const oddRe  = (zIm + mIm) / 2, oddIm  = (mRe - zRe) / 2;
+
+        // Recombine into bin k of the full-length transform
+        const twiddleRe = unpackReal[k], twiddleIm = unpackImag[k];
+        const binRe = evenRe + (twiddleRe * oddRe - twiddleIm * oddIm);
+        const binIm = evenIm + (twiddleRe * oddIm + twiddleIm * oddRe);
+        const binPower = binRe * binRe + binIm * binIm;
+
+        if (k >= bands.vocalStart  && k < bands.vocalEnd)  vocalPower  += binPower;
+        if (k >= bands.trebleStart && k < bands.trebleEnd) treblePower += binPower;
+        if (k >= bands.bassStart   && k < bands.bassEnd)   bassPower   += binPower;
+    }
+
+    analysis.vocalEnergy[frameIndex]  = Math.sqrt(vocalPower  / (bands.vocalEnd  - bands.vocalStart));
+    analysis.trebleEnergy[frameIndex] = Math.sqrt(treblePower / (bands.trebleEnd - bands.trebleStart));
+    analysis.bassEnergy[frameIndex]   = Math.sqrt(bassPower   / (bands.bassEnd   - bands.bassStart));
+}
+
+
+// Fills the frames skipped by frameStride with a straight line between the
+// analyzed frames on either side. With frameStride = 1 this does nothing.
+// The final frame must already be analyzed so the last segment is never
+// extrapolated.
+function interpolateBetweenAnalyzedFrames(values, frameStride, frameCount) {
+    const lastFrame = frameCount - 1;
+    for (let left = 0; left < lastFrame; left += frameStride) {
+        const right = Math.min(left + frameStride, lastFrame);
+        const span = right - left;
+        for (let frame = left + 1; frame < right; frame++) {
+            values[frame] = values[left] + (values[right] - values[left]) * ((frame - left) / span);
+        }
+    }
+}
+
+// Runs the per-frame analysis over the whole track, analyzing every
+// frameStride-th frame (plus always the last one) and interpolating the rest.
+// Returns how many frames were actually analyzed.
+function runAnalysisLoop(analysis, frameCount, frameStride, onProgress) {
+    const analyzeFrame = analysis.pffft ? analyzeFrameWasm : analyzeFrameJs;
+    const analyzedFrameCount = Math.ceil(frameCount / frameStride);
+    const progressEvery = Math.max(1, Math.floor(analyzedFrameCount / 50));
+
+    for (let analyzedIndex = 0; analyzedIndex < analyzedFrameCount; analyzedIndex++) {
+        analyzeFrame(analyzedIndex * frameStride, analysis);
+        if (analyzedIndex % progressEvery === 0) onProgress(analyzedIndex, analyzedFrameCount);
+    }
+
+    const lastFrame = frameCount - 1;
+    if (frameCount > 0 && lastFrame % frameStride !== 0) analyzeFrame(lastFrame, analysis);
+
+    interpolateBetweenAnalyzedFrames(analysis.vocalEnergy, frameStride, frameCount);
+    interpolateBetweenAnalyzedFrames(analysis.trebleEnergy, frameStride, frameCount);
+    interpolateBetweenAnalyzedFrames(analysis.bassEnergy, frameStride, frameCount);
+    return analyzedFrameCount;
+}  
+
 // ── Main onmessage ────────────────────────────────────────────────
 // Worker message handler receives audio samples and analysis parameters
 // Sends progress updates and a final result back to the main thread
@@ -1514,15 +1751,20 @@ self.onmessage = async function(e) {
         // the kick channel and returns immediately. Never reaches the FFT
         // loop below, so vocal/treble are untouched.
         if (!cachedSampleDataForPreview) return; // guards a preview request racing ahead of load-samples
-        const { sr: sampleRate, stepMs, kickLp: kickLowpassHz, kickRej: kickSustainRejection, requestId } = e.data;
-        const kickChannel = extractKick(cachedSampleDataForPreview, sampleRate, stepMs, kickLowpassHz, kickSustainRejection);
-        self.postMessage({
-            type: 'kick-preview-done',
-            requestId,
-            beats: Array.from(kickChannel),
-            onsets: detectOnsets(kickChannel, stepMs, 0.06),
-            bpm: bpmFromEnv(kickChannel, stepMs),
-        });
+        try {
+            const { sr: sampleRate, stepMs, kickLp: kickLowpassHz, kickRej: kickSustainRejection } = e.data;
+            const envelope = getKickEnvelope(cachedSampleDataForPreview, sampleRate, stepMs, kickLowpassHz);
+            const kickChannel = shapeKickChannel(envelope, stepMs, kickSustainRejection);
+            console.log('kick-preview invoked');
+            self.postMessage({
+                type: 'kick-preview-done',
+                beats: Array.from(kickChannel, roundToThousandths),
+                onsets: detectOnsets(kickChannel, stepMs),
+                bpm: bpmFromEnv(kickChannel, stepMs),
+            });
+        } catch (error) {
+            self.postMessage({ type: 'error', message: String(error) });   // an async handler's throw would otherwise never reach worker.onerror
+        }
         return;
     }
 
@@ -1536,7 +1778,8 @@ self.onmessage = async function(e) {
         kickRej: kickSustainRejection = 1.0,
         kickBass = false,
         turbo   = true,       // false for 'js' (safe) | true for 'wasm'
-        engine   = 'lut'
+        engine   = 'lut',
+        fftStride = 2,       
     } = e.data;
 
     // Helper to post a progress message
@@ -1545,7 +1788,10 @@ self.onmessage = async function(e) {
     // Reset waveform before every run — engines fill it lazily,
     // so stale data from a previous run must be cleared.
     waveform.fill(0);
+
+    // full path performance logging
     const analyzeStart = performance.now();
+
     if (engine === 'lut') {
         const HOP = 512;                                  // hop size in samples
         const stepMs = HOP / sr * 1000;                   // hop size in milliseconds
@@ -1601,47 +1847,18 @@ self.onmessage = async function(e) {
         // Frequency bin ranges
         // +1 makes the range inclusive of 
         // the end bins (ranges overlap at binHz)
-        const b0 = Math.floor(43 / binHz);                 // bass band start (43 Hz)
-        const b1 = Math.floor(258 / binHz + 1);            // bass band end  (258 Hz)
-        const v0 = Math.floor(300 / binHz);                // vocal band start (300 Hz)
-        const v1 = Math.floor(4000 / binHz) + 1;           // vocal band end   (4000 Hz)
-        const t0 = Math.floor(4000 / binHz);               // treble band start (4000 Hz)
-        const t1 = Math.floor(11000 / binHz) + 1;          // treble band end   (11000 Hz)
+        const b0 = Math.floor(43 / binHz);                 // bass band start
+        const b1 = Math.floor(258 / binHz + 1);            // bass band end
+        const v0 = Math.floor(300 / binHz);                // vocal band start
+        const v1 = Math.floor(4000 / binHz) + 1;           // vocal band end
+        const t0 = Math.floor(4000 / binHz);               // treble band start
+        const t1 = Math.floor(11000 / binHz) + 1;          // treble band end
 
-        // Real-input FFT (rFFT), x is always real (imaginary part is always zero),
-        // so half that work is wasted. The trick:
-        //
-        //   1. Pack x[2n] as the real part and x[2n+1] as the imaginary
-        //      part of a half-length (N/2) complex sequence z[n]. One
-        //      N/2-point complex FFT on z gives Z[0..N/2-1].
-        //
-        //   2. Z is Even[k] + i*Odd[k], where Even/Odd are the DFTs of
-        //      x's even- and odd-indexed samples. Because x is real,
-        //      Even and Odd are each conjugate-symmetric — which is
-        //      exactly what lets them be separated back out of Z:
-        //        Even[k] = (Z[k] + conj(Z[mirror])) / 2
-        //        Odd[k]  = -i * (Z[k] - conj(Z[mirror])) / 2,  mirror = (N/2 - k) mod (N/2)
-        //      (k=0 needs no special case: mirror naturally wraps to 0,
-        //      since Z has period N/2, and the formula degenerates
-        //      correctly on its own.)
-        //
-        //   3. Recombine via the standard radix-2 butterfly to get the
-        //      bin of the FULL N-point transform:
-        //        X[k] = Even[k] + W_N^k * Odd[k],   W_N^k = e^(-2*pi*i*k/N)
-        //
-        // Steps 2-3 only need to run up to the highest bin any band
-        // actually reads (treble's upper edge) — nothing past that is
-        // ever used, so the unpack loop is bounded well below N/2 too.
-        //
-        // The lutTwRe/lutTwIm table built above for LUT_FFT_N already
-        // contains every stage-size entry a HALF_N-point FFT needs
-        // (buildTwiddles fills every power-of-two stage up to its
-        // argument), so no second stage-twiddle table is needed — only
-        // the small per-bin unpack table below is new.
+        // Real-input FFT (rFFT)
         const maxNeededBin = Math.max(b1, v1, t1);
 
         if (!unpackTwRe || unpackTwRe.length <= maxNeededBin) {
-            unpackTwRe = new Float64Array(maxNeededBin + 1); // using 32-bit avoid compound rounding errors across the stages.
+            unpackTwRe = new Float64Array(maxNeededBin + 1); // using 64-bit avoid compound rounding errors across the stages.
             unpackTwIm = new Float64Array(maxNeededBin + 1);
             for (let k = 0; k <= maxNeededBin; k++) {
                 const theta = -2 * Math.PI * k / LN;
@@ -1650,7 +1867,7 @@ self.onmessage = async function(e) {
             }
         }
 
-        // Output envelopes for vocal and treble bands
+        // Output envelopes for each band
         const ve = new Float32Array(frameCount); // tiny rounding errors in the 6th decimal place, will vanish through the logarithmic scaling function
         const te = new Float32Array(frameCount);
         const be = new Float32Array(frameCount);
@@ -1666,105 +1883,38 @@ self.onmessage = async function(e) {
 
         // half the size
         const packedBuffer = new Float32Array(HALF_N * 2);
+        const frameStride = Math.max(1, Math.floor(fftStride));
 
-        // Reused scratch buffer, wasm path
-        const windowedFrameScratch = pffft ? new Float32Array(LN) : null;
+        // One context object holds everything the per-frame functions need. Every
+        // field exists for both paths (null when unused) so the object keeps a
+        // single shape.
+        const analysis = {
+            samples, sampleCount,
+            hannWindow: win,
+            fftSize: LN, hopSize: HOP, halfSize: HALF_N,
+            bands: { bassStart: b0, bassEnd: b1, vocalStart: v0, vocalEnd: v1, trebleStart: t0, trebleEnd: t1 },
+            vocalEnergy: ve, trebleEnergy: te, bassEnergy: be,
+            profile: { fftMs: 0 },                                       // diagnostic only
+            // WASM path
+            pffft,
+            windowedFrame: pffft ? new Float32Array(LN) : null,
+            // JS path
+            packedBuffer,
+            twiddleReal: lutTwRe, twiddleImag: lutTwIm,
+            unpackReal: unpackTwRe, unpackImag: unpackTwIm, maxNeededBin,
+        };
 
-        // Progress update every ~2% of frames
-        const TICK = Math.max(1, Math.floor(frameCount / 50));
-        let fftTimeAccum = 0;
         const loopStart = performance.now();
-        // Per-frame analysis
-        for (let f = 0; f < frameCount; f++) {
-            // Centered frame (zero-padded edges): frame f spans samples [f*HOP - LN/2, f*HOP + LN/2)
-            const s0 = f * HOP - LN / 2;
+        const analyzedFrameCount = runAnalysisLoop(analysis, frameCount, frameStride, (done, total) => {
+            prog(10 + Math.round(done / total * 85), 'BASS / VOCAL / TREBLE');
+        });
+        const loopMs = performance.now() - loopStart;
 
-            let vb = 0, tb = 0, bb = 0; // band energy accumulators
-
-            if (pffft) {
-                // WASM path — window the frame into a plain real array,
-                // one call does the whole N=16384 real FFT, no packing trick.
-                for (let i = 0; i < LN; i++) {
-                    const k = s0 + i;
-                    windowedFrameScratch[i] = (k >= 0 && k < sampleCount ? samples[k] : 0) * win[i];
-                }
-                const fftT0 = performance.now();
-                const spectrum = pffft.transform(windowedFrameScratch); // interleaved [re,im,...], ordered — matches our bin indices directly
-                fftTimeAccum += performance.now() - fftT0;
-                for (let k = v0; k < v1; k++) { const re = spectrum[k * 2], im = spectrum[k * 2 + 1]; vb += re * re + im * im; }
-                for (let k = t0; k < t1; k++) { const re = spectrum[k * 2], im = spectrum[k * 2 + 1]; tb += re * re + im * im; }
-                for (let k = b0; k < b1; k++) { const re = spectrum[k * 2], im = spectrum[k * 2 + 1]; bb += re * re + im * im; }
-            } else {
-                // pack windowed even/odd samples into one half-length
-                // complex buffer, instead of filling a full-length real one
-                for (let n = 0; n < HALF_N; n++) {
-                    const evenIndex = s0 + n * 2;
-                    const oddIndex  = evenIndex + 1;
-                    const evenSample = (evenIndex >= 0 && evenIndex < sampleCount) ? samples[evenIndex] : 0;
-                    const oddSample  = (oddIndex  >= 0 && oddIndex  < sampleCount) ? samples[oddIndex]  : 0;
-                    packedBuffer[n * 2]     = evenSample * win[n * 2];
-                    packedBuffer[n * 2 + 1] = oddSample  * win[n * 2 + 1];
-                }
-
-                // One HALF_N-point complex FFT now does the work the old
-                // LN-point one did
-                const fftT0 = performance.now();
-                fft(packedBuffer, lutTwRe, lutTwIm);
-                fftTimeAccum += performance.now() - fftT0;
-                // one combined pass over k, instead of three separate
-                // per-band loops — the bands don't overlap (or overlap by at
-                // most one bin, unchanged from before), so this also avoids
-                // redundant unpack+recombine work at that shared edge
-                for (let k = 0; k <= maxNeededBin; k++) {
-                    const mirrorIndex = (HALF_N - k) % HALF_N; // k=0 wraps to 0 — Z has period HALF_N
-
-                    const zRe = packedBuffer[k * 2];
-                    const zIm = packedBuffer[k * 2 + 1];
-                    const mRe = packedBuffer[mirrorIndex * 2];
-                    const mIm = packedBuffer[mirrorIndex * 2 + 1];
-
-                    // Separate the even/odd sub-spectra the packing step mixed together
-                    const evenRe = (zRe + mRe) / 2;
-                    const evenIm = (zIm - mIm) / 2;
-                    const oddRe  = (zIm + mIm) / 2;
-                    const oddIm  = (mRe - zRe) / 2;
-
-                    // Recombine into bin k of the full-length transform
-                    const wRe = unpackTwRe[k], wIm = unpackTwIm[k];
-                    const xRe = evenRe + (wRe * oddRe - wIm * oddIm);
-                    const xIm = evenIm + (wRe * oddIm + wIm * oddRe);
-                    const magnitudeSquared = xRe * xRe + xIm * xIm;
-
-                    if (k >= v0 && k < v1) vb += magnitudeSquared;
-                    if (k >= t0 && k < t1) tb += magnitudeSquared;
-                    if (k >= b0 && k < b1) bb += magnitudeSquared;
-                }
-            }
-
-            // Store RMS-like band amplitude per frame
-            ve[f] = Math.sqrt(vb / (v1 - v0));
-            te[f] = Math.sqrt(tb / (t1 - t0));
-            be[f] = Math.sqrt(bb / (b1 - b0));
-  
-            // Progress update
-            if (f % TICK === 0) {
-                prog(10 + Math.round(f / frameCount * 85), 'BASS / VOCAL / TREBLE');
-            }
-        }
-
-        const loopEnd = performance.now();
-        console.log('[worker] frame loop:', (loopEnd - loopStart).toFixed(1), 'ms for', frameCount, 'frames |',
-                    ((loopEnd - loopStart) / frameCount).toFixed(3), 'ms/frame | engine:', pffft ? 'wasm' : 'js');
-
-        console.log('[worker] FFT-only time:', fftTimeAccum.toFixed(1), 'ms |',
-                    (fftTimeAccum / frameCount).toFixed(3), 'ms/frame');
-
-        // // Destroy and clear cache (force re-init on next call) if the 
-        // // same worker runs multiple analyses with different FFT sizes        
-        // if (pffft) {
-        //     pffft.destroy();
-        //     pffftModulePromise = null;   // re-instantiating the WASM module is not cheap
-        // }
+        console.log('[worker] frame loop:', loopMs.toFixed(1), 'ms |', analyzedFrameCount, 'of', frameCount,
+                    'frames analyzed (stride ' + frameStride + ') |', (loopMs / analyzedFrameCount).toFixed(3),
+                    'ms per analyzed frame | engine:', pffft ? 'wasm' : 'js');
+        console.log('[worker] FFT-only time:', analysis.profile.fftMs.toFixed(1), 'ms |',
+                    (analysis.profile.fftMs / analyzedFrameCount).toFixed(3), 'ms per analyzed frame');
 
         // Convert linear amplitude array to decibels (with small epsilon to avoid log(0))
         const db = x => {
@@ -1787,22 +1937,25 @@ self.onmessage = async function(e) {
         const activeBassEnvelope = kickBass ? kickChannel : bass;
         const comparisonBassEnvelope = kickBass ? bass : kickChannel;
 
+        console.log('[worker] analyze total:', (performance.now() - analyzeStart).toFixed(1), 'ms | engine:', pffft ? 'wasm' : 'js');
+
         // Paired posts: waveform first, then done. Order matters — the main
         // thread's 'done' handler assumes waveform is already populated.
         // Do not insert anything between these that could throw and skip the
         // second post; the main thread would hang waiting for 'done'.
         self.postMessage({ type: 'waveform', data: waveform }, [waveform.buffer]);
-        console.log('[worker] analyze total:', (performance.now() - analyzeStart).toFixed(1), 'ms | engine:', pffft ? 'wasm' : 'js');        
         self.postMessage({
             type: 'done',
-            step_ms: Math.round(stepMs * 1e4) / 1e4,                         // step in ms, rounded to 4 decimals
-            beats: Array.from(activeBassEnvelope),                           // Float32 data arrays map smoothly to arrays
-            bass_comparison_env: Array.from(comparisonBassEnvelope),         // Studio-only, never exported
-            vocal_env: Array.from(vocal),
-            treble_env: Array.from(treble),
-            onsets: detectOnsets(activeBassEnvelope, stepMs, .06),
-            vocal_onsets: detectOnsets(vocal, stepMs, .08, 0.15, 150), // longer cooldown for vocal onsets as it tends to be longer events
+            step_ms: Math.round(stepMs * 1e4) / 1e4,                                        // step in ms, rounded to 4 decimals
+            beats: Array.from(activeBassEnvelope, roundToThousandths),                      // Float32 data arrays map smoothly to arrays
+            bass_comparison_env: Array.from(comparisonBassEnvelope, roundToThousandths),    // Studio-only, never exported
+            vocal_env: Array.from(vocal, roundToThousandths),
+            treble_env: Array.from(treble, roundToThousandths),
+            vocal_onsets: detectOnsets(vocal, stepMs),         // TODO: wiring path, thinking of dropping onsets entirely
+            onsets: detectOnsets(activeBassEnvelope, stepMs),
             bpm: bpmFromEnv(activeBassEnvelope, stepMs),
+            onsets_comparison: detectOnsets(comparisonBassEnvelope, stepMs),
+            bpm_comparison: bpmFromEnv(comparisonBassEnvelope, stepMs),
             kick_bass: kickBass
         });
 
@@ -1833,8 +1986,7 @@ const RADIX_WORKER_SRC = // TODO: 2x copies in and out worker
           `const WASM_SIMD_B64 = "${SIMD_B64}";\n` +
           atob(GLUE_B64) + '\n' 
         : `const WASM_AVAILABLE = false;\n`) +
-    RADIX_WORKER_SRC_HEAD +
-    RADIX_WORKER_SRC_TAIL;
+    RADIX_WORKER_RAW;
 
 const workerBlob = new Blob([RADIX_WORKER_SRC], { type: 'application/javascript' });
 
@@ -1859,13 +2011,14 @@ const ENGINE_MAP = Object.fromEntries(ENGINE_REGISTRY.map(e => [e.id, e]));
 // Analysis engines read from here. Mutated directly by slider/select
 // inputs via renderParamPanel() event listeners.
 // ═══════════════════════════════════════════════════════════════════
-const PARAMS = { // passed to Worker via postMessage
-    turbo: true,
+const PARAMS = { // passed to Worker via postMessage, ensure analSig mirrors theses
+    turbo: true,     // FFT through WASM
+    fftStride: 2,    // 1 = every frame (exact), 2 = every 2nd, 4 = every 4th; the rest are interpolated
     // peak-picking kick-detection params
     kickBass: false, // false = FFT band analysis ("lut" model), true = time-domain bass kick
-    kickLp: 120,    // lpHz: low-pass cutoff frequency for kick detection (Hz)
-    kickRej: 1,     // rej: rejection factor for the adaptive slow envelope (noise floor)
-    // dummy: 'A',  // Radio model example, esnure Key:value matches PARAM_SPECS[model][id]:PARAM_SPECS[model][options][value]
+    kickLp: 120,     // lpHz: low-pass cutoff frequency for kick detection (Hz)
+    kickRej: 1,      // rej: rejection factor for the adaptive slow envelope (noise floor)
+    // dummy: 'A',   // Radio model example, esnure Key:value matches PARAM_SPECS[model][id]:PARAM_SPECS[model][options][value]
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1914,6 +2067,20 @@ const PARAM_SPECS = {
                 hint:  'Noise-floor multiplier for the adaptive envelope. ' +
                        'Higher = stricter (fewer, stronger onsets). ' +
                        'Lower = more sensitive (may pick up ghost notes).',
+            },
+            {
+                // Toggles per frame analysis stride.
+                id:      'fftStride',
+                label:   'Stride',
+                type:    'slider',
+                min:     1,
+                max:     4,
+                step:    1,
+                fmt:     v => Number(v) === 1 ? '1 (exact)' : `${v} (≈${Math.round(100 / Number(v))}% analyzed)`,
+                hint:  'Frames analyzed per FFT. 1 = every frame (exact, slowest). ' +
+                       'Higher values interpolate between analyzed frames — faster, ' +
+                       'with slightly softer fine detail, no visible difference on most tracks. ' +
+                       'Kick detection is not affected.',
             },
             {
                 // Toggles bass analysis engine between the FFT band pipeline
@@ -2135,10 +2302,12 @@ const state = {
     decodedFor:   null,   // cached buffer file reference
     beats:        [],     // onsets from bass channel — used for beat visualizer sync
     onsets:       [],     // onsets from bass channel via extractKick — used for discrete beat visualizer sync
+    onsetsComp:   [],     // studio mode switching only  
     vocalBeats:   [],     // onsets from vocal channel — used for lyric snapping
-                          // populated by extractVocalProxy(); falls back to beats array if empty
-    waveformData: null,   // Float32Array[400] from Worker, null until first extraction
+    analSig:      null,   // memoization key - signature of current analysis { file, engine, PARAMS }, any FULL analysis path must update this
+    waveformData: null,   
     bpm:          0,
+    bpmComp:      0,      // studio mode switching only  
     stepMs:       0,      // 0 = discrete mode, >0 = LUT mode (mirrors BEAT_DATA.step_ms)
     vocalEnv:     [],     // populated only when engine === 'lut'
     trebleEnv:    [],
@@ -2146,20 +2315,20 @@ const state = {
     results:      [],     // assigned lyrics: { text, start }
                           // end is implicit: template renderer uses next line's start
     index:        0,      // current lyrics line index
-    mode:         'beats',     // 'buffer' | 'snap' | 'beats'
-    engine:       'lut',  // 'lut' | others to be implemented — controls full-mix analysis
-    vocalEngine:  'onnx',       // 'onnx' — controls vocal stem extraction (future implementation)
+    mode:         'beats',   // 'buffer' | 'snap' | 'beats'
+    engine:       'lut',     // 'lut' | others to be implemented — controls full-mix analysis
+    vocalEngine:  'onnx',    // 'onnx' — controls vocal stem extraction (future implementation)
     player:       null,
-    playerUrl:    null,   // stored separately — player.src becomes a resolved URL after assignment
-    designPlayerUrl: null,
-    activeWorker: null,   // kept so cancel can terminate mid-analysis
+    playerUrl:    null,      // stored separately — player.src becomes a resolved URL after assignment
+    activeWorker: null,      // kept so cancel can terminate mid-analysis
     // Serialised export strings — populated by finishSession()
     beatsJson: '', lyricsJs: '', beatsRaw: '', lyricsRaw: '',
     // Preview state
     previewActive:  false,  // true when in-page renderer is running
     // Design state
     animConfig: null,
-    comparisonBeats: []
+    comparisonBeats: [],
+    kickBassActive: false  // which extraction currently sits in state.beats, default FFT, mirrors kickBass
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2312,7 +2481,15 @@ function showView(viewName) {
     Object.entries(VIEWS).forEach(([name, element]) => {
         element.style.display = (name === viewName) ? 'block' : 'none';
     });
+    // Let AnimationGate handle the design-view start.
     AnimationGate.applyForView(viewName);
+    // Session loop resumes via the play event or by explicit start.
+
+    if (viewName === 'setup') {
+        startBtn.textContent = 'START SESSION';
+        startBtn.disabled    = false;
+    }
+    if (viewName === 'session') { syncSessionUi(); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2347,6 +2524,7 @@ function showOverlay(engine) {
 // (stops the seek loop), then player (stops audio), then URL revoke.
 // Reversing this order can cause rAF to reference a null player.
 function cleanupSession(isNewSession = false) {
+    // state reset block
     if (state.activeWorker) { state.activeWorker.terminate(); state.activeWorker = null; }
     stopRafLoop();
     // Stop in-page preview renderer before clearing state
@@ -2354,15 +2532,15 @@ function cleanupSession(isNewSession = false) {
     if (_seekThrottle)      { clearTimeout(_seekThrottle); _seekThrottle = null; }
     if (state.player)       { state.player.pause(); state.player.src = ''; state.player = null; }
     if (state.playerUrl)    { URL.revokeObjectURL(state.playerUrl); state.playerUrl = null; }
-    if (state.designPlayerUrl) { URL.revokeObjectURL(state.designPlayerUrl); state.designPlayerUrl = null; }
-    DesignStep.stopKickPreviewWorker();
+    DesignStep.reset(); // defensive in case a code path ever tears down session state without going through showView
     _draggingIdx = -1;
-    previewWrap.classList.remove('visible'); 
+    previewWrap.classList.remove('visible');
     state.index = 0; state.results = []; state.beats = []; 
-    state.onsets = []; state.vocalBeats = []; state.decoded = null; 
-    state.mono = null; state.decodedFor = null; state.comparisonBeats = [];
-    state.waveformData  = null; state.lyrics = []; state.bpm = 0;
-    state.stepMs = 0; state.vocalEnv = []; state.trebleEnv = [];
+    state.onsets = []; state.onsetsComp = []; state.vocalBeats = []; 
+    state.decoded = null; state.mono = null; state.decodedFor = null;
+    state.comparisonBeats = []; state.waveformData  = null; state.lyrics = [];
+    state.bpm = 0; state.bpmComp = 0; state.stepMs = 0; state.vocalEnv = []; state.trebleEnv = [];
+    state.kickBassActive = false; state.analSig = null;
     if (isNewSession) { state.animConfig = null; } // let design prevails across different audio uploads
     progressFill.style.width = '0%';
     seekFill.style.width = '0%';
@@ -2370,7 +2548,7 @@ function cleanupSession(isNewSession = false) {
     _viewStart = 0; _viewDur = 0;
 }
 
-function refresUI() {
+function refreshUI() {
     state.results   = [];
     state.index     = 0;
     totalLinesSpan.innerHTML    = state.lyrics.length || `${icon('loop')}`;
@@ -2386,24 +2564,35 @@ function updateProgress() {
         progressFill.style.width = `${(state.index / state.lyrics.length) * 100}%`;
 }
 
+function syncSessionUi() {
+    totalLinesSpan.innerHTML    = state.lyrics.length || `${icon('loop')}`;
+    lineCounterSpan.textContent = state.results.length;
+    bpmDisplay.textContent      = state.bpm > 0 ? `${state.bpm} BPM` : 'BPM —';
+    // Display the current line based on state.index, not the first line
+    currLine.innerHTML = state.lyrics.length > 0
+        ? (state.lyrics[state.index] ?? `${icon('check')} ALL LYRICS MARKED`)
+        : (state.index > 0 ? `${icon('beat')} ${state.index} BEATS MARKED` : `${icon('beat')} NO LYRICS — TAPS MARK BEATS`);
+    autoassBtn.disabled = state.beats.length === 0 || state.lyrics.length === 0;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // PLAYBACK CONTROLS
 // ═══════════════════════════════════════════════════════════════════
 pbPlay.addEventListener('click', () => {
-    if (!state.player) return;
+    if (!state.player) { toast('Drop an audio file first'); return; }
     state.player.paused ? state.player.play() : state.player.pause();
     // No rAF management here — 'play'/'pause' events handle it
 });
 
 pbStop.addEventListener('click', () => {
-    if (!state.player) return;
+    if (!state.player) { toast('Drop an audio file first'); return; }
     state.player.pause();
     state.player.currentTime = 0;
 });
 
 // Seek by clicking the seek track — maps click X to audio position
 seekTrack.addEventListener('click', (e) => {
-    if (!state.player || !state.player.duration) return;
+    if (!state.player || !state.player.duration) { toast('Drop an audio file first'); return; }
     const rect = seekTrack.getBoundingClientRect();
     const pct  = (e.clientX - rect.left) / rect.width;
     state.player.currentTime = pct * state.player.duration;
@@ -2415,7 +2604,7 @@ reslyBtn.addEventListener('click', () => {
         // Refresh UI
         closePrev.click();
         pbStop.click();
-        refresUI();
+        refreshUI();
         toast('Lyrics timestamps cleared');
     }
 });
@@ -2428,19 +2617,24 @@ reslyBtn.addEventListener('click', () => {
 const DesignStep = {
     animCore: null,
     config: JSON.parse(JSON.stringify(DEFAULT_ANIM_CONFIG)),
+    running: false,
     animationFrameId: 0,
     lastFrameTimeMs: 0,
     frameTimeSamplesMs: [],
     lastStatsUpdateMs: 0,
     kickPreviewWorker: null,
-    kickPreviewRequestId: 0,
-    kickPreviewLatestAppliedId: 0,
+    kickPreviewInFlight: false,
+    kickPreviewPending: false,
+    // kickPreviewRequestId: 0,
+    // kickPreviewLatestAppliedId: 0,
 
     init(initialLyricText) {
         if (this.animCore) {
-            // Re-entering design-view (e.g. from the output-view button) —
-            // don't rebuild AnimCore, just refresh the text if a new one came in.
+            // Re-entering during the same session, 
+            // analysis may have been re-run since the last visit.
+            this.syncLutData();
             if (initialLyricText) this.animCore.setLyricText(initialLyricText);
+            this.requestFrame();
             return;
         } // already initialized — re-entering this step shouldn't rebuild everything
 
@@ -2454,95 +2648,143 @@ const DesignStep = {
             },
             this.config,
         );
-        this.animCore.setLutData({ stepMs: state.stepMs, bass: state.beats, vocal: state.vocalEnv, treble: state.trebleEnv });
+        this.syncLutData();
 
         const resolvedLyricText = initialLyricText || (state.results.length ? state.results[0].text : null);
-        if (resolvedLyricText) {
-            blockTextInput.hidden = true;
-            this.animCore.setLyricText(resolvedLyricText);
-        } else {
-            // Neither a passed-in line nor tapped results exist — beats-only
-            // mode with an empty lyrics textarea. Let the user type directly.
-            blockTextInput.hidden = false;
-            blockTextInput.oninput = () => this.animCore.setLyricText(blockTextInput.value || 'FIZX');
-            this.animCore.setLyricText(blockTextInput.value || 'FIZX');
-        }
-
+        // The textarea is the source of truth, user deside what goes in from anywhere
+        blockTextInput.value = resolvedLyricText;
+        blockTextInput.oninput = () => this.animCore.setLyricText(blockTextInput.value || 'FIZX');
+        this.animCore.setLyricText(blockTextInput.value || 'FIZX');
+        
+        // populate panel controls
         this.buildControlPanel();
-        this.startKickPreviewWorker();
 
-        const audioEl = document.getElementById('design-audio');
-        state.designPlayerUrl = URL.createObjectURL(state.audioFile);
-        audioEl.src = state.designPlayerUrl;
+        // Property assignment (not addEventListener) so re-initializing after reset() can never stack handlers.
+        state.player.onplay = () => { this.lastFrameTimeMs = performance.now(); this.requestFrame(); };
+        state.player.onseeked = () => this.requestFrame();
 
         // Sized once here, not per frame. Requires that the design view is
         // already visible when init() runs — clientWidth is 0 on a display:none
         // element, which would leave the canvas with no drawable area.
         // call showView('design') before DesignStep.init()
         diagnosticCanvas.width = diagnosticCanvas.clientWidth;
-        diagnosticCanvas.height = 72; 
-        audioEl.onseeked = () => drawDesignDiagnostics(audioEl.currentTime);
+        diagnosticCanvas.height = 72;  // width is fitted on every draw instead
+        this.requestFrame();           // paint the first still frame
     },
 
-    // Starts the dedicated worker used for live kick-channel preview while
-    // dragging the LP/rejection sliders. Separate from the worker
-    // extractRadix() creates for full-track analysis — that one is built
-    // fresh per run and torn down after 'done', which doesn't suit staying
-    // alive for a drag gesture that can fire many times a second.
-    startKickPreviewWorker() {
+    // Tears down everything tied to the previous song. The user's design (this.config) is kept.
+    reset() {
+        this.stop();
+        this.stopKickPreviewWorker();
+        if (this.animCore) { this.animCore.destroy(); this.animCore = null; }
+        this.frameTimeSamplesMs.length = 0;
+        this.textState();
+    },
+
+    // use input text as final lyrics for studio > output workflow
+    textState() {
+        const text = blockTextInput.value.trim() || 'FIZX';
+        state.results = [{ text, start: 0 }];
+    },
+
+    // single entry points for pushing data/config into AnimCore
+    syncLutData() {
+        this.animCore.setLutData({ stepMs: state.stepMs, bass: state.beats, vocal: state.vocalEnv, treble: state.trebleEnv });
+        this.requestFrame();
+    },
+
+    applyConfig() {
+        this.animCore.setConfig(this.config);
+        this.requestFrame();
+    },
+
+    // kick preview: lazy worker, at most one computation in flight
+    ensureKickPreviewWorker() {
         if (this.kickPreviewWorker) return; // already running
 
-        this.kickPreviewWorker = new Worker(getRadixWorkerUrl());
-        this.kickPreviewWorker.onmessage = (event) => {
+        const worker = new Worker(getRadixWorkerUrl());
+        worker.onmessage = (event) => {
             const message = event.data;
+            if (message.type === 'error') {
+                console.error('[DesignStep] kick preview failed:', message.message);
+                this.kickPreviewInFlight = false;
+                return;
+            }
             if (message.type !== 'kick-preview-done') return;
-            if (message.requestId < this.kickPreviewLatestAppliedId) return; // a newer request already landed — this one is stale, discard it
-            this.kickPreviewLatestAppliedId = message.requestId;
+            this.kickPreviewInFlight = false;
             this.applyKickPreviewResult(message);
+            if (this.kickPreviewPending) this.sendKickPreview();   // slider moved while computing: go again with the latest values
+        };
+
+        worker.onerror = (error) => {
+            console.error('[DesignStep] kick preview worker failed:', error.message);
+            this.stopKickPreviewWorker();                          // the next request creates a fresh worker
         };
 
         // Sent once, as a transferable copy — state.mono itself is
         // never transferred, so it stays intact for anything else that
         // needs it (a full re-analysis on bass-mode switch, for instance).
         const sampleDataCopy = state.mono.slice();
-        this.kickPreviewWorker.postMessage(
+        worker.postMessage(
             { type: 'load-samples', samples: sampleDataCopy },
             [sampleDataCopy.buffer],
         );
+        this.kickPreviewWorker = worker;
     },
 
     stopKickPreviewWorker() {
-        if (this.kickPreviewWorker) {
-            this.kickPreviewWorker.terminate();
-            this.kickPreviewWorker = null;
-        }
+        if (this.kickPreviewWorker) this.kickPreviewWorker.terminate();
+        this.kickPreviewWorker = null;
+        this.kickPreviewInFlight = false;
+        this.kickPreviewPending = false;
     },
 
     // Fires on every kick-slider drag tick. Cheap — the worker already has the sample data cached from startKickPreviewWorker().
     requestKickPreview() {
-        if (!this.kickPreviewWorker) return;
-        if (!PARAMS.kickBass) return; // kick sliders are disabled in FFT mode — nothing to preview
-        this.kickPreviewRequestId += 1;
+        this.ensureKickPreviewWorker();
+        if (this.kickPreviewInFlight) { this.kickPreviewPending = true; return; }
+        this.sendKickPreview();
+    },
+
+    sendKickPreview() {
+        this.kickPreviewInFlight = true;
+        this.kickPreviewPending = false;
         this.kickPreviewWorker.postMessage({
             type: 'kick-preview',
             sr: state.decoded.sampleRate,
             stepMs: state.stepMs,
-            kickLp: PARAMS.kickLp,
+            kickLp: PARAMS.kickLp,      // read at send time, so a deferred send always carries the latest slider values
             kickRej: PARAMS.kickRej,
-            requestId: this.kickPreviewRequestId,
         });
     },
 
-    // Applies a finished preview result — same effect as committing a slider change, just continuous while dragging. comparisonBeats is untouched: it's the other extraction mode's array, which kick params don't affect.
+    // Applies a finished preview result
     applyKickPreviewResult(result) {
-        state.beats = result.beats;
-        state.onsets = result.onsets;
-        state.bpm = result.bpm;
-        this.animCore.setLutData({ stepMs: state.stepMs, bass: state.beats, vocal: state.vocalEnv, treble: state.trebleEnv });
+        // The preview always computes the kick channel. Write it to whichever
+        // side of the pair currently holds kick — which is the "active" side if
+        // kickBassActive is true, or the "comparison" side if it's false.
+        if (state.kickBassActive) {
+            state.beats  = result.beats;
+            state.onsets = result.onsets;
+            state.bpm    = result.bpm;
+        } else {
+            state.comparisonBeats  = result.beats;
+            state.onsetsComp       = result.onsets;
+            state.bpmComp          = result.bpm;
+        }
+        this.syncLutData();
     },    
 
-    // Creates one slider row bound to `targetObject[paramDef.key]`, and calls animCore.setConfig() on change
-    createSliderControl(container, paramDef, targetObject) {
+    // One slider row bound to `targetObject[paramDef.key]`.
+    // If `onCommit` is provided, it's called after the value is written and
+    // the label updated (slider is released). Used for sliders that need to trigger 
+    // expensive work (worker round-trips, re-analysis). The caller is responsible for 
+    // any spinner toggling inside onCommit.
+    // If `onInput`, the default behavior is to call
+    // this.applyConfig() — a cheap re-apply for config-only sliders
+    // (live feedback). With neither, the value is applied to the animation config live.
+    // ensure calling after animCore is created.
+    createSliderControl(container, paramDef, targetObject, { onInput, onCommit } = {}) {
         const row = document.createElement('div');
         row.className = 'slider-control';
         row.dataset.tip = paramDef.tip;
@@ -2553,11 +2795,18 @@ const DesignStep = {
         `;
         const inputEl = row.children[1];
         const valueLabelEl = row.children[2];
-        valueLabelEl.textContent = inputEl.value;
+        const format = paramDef.fmt || ((v) => String(v));
+        valueLabelEl.textContent = format(inputEl.value);
+
         inputEl.oninput = () => {
             targetObject[paramDef.key] = Number(inputEl.value);
-            valueLabelEl.textContent = inputEl.value;
-            this.animCore.setConfig(this.config);
+            valueLabelEl.textContent = format(inputEl.value);
+            if (onInput) onInput();
+            else if (!onCommit) this.applyConfig(); // cheap; live is fine
+        };
+
+        inputEl.onchange = () => {
+            if (onCommit) onCommit();
         };
         container.appendChild(row);
     },
@@ -2568,9 +2817,8 @@ const DesignStep = {
         details.className = 'control-group';
         details.open = true;
         details.innerHTML = `<summary>${title}</summary>`;
-
+        
         const select = document.createElement('select');
-        select.dataset.tip = 'Pick one.';
         Object.entries(registry)
             .filter(([, definition]) => !scope || definition.scope === 'both' || definition.scope === scope)
             .forEach(([id, definition]) => select.add(new Option(definition.label, id)));
@@ -2582,16 +2830,57 @@ const DesignStep = {
             slot.params = slot.params || {};
             (registry[slot.id].params || []).forEach((paramDef) => this.createSliderControl(paramsContainer, paramDef, slot.params));
         };
+
+        // show the registry tip
+        const summaryEl = details.querySelector('summary');
+        summaryEl.dataset.tip = registry[slot.id].tip;
+
         select.onchange = () => {
             slot.id = select.value;
             slot.params = {};
+            summaryEl.dataset.tip = registry[slot.id].tip;
             redrawParams();
-            this.animCore.setConfig(this.config);
+            this.applyConfig();
         };
 
         redrawParams();
         details.append(select, paramsContainer);
         container.appendChild(details);
+
+        return details; // return the element instead of relying on panel.lastChild
+    },
+
+    // create processing spinner
+    makeSpinner() {
+        const el = document.createElement('div');
+        el.className = 'mini-spinner';
+        el.style.display = 'none';
+        return el;
+    },
+
+    // Append processing spinner to targeted element
+    appendSpinner(appendEl, spinnerEl) {
+        // appendEl.style.display = 'flex';
+        // appendEl.style.alignItems = 'center';
+        // appendEl.style.justifyContent = 'space-between';
+        appendEl.append(spinnerEl);
+    },
+
+    // Locks every control in the panel while the worker runs,
+    // so a second switch cannot be queued and two analyses can never overlap.
+    async withSpinner(spinnerEl, fn) {
+        spinnerEl.style.display = '';
+        const panel = document.getElementById('design-controls');
+        panel.querySelectorAll('input, select, button').forEach(el => el.disabled = true);
+        try {
+            return await fn();
+        } catch (err) {
+            console.error('[DesignStep] re-analysis failed:', err);
+            toast('Re-analysis failed: ' + (err.message || err));
+        } finally {
+            spinnerEl.style.display = 'none';
+            panel.querySelectorAll('input, select, button').forEach(el => el.disabled = false);
+        }
     },
 
     buildControlPanel() {
@@ -2599,17 +2888,66 @@ const DesignStep = {
         panel.innerHTML = '';
         const config = this.config;
 
+        // studio processing spinners
+        const bassSpinner = this.makeSpinner();
+
+        // Bass extraction mode
+        const bassModeGroup = document.createElement('details');
+        bassModeGroup.className = 'control-group';
+        bassModeGroup.open = true;
+        bassModeGroup.innerHTML = '<summary>Bass extraction</summary>';    
+        const bmSummary = bassModeGroup.querySelector('summary');
+        this.appendSpinner(bmSummary, bassSpinner);
+        bmSummary.dataset.tip = 'Kick: applies filtering — sharper, less bleed. FFT: use original spectrum — default behavior, included for comparison.';  
+        const bassModeSelect = document.createElement('select');
+        bassModeSelect.add(new Option('Kick (time-domain, recommended)', 'kick'));
+        bassModeSelect.add(new Option('FFT slice (43-258Hz)', 'fft'));
+        bassModeSelect.value = PARAMS.kickBass ? 'kick' : 'fft';
+        bassModeSelect.onchange = () => {
+            this.setBassMode(bassModeSelect.value === 'kick');
+        };
+        bassModeGroup.appendChild(bassModeSelect);
+        panel.appendChild(bassModeGroup);
+        // stride sliders
+        [
+            { key: 'fftStride', label: 'Stride', min: 1, max: 4, step: 1, default: 2,
+              fmt: v => Number(v) === 1 ? '1 (exact)' : `${v} (≈${Math.round(100 / Number(v))}% analyzed)`,
+              tip: 'Frames analyzed per FFT. 1 = every frame (exact, slowest). Higher values interpolate between analyzed frames — faster, no visible difference on most tracks.' },
+        ].forEach((paramDef) => this.createSliderControl(bassModeGroup, paramDef, PARAMS, {
+            onCommit: () => this.withSpinner(bassSpinner, () => this.reanalyzeFullTrack())
+        })); 
+
+        // Kick detection — only affects the time-domain bass channel
+        const kickGroup = document.createElement('details');
+        kickGroup.className = 'control-group';
+        kickGroup.innerHTML = '<summary>Kick detection</summary>';
+        const kgSummary = kickGroup.querySelector('summary');
+        kgSummary.dataset.tip = 'Adjusts the kick channel live. In FFT mode it updates the comparison line, so you can tune it before switching.';
+        [
+            { key: 'kickLp', label: 'LP cutoff (Hz)', min: 70, max: 250, step: 5, default: 120,
+              tip: 'Upper edge of the kick band. Lower isolates sub/kick only; higher lets bass guitar and snare body in.' },
+            { key: 'kickRej', label: 'Sustain reject', min: 0, max: 1.5, step: 0.05, default: 1,
+              tip: 'Subtracts the slow bass level so held notes vanish and only sharp hits remain. Too high can erase soft kicks.' },
+        ].forEach((paramDef) => this.createSliderControl(kickGroup, paramDef, PARAMS, {
+            onInput: () => this.requestKickPreview()
+        }));
+        // pre-warm the worker on hover/focus
+        kickGroup.addEventListener('pointerenter', () => this.ensureKickPreviewWorker(), { once: true });
+        kickGroup.addEventListener('focusin', () => this.ensureKickPreviewWorker(), { once: true });
+        panel.appendChild(kickGroup);
+
         // Response model
         const responseGroup = document.createElement('details');
         responseGroup.className = 'control-group';
         responseGroup.open = true;
         responseGroup.innerHTML = '<summary>Response</summary>';
+        const rgSummary = responseGroup.querySelector('summary');
+        rgSummary.dataset.tip = 'Controls how animations reacts to bass value, smooth or snappy.';
         const modelSelect = document.createElement('select');
-        modelSelect.dataset.tip = 'How the bass value reacts. Punch retriggers on every detected hit, so close hits stay visually distinct.';
         [['baseline', 'Baseline (snap + decay)'], ['fastdecay', 'Fast decay'], ['punch', 'Level + Punch']]
             .forEach(([value, label]) => modelSelect.add(new Option(label, value)));
         modelSelect.value = config.response.model;
-        modelSelect.onchange = () => { config.response.model = modelSelect.value; this.animCore.setConfig(config); };
+        modelSelect.onchange = () => { config.response.model = modelSelect.value; this.applyConfig(); };
         responseGroup.appendChild(modelSelect);
 
         [
@@ -2622,55 +2960,6 @@ const DesignStep = {
         ].forEach((paramDef) => this.createSliderControl(responseGroup, paramDef, config.response));
         panel.appendChild(responseGroup);
 
-        // Kick detection — only affects the time-domain bass channel
-        const kickGroup = document.createElement('details');
-        kickGroup.className = 'control-group';
-        kickGroup.classList.toggle('disabled', !PARAMS.kickBass);
-        kickGroup.innerHTML = '<summary>Kick detection</summary>';
-        [
-            { key: 'kickLp', label: 'LP cutoff (Hz)', min: 70, max: 250, step: 5, default: 120,
-              tip: 'Upper edge of the kick band. Lower isolates sub/kick only; higher lets bass guitar and snare body in.' },
-            { key: 'kickRej', label: 'Sustain reject', min: 0, max: 1.5, step: 0.05, default: 1,
-              tip: 'Subtracts the slow bass level so held notes vanish and only sharp hits remain. Too high can erase soft kicks.' },
-        ].forEach((paramDef) => {
-            const row = document.createElement('div');
-            row.className = 'slider-control';
-            row.dataset.tip = paramDef.tip;
-            row.innerHTML = `
-                <span>${paramDef.label}</span>
-                <input type="range" min="${paramDef.min}" max="${paramDef.max}" step="${paramDef.step}" value="${PARAMS[paramDef.key] ?? paramDef.default}">
-                <span></span>
-            `;
-            const inputEl = row.children[1];
-            const valueLabelEl = row.children[2];
-            valueLabelEl.textContent = inputEl.value;
-            inputEl.oninput = () => {
-                valueLabelEl.textContent = inputEl.value;
-                PARAMS[paramDef.key] = Number(inputEl.value);
-                this.requestKickPreview();
-            };
-            kickGroup.appendChild(row);
-        });
-        panel.appendChild(kickGroup);
-
-        // Bass extraction mode
-        const bassModeGroup = document.createElement('details');
-        bassModeGroup.className = 'control-group';
-        bassModeGroup.open = true;
-        bassModeGroup.innerHTML = '<summary>Bass extraction</summary>';
-        const bassModeSelect = document.createElement('select');
-        bassModeSelect.dataset.tip = 'Kick isolates percussive transients via filtering — sharper, less bleed. FFT slices 43-258Hz from the same spectrum as vocal/treble — closer to the old behavior, included for comparison.';
-        bassModeSelect.add(new Option('Kick (time-domain, recommended)', 'kick'));
-        bassModeSelect.add(new Option('FFT slice (43-258Hz)', 'fft'));
-        bassModeSelect.value = PARAMS.kickBass ? 'kick' : 'fft';
-        bassModeSelect.onchange = () => {
-            PARAMS.kickBass = bassModeSelect.value === 'kick';
-            kickGroup.classList.toggle('disabled', bassModeSelect.value !== 'kick');
-            this.reanalyzeFullTrack();
-        };
-        bassModeGroup.appendChild(bassModeSelect);
-        panel.appendChild(bassModeGroup);
-
         // Circle style
         const circleStyleSlot = {
             get id() { return config.circle.style; }, set id(value) { config.circle.style = value; },
@@ -2680,15 +2969,15 @@ const DesignStep = {
 
         // Effect stacks — circle and text, with add/remove
         const buildEffectRow = (title, effectArray, index, scope) => {
-            this.createStyleOrEffectPicker(panel, title, EFFECTS, effectArray[index], scope);
+            const row = this.createStyleOrEffectPicker(panel, title, EFFECTS, effectArray[index], scope);
             const removeButton = document.createElement('button');
             removeButton.textContent = 'Remove';
             removeButton.onclick = () => {
                 effectArray.splice(index, 1);
-                this.animCore.setConfig(config);
+                this.applyConfig();
                 this.buildControlPanel(); // rebuild — indices shifted
             };
-            panel.lastChild.appendChild(removeButton);
+            row.appendChild(removeButton);
         };
         config.circle.effects.forEach((_, index) => buildEffectRow(`Circle effect ${index + 1}`, config.circle.effects, index, 'circle'));
 
@@ -2703,7 +2992,7 @@ const DesignStep = {
             addButton.onclick = () => {
                 const firstMatchingEffectId = Object.keys(EFFECTS).find((id) => EFFECTS[id].scope === 'both' || EFFECTS[id].scope === scope);
                 effectArray.push({ id: firstMatchingEffectId, params: {} });
-                this.animCore.setConfig(config);
+                this.applyConfig();
                 this.buildControlPanel();
             };
             panel.appendChild(addButton);
@@ -2713,51 +3002,85 @@ const DesignStep = {
     // Full re-run through the worker — needed when switching bass mode, since FFT-sliced bass only exists inside that loop
     async reanalyzeFullTrack() {
         const result = await extractRadix(state.audioFile, () => {});
-        Object.assign(state, {
-            beats: result.beats,
-            vocalEnv: result.vocalEnv,
-            trebleEnv: result.trebleEnv,
-            stepMs: result.stepMs,
-            bpm: result.bpm,
-            onsets: result.onsets,
-            vocalBeats: result.vocalBeats,
-            comparisonBeats: result.comparisonBeats,
-        });
-        this.animCore.setLutData({ stepMs: state.stepMs, bass: state.beats, vocal: state.vocalEnv, treble: state.trebleEnv });
+        applyAnalysisResult(result);
+        this.syncLutData();
+
+        // Object.assign(state, {
+        //     beats: result.beats,
+        //     vocalEnv: result.vocalEnv,
+        //     trebleEnv: result.trebleEnv,
+        //     stepMs: result.stepMs,
+        //     bpm: result.bpm,
+        //     onsets: result.onsets,
+        //     vocalBeats: result.vocalBeats,
+        //     comparisonBeats: result.comparisonBeats,
+        //     onsetsComp: result.onsetsComp,
+        //     bpmComp: result.bpmComp,
+        // });
+        // this.animCore.setLutData({ stepMs: state.stepMs, bass: state.beats, vocal: state.vocalEnv, treble: state.trebleEnv });
     },
 
+    // switch data based on mode instead of worker spin
+    setBassMode(useKick) {
+        if (!state.comparisonBeats.length) {
+            toast('Both bass extractions are not available yet.');
+            return;
+        }
+        PARAMS.kickBass = useKick; // defensive
+        if (state.kickBassActive === useKick) return; // already showing that source: a repeated call must not swap back
+
+        [state.beats,  state.comparisonBeats] = [state.comparisonBeats, state.beats];
+        [state.onsets, state.onsetsComp]      = [state.onsetsComp,      state.onsets];
+        [state.bpm,    state.bpmComp]         = [state.bpmComp,         state.bpm];
+        state.kickBassActive = useKick;
+        this.syncLutData();
+    },
+
+     // render loop: redraws on demand, keeps running only while audio plays
     start() {
-        if (this.animationFrameId) return;
-        this.lastFrameTimeMs = performance.now();
-        const audioEl = document.getElementById('design-audio');
-
-        const loop = (nowMs) => {
-            this.animationFrameId = requestAnimationFrame(loop);
-            const deltaTimeMs = Math.min(50, nowMs - this.lastFrameTimeMs); // clamp — avoids a huge jump after a tab switch
-            this.lastFrameTimeMs = nowMs;
-            if (audioEl.paused) return;
-
-            this.animCore.renderFrame(audioEl.currentTime, deltaTimeMs, nowMs);
-            drawDesignDiagnostics(audioEl.currentTime);
-
-            this.frameTimeSamplesMs.push(deltaTimeMs);
-            if (this.frameTimeSamplesMs.length > 180) this.frameTimeSamplesMs.shift();
-
-            if (nowMs - this.lastStatsUpdateMs > 150) { // update the readout a few times a second, not every frame
-                this.lastStatsUpdateMs = nowMs;
-                const averageMs = this.frameTimeSamplesMs.reduce((sum, value) => sum + value, 0) / this.frameTimeSamplesMs.length;
-                const maxMs = Math.max(...this.frameTimeSamplesMs);
-                const slowFrameCount = this.frameTimeSamplesMs.filter((value) => value > 24).length;
-                document.getElementById('design-frame-stats').textContent =
-                    `frame avg ${averageMs.toFixed(1)}ms  max ${maxMs.toFixed(0)}ms  >24ms: ${slowFrameCount}/${this.frameTimeSamplesMs.length}`;
-            }
-        };
-        this.animationFrameId = requestAnimationFrame(loop);
+        this.running = true;
+        this.requestFrame();
     },
-
     stop() {
+        this.running = false;
         cancelAnimationFrame(this.animationFrameId);
         this.animationFrameId = 0;
+    },
+
+    // Schedules one frame if none is pending. While audio plays the loop reschedules itself; when paused it draws
+    // once per request (config change, seek, data swap) and then goes idle instead of waking up 60 times a second.
+    requestFrame() {
+        if (!this.running || !this.animCore || this.animationFrameId) return;
+        this.animationFrameId = requestAnimationFrame((nowMs) => this.renderStep(nowMs));
+    },
+
+    renderStep(nowMs) {
+        this.animationFrameId = 0;
+        if (!this.animCore || !state.player) return;
+
+        const playbackTimeSec = state.player.currentTime;
+        const deltaTimeMs = Math.min(50, nowMs - this.lastFrameTimeMs);   // clamp: avoids a huge jump after a tab switch or a long idle
+        this.lastFrameTimeMs = nowMs;
+
+        this.animCore.renderFrame(playbackTimeSec, deltaTimeMs, nowMs);
+        drawDesignDiagnostics(playbackTimeSec);
+
+        if (state.player.paused) return;                                  // one-shot redraw finished
+        this.recordFrameStats(deltaTimeMs, nowMs);
+        this.requestFrame();
+    },
+
+    recordFrameStats(deltaTimeMs, nowMs) {
+        this.frameTimeSamplesMs.push(deltaTimeMs);
+        if (this.frameTimeSamplesMs.length > 180) this.frameTimeSamplesMs.shift();
+
+        if (nowMs - this.lastStatsUpdateMs < 150) return;                 // a few updates per second, not every frame
+        this.lastStatsUpdateMs = nowMs;
+        const averageMs = this.frameTimeSamplesMs.reduce((sum, value) => sum + value, 0) / this.frameTimeSamplesMs.length;
+        const maxMs = Math.max(...this.frameTimeSamplesMs);
+        const slowFrameCount = this.frameTimeSamplesMs.filter((value) => value > 24).length;
+        document.getElementById('design-frame-stats').textContent =
+            `frame avg ${averageMs.toFixed(1)}ms  max ${maxMs.toFixed(0)}ms  >24ms: ${slowFrameCount}/${this.frameTimeSamplesMs.length}`;
     },
 };
 
@@ -2833,30 +3156,15 @@ function drawDesignDiagnostics(playbackTimeSec) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// One switch controlling whether the Design step is animating.
-// `manualOverride` is null until the user touches the checkbox
-// themselves; until then, each step change sets it automatically.
+// DesignStep handlers
 // ═══════════════════════════════════════════════════════════════════
 const AnimationGate = {
-    manualOverride: null,
-
-    setEnabled(isEnabled) {
-        document.getElementById('animation-toggle').checked = isEnabled;
-        if (isEnabled) DesignStep.start(); else DesignStep.stop();
-        document.getElementById('design-stage').style.visibility = isEnabled ? '' : 'hidden';
-    },
-
     // Called by showView() on every view change. Defaults to on only
-    // while design-view is showing, unless the checkbox has been touched.
+    // while design-view is showing.
     applyForView(viewName) {
-        if (this.manualOverride === null) this.setEnabled(viewName === 'design');
+        if (viewName === 'design') DesignStep.start();
+        else DesignStep.stop();
     },
-};
-
-
-document.getElementById('animation-toggle').onchange = (event) => {
-    AnimationGate.manualOverride = event.target.checked;
-    AnimationGate.setEnabled(event.target.checked);
 };
 
 document.getElementById('design-animations-btn').addEventListener('click', () => {
@@ -2865,13 +3173,14 @@ document.getElementById('design-animations-btn').addEventListener('click', () =>
 });
 
 document.getElementById('design-back-btn').addEventListener('click', () => {
-    showView(state.results.length ? 'output' : 'setup');
+    DesignStep.reset();
+    showView('setup');
 });
 
 document.getElementById('design-export-btn').onclick = () => {
     state.animConfig = DesignStep.config;
-    recordTap();
-    download('fizx_design_compiled.html', buildFizxHtml());
+    DesignStep.reset(); // TODO: make sense here?
+    finishBtn.click();
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -3092,7 +3401,8 @@ function extractRadix(audioFile, onProgress) {
                         { 
                             stepMs: msg.step_ms, beats: msg.beats, comparisonBeats: msg.bass_comparison_env, 
                             vocalEnv: msg.vocal_env, trebleEnv: msg.treble_env, bpm: msg.bpm, onsets: msg.onsets, 
-                            vocalBeats: msg.vocal_onsets, kickBass: msg.kick_bass
+                            vocalBeats: msg.vocal_onsets, onsetsComp: msg.onsets_comparison, bmpComp: msg.bpm_comparison, 
+                            kickBass: msg.kick_bass
                         }
                     );
                 } else { // other engines path
@@ -3114,10 +3424,51 @@ function extractRadix(audioFile, onProgress) {
                 kickRej:PARAMS.kickRej,
                 kickBass: PARAMS.kickBass,
                 turbo: PARAMS.turbo,
+                fftStride: PARAMS.fftStride,
                 engine: state.engine
             },
             [samples.buffer]
         );
+    });
+}
+
+// The signature is captured at the moment the analysis completes,
+function currentAnalSig() { 
+    return {
+        file:       state.audioFile, // handles file swap, ensure its non-null at every call site
+        engine:     state.engine, // handles engine swap
+        // handle tuning changes
+        // must mirror PARAMS entries
+        // and worker's payload
+        kickBass:   PARAMS.kickBass,
+        kickLp:     PARAMS.kickLp, // even when FFT is active — the comparison envelope depends on them.
+        kickRej:    PARAMS.kickRej,
+        fftStride:  PARAMS.fftStride,
+        turbo:      PARAMS.turbo,
+    };
+}
+
+// "fresh" means "these exact inputs produced these exact outputs." No ambiguity
+// the guard is only for the path where skipping is a UX improvement
+// e.g.: setup > session > cancel (with no changes) > design
+function isAnalFresh() {
+    const s = state.analSig;
+    if (!s) return false;
+    const c = currentAnalSig();
+    return Object.keys(c).every(k => c[k] === s[k]);
+}
+
+// one place that copies an extractRadix() result
+// into state and update analysis signature
+function applyAnalysisResult(result) {
+    Object.assign(state, {
+        beats: result.beats,           comparisonBeats: result.comparisonBeats,
+        onsets: result.onsets,         onsetsComp: result.onsetsComp,
+        bpm: result.bpm,               bpmComp: result.bpmComp,
+        vocalEnv: result.vocalEnv,     trebleEnv: result.trebleEnv,
+        vocalBeats: result.vocalBeats, stepMs: result.stepMs,
+        kickBassActive: result.kickBass ?? PARAMS.kickBass,   // which extraction currently sits in state.beats
+        analSig: currentAnalSig(), // reads pre-assign state (input to current object update), deliberate because its a snapshot
     });
 }
 
@@ -3185,6 +3536,13 @@ function onProgress(pct, label) { // TODO: Proper wiring and co-ordination with 
     analysisSub.textContent = label; // sub-label, not the main label
 }
 
+function creatPLayer(file) {
+    // Build audio player — store URL separately for reliable revoke later
+    state.playerUrl = URL.createObjectURL(file);  
+    state.player = new Audio(state.playerUrl);
+    attachPlayerListeners(state.player);
+}
+
 async function analAudio() {
     if (state.mode !== 'buffer') {
         showOverlay(state.engine);
@@ -3193,14 +3551,7 @@ async function analAudio() {
         const result = await extractRadix(state.audioFile, onProgress);
 
         if (state.engine === 'lut') {
-            state.beats      = result.beats;
-            state.vocalEnv   = result.vocalEnv;
-            state.trebleEnv  = result.trebleEnv;
-            state.stepMs     = result.stepMs;
-            state.bpm        = result.bpm;
-            state.onsets     = result.onsets;
-            state.vocalBeats = result.vocalBeats;
-            state.comparisonBeats = result.comparisonBeats;
+            applyAnalysisResult(result);
         } else {
             state.beats = result.onsets;
             state.bpm   = result.bpm;
@@ -3226,8 +3577,10 @@ startBtn.addEventListener('click', async () => {
     startBtn.disabled    = true;
 
     try {
-        // Initiate analysis
-        await analAudio(); // still runs for 'beats' mode too — it needs state.beats/stepMs regardless of whether lyrics exist
+        if (!isAnalFresh()) {
+            // Initiate analysis
+            await analAudio(); // still runs for 'beats' mode too — it needs state.beats/stepMs regardless of whether lyrics exist
+        }
 
         if (state.mode === 'beats') {
             // Skip the lyric-tapping session entirely. If the user typed
@@ -3238,32 +3591,26 @@ startBtn.addEventListener('click', async () => {
             // show first then init, order matters
             showView('design');
             DesignStep.init(firstLyricLine);
-            startBtn.textContent = 'START SESSION';
-            startBtn.disabled    = false;
             return;
         }
 
-        // Build audio player — store URL separately for reliable revoke later
-        state.playerUrl = URL.createObjectURL(state.audioFile);
-        state.player    = new Audio(state.playerUrl);
+        if (!state.player && state.audioFile) creatPLayer(state.audioFile);
+
         // Enable auto-assign now that beats are available
         autoassBtn.disabled = false;
-        refresUI();
+        refreshUI();
 
         showView('session');
         pbPlay.innerHTML          = icon('pause')
         updateParamVisibility(); // syncs session-params panel visibility with current mode/engine
 
-        attachPlayerListeners(state.player);
         await state.player.play();
         updateProgress();
-
     } catch (err) {
         analysisOverlay.classList.remove('visible');
         console.error('Setup failed:', err);
         toast('Setup failed: ' + (err.message || err));
-        startBtn.textContent = 'START SESSION';
-        startBtn.disabled    = false;
+        showView('setup');
     }
 });
 
@@ -3272,15 +3619,6 @@ startBtn.addEventListener('click', async () => {
 // ═══════════════════════════════════════════════════════════════════
 // Shared function for tap logic called by both spacebar and touch
 function recordTap() { 
-    if (state.mode === 'beats') {
-        // just snap text to the start
-        state.results = [{
-            text:  blockTextInput.value,
-            start: 0,
-        }];
-        return;
-    }
-
     let t = state.player.currentTime;
 
     if (state.mode === 'buffer') {
@@ -3386,22 +3724,21 @@ document.querySelector('.stage').addEventListener('touchstart', (e) => {
 // ═══════════════════════════════════════════════════════════════════
 function populateEditor() {
     if (!state.lyrics.length) { toast('No lyrics to populate'); return; }
+    
+    const n = state.lyrics.length;
 
     if (state.results.length > 0) {
         // Allowing Manual tabs in editor, gates subsequent timing
         // mutations (e.g.: re-analysis), solved by reslyBtn
-        state.results = state.results.map((res, i) => ({
-            ...res,
-            text: state.lyrics[i] || res.text // Use updated lyric text if available (mappig supports late lyrics text editing)
-        }));
-        // state.index remains as is (e.g., 5) so tapping can continue
-        toast(`${icon('bolt')} ${state.results.length} lines populated. Click ${icon('refresh')} to clear existing timing.`);
-    } else {
+        state.results = state.lyrics.map((text, i) =>
+            state.results[i] ?? { text, start: 0 }
+        );
+        toast(`${icon('bolt')} ${n} lines populated. Click ${icon('refresh')} to clear existing timing.`);
+    } else { // The auto-assign is a heuristic starter. Once the user starts tapping, they've taken over.
         // Prefer vocalBeats for lyric placement — represents vocal attack onsets.
         // Falls back to full-mix beats if vocal extraction was skipped or failed.
-        const n         = state.lyrics.length;
         const duration  = state.player?.duration || 60;
-        const snapBeats = state.vocalBeats.length ? state.vocalBeats : state.beats;
+        const snapBeats = state.vocalBeats.length ? state.vocalBeats : state.onsets;
 
         if (snapBeats.length >= n) {
             // Beat-window mode: divide beats into N equal-count windows,
@@ -3440,11 +3777,11 @@ function populateEditor() {
                 start: parseFloat((usable * (i / Math.max(n - 1, 1))).toFixed(3)),
             }));
         }
-        state.index = n;
         toast(`${icon('bolt')} ${n} lines snapped to ${state.vocalBeats.length ? 'vocals' : 'beats'}`);
     }
 
     // UI Updates
+    state.index = n; // extra taps gets distinct names regardless of timing
     lineCounterSpan.textContent = state.results.length;
     currLine.innerHTML = `${icon('bolt')} EDITOR POPULATED — DRAG SLIDERS TO ADJUST`;
     updateProgress();
@@ -3685,14 +4022,14 @@ function drawPreviewFrame() {
     if (_showOnsets) {
         // Full-mix beats: small dim circles at midline
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        for (const b of state.beats) {
+        for (const b of state.onsets) { // discrete values
             const x = timeToX(b);
             if (x < 0 || x > w) continue;
             ctx.beginPath(); ctx.arc(x, WAVE_MID, 2, 0, Math.PI * 2); ctx.fill();
         }
         // Vocal onsets: slightly larger accent circles above midline
         ctx.fillStyle = accent; ctx.globalAlpha = 0.55;
-        for (const b of (state.vocalBeats || [])) {
+        for (const b of (state.vocalBeats || [])) { // discrete values
             const x = timeToX(b);
             if (x < 0 || x > w) continue;
             ctx.beginPath(); ctx.arc(x, WAVE_MID - 8, 2.5, 0, Math.PI * 2); ctx.fill();
@@ -3759,7 +4096,7 @@ function drawPreviewFrame() {
 
     // ── Beat flash border ─────────────────────────────────────────
     // Uses ±30ms window — generous enough for visual sync without being distracting
-    if (state.beats.some(b => Math.abs(b - t) < 0.03)) {
+    if (state.onsets.some(b => Math.abs(b - t) < 0.03)) {
         ctx.save(); ctx.strokeStyle = accent;
         ctx.lineWidth = 2; ctx.globalAlpha = 0.4;
         ctx.strokeRect(1, 1, w - 2, h - 2); ctx.restore();
@@ -3830,7 +4167,7 @@ function renderPreviewEditor() {
             _draggingIdx = -1;
             applyRowFocus(-1);            
             setResultStart(i, parseFloat(e.target.value), sl);
-            if (state.player) state.player.pause();
+            // if (state.player) state.player.pause();
         });
         // Delete: splice + re-render to avoid closure
         // index bugs that event delegation on a mutable list introduces.
@@ -3943,7 +4280,7 @@ function initCanvasDrag() {
             _draggingIdx = -1;
             applyRowFocus(-1);
             _previewCanvas.style.cursor = 'crosshair';
-            if (state.player) state.player.pause();
+            // if (state.player) state.player.pause();
             requestRedraw();
         }
         if (panning) {
@@ -4154,6 +4491,7 @@ document.getElementById('zoom-reset-btn')?.addEventListener('click', () => {
 
 // Full visual preview in a new tab
 previewBtn.addEventListener('click', () => {
+    if (state.player) state.player.pause();
     const url = URL.createObjectURL(new Blob([buildFizxHtml()], { type: 'text/html' }));
     window.open(url, '_blank');
     // Revoke after a delay — tab has already loaded the document by then.
@@ -4278,11 +4616,9 @@ finishBtn.addEventListener('click', () => {
 // CANCEL
 // ═══════════════════════════════════════════════════════════════════
 cancelBtn.addEventListener('click', () => {
-    cleanupSession();
+    if (state.player) state.player.pause();
     analysisOverlay.classList.remove('visible');
     showView('setup');
-    startBtn.disabled    = false;
-    startBtn.textContent = 'START SESSION';
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -4307,7 +4643,7 @@ reanalBtn.addEventListener('click', async () => {
     showOverlay(state.engine);
 
     try {
-        await analAudio();
+        await analAudio(); // no need for sig guard, this is a "forced re-run" that should update the sig 
         bpmDisplay.textContent = state.bpm > 0 ? `${state.bpm} BPM` : 'BPM —';
         toast(`${icon('reanalyze')} ${state.beats.length} ${state.engine === 'lut' ? 'LUT frames' : 'onsets'} · ${state.bpm} BPM`);
     } catch (err) {
@@ -4354,16 +4690,11 @@ newsBtn.addEventListener('click', () => {
     if (confirmed) {
         cleanupSession(true);
         showView('setup');
-        startBtn.disabled = false; 
-        startBtn.textContent = 'START SESSION';
         lyricsInput.value = '';
         dropZone.innerHTML = 'DROP AUDIO FILE<div class="dz-hint">MP3 · WAV · OGG · FLAC</div>';
         fileInput.value = '';  // Without it, re-selecting the same file fires no change event
         dropZone.classList.remove('loaded');
-        state.audioFile = null; state.beats = []; state.onsets = [];
-        state.vocalBeats = []; state.decoded = null; state.mono = null; 
-        state.decodedFor = null; state.stepMs = 0; state.vocalEnv = [];
-        state.trebleEnv = []; state.lyrics = []; state.bpm = 0;
+        state.audioFile = null;
     }
 });
 cntsBtn.addEventListener('click', () => {
@@ -4392,6 +4723,10 @@ function setAudioFile(file) {
     if (!file || !file.type.startsWith('audio/')) { toast('Drop an audio file (MP3, WAV, OGG, FLAC)'); return; }
     cleanupSession();
     state.audioFile = file;
+    // single shared URL and player for the studio's lifetime
+    // created here for preview and access from any view
+    creatPLayer(file);
+    // update UI
     dropZone.innerHTML = `${file.name}<div class="dz-hint">${(file.size/1048576).toFixed(1)} MB</div>`;
     dropZone.classList.add('loaded');
 }

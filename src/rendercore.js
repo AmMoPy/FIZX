@@ -162,8 +162,12 @@ class AnimCore {
     setConfig(config) {
         this.config = config;
 
-        this.responseModel = createResponseModel(config.response);
-
+        // The response model reads its settings live from config.response, so it only needs rebuilding if that
+        // object itself was replaced. Rebuilding on every slider tick zeroes its smoothing state and the preview flickers.
+        if (this.responseConfigSource !== config.response) {
+            this.responseModel = createResponseModel(config.response);
+            this.responseConfigSource = config.response;
+        }
         this.circleStyle = CIRCLE_STYLES[config.circle.style] || CIRCLE_STYLES.sweep;
         const defaultStyleParams = {};
         this.circleStyle.params.forEach((paramDef) => { defaultStyleParams[paramDef.key] = paramDef.default; });
