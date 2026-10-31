@@ -211,6 +211,9 @@
         }
         .seek-fill { height: 100%; background: var(--accent); width: 0%; border-radius: 2px; box-shadow: 0 0 6px var(--accent); pointer-events: none; }
         .pb-time { font-family: var(--prim); font-size: 0.8rem; color: var(--text-dim); flex-shrink: 0; min-width: 70px; text-align: right; }
+        #now-playing {
+            font-family: var(--prim);
+        }
 
         /* ── Progress + stats (tap progress, separate from seek) ─── */
         .progress-track { width: 100%; height: 2px; background: var(--surface-2); border-radius: 1px; margin: 20px 0 12px; overflow: hidden; }
@@ -401,7 +404,7 @@
             position: relative;
             font-size: 2rem;
             bottom: 100px;
-
+            left: 250px;
         }
 
         #design-text-glow {
@@ -675,7 +678,14 @@
             }
             #design-stage {
                 height: 42vh;             /* shorter stage so controls remain reachable */
-            }            
+            }       
+            #design-text-transition-container {
+                right: initial;
+            }
+            #design-text-layer {
+                bottom: initial;
+                left: initial;
+            }  
         }
 
         @media (min-width: 601px) {
@@ -695,6 +705,7 @@
 
     <!-- Playback bar: play/pause toggles, stop resets position to 0 -->
     <div id="playback-bar-shared" class="playback-bar">
+        <div id="now-playing"></div>
         <button class="pb-btn" id="pb-play" title="Play / Pause"></button>
         <button class="pb-btn" id="pb-stop" title="Stop"></button>
         <div class="seek-track" id="seek-track">
@@ -2376,6 +2387,7 @@ const applyBtn        = document.getElementById('preview-refresh-btn');
 const onsetBtn        = document.getElementById('toggle-onsets-btn');
 const closePrev       = document.getElementById('close-preview-btn')
 const seekTrack       = document.getElementById('seek-track');
+const nowPlaying      = document.getElementById('now-playing');   
 const seekFill        = document.getElementById('seek-fill');
 const eSelector       = document.getElementById('engine-selector');
 const setupParent     = document.getElementById('engine-param-panels');
@@ -2894,11 +2906,11 @@ const DesignStep = {
         // Bass extraction mode
         const bassModeGroup = document.createElement('details');
         bassModeGroup.className = 'control-group';
-        bassModeGroup.open = true;
+        // bassModeGroup.open = true;
         bassModeGroup.innerHTML = '<summary>Bass extraction</summary>';    
         const bmSummary = bassModeGroup.querySelector('summary');
         this.appendSpinner(bmSummary, bassSpinner);
-        bmSummary.dataset.tip = 'Kick: applies filtering — sharper, less bleed. FFT: use original spectrum — default behavior, included for comparison.';  
+        bmSummary.dataset.tip = 'Kick: applies filtering — sharper, less bleed. FFT: use original spectrum — smoothed, quieter.';  
         const bassModeSelect = document.createElement('select');
         bassModeSelect.add(new Option('Kick (time-domain, recommended)', 'kick'));
         bassModeSelect.add(new Option('FFT slice (43-258Hz)', 'fft'));
@@ -2939,7 +2951,7 @@ const DesignStep = {
         // Response model
         const responseGroup = document.createElement('details');
         responseGroup.className = 'control-group';
-        responseGroup.open = true;
+        // responseGroup.open = true;
         responseGroup.innerHTML = '<summary>Response</summary>';
         const rgSummary = responseGroup.querySelector('summary');
         rgSummary.dataset.tip = 'Controls how animations reacts to bass value, smooth or snappy.';
@@ -2951,13 +2963,33 @@ const DesignStep = {
         responseGroup.appendChild(modelSelect);
 
         [
-            { key: 'decayMs', label: 'Decay (ms)', min: 15, max: 150, step: 5, default: 60,
-              tip: 'Release time of the bass value. Shorter means a snappier re-pulse between close hits.' },
-            { key: 'punchSensitivity', label: 'Punch sensitivity', min: 0.02, max: 0.3, step: 0.01, default: 0.06,
-              tip: 'How sharp a rise must be to count as a hit. Lower catches more hits, including quieter instrument transients.' },
+            { key: 'smoothness', label: 'Kick Smoothness', min: 0, max: 1, step: 0.1, default: 0,
+              tip: 'Smooths the kick response. 0 = snappy and precise, 1 = soft and rounded. Use this to tame harsh hits on kick-driven tracks.' },            
+            { key: 'punchSensitivity', label: 'Punch sensitivity', min: 0.02, max: 0.8, step: 0.01, default: 0.06,
+              tip: 'How sharp a rise must be to count as a hit. Lower catches more hits, including quieter instruments.' },
             { key: 'offsetMs', label: 'A/V offset (ms)', min: -400, max: 400, step: 5, default: 0,
               tip: 'Positive shifts visuals earlier, negative later. Use this to compensate for Bluetooth or output-device audio latency.' },
-        ].forEach((paramDef) => this.createSliderControl(responseGroup, paramDef, config.response));
+        ].forEach((mainParam) => this.createSliderControl(responseGroup, mainParam, config.response));
+        
+
+        // Advanced knobs, collapsed by default
+        const advanced = document.createElement('details');
+        advanced.className = 'control-group';
+        advanced.style.marginTop = '8px';
+        advanced.innerHTML = '<summary>Advanced shaping</summary>';
+        [           
+            { key: 'decayMs', label: 'Decay (ms)', min: 15, max: 150, step: 5, default: 60,
+              tip: 'Release time of the bass value. Shorter means a snappier re-pulse between close hits.' },
+            { key: 'attackMs', label: 'Attack (ms)', min: 0, max: 150, step: 5, default: 0,
+              tip: 'Tames Kick snap, lower means instant snap. Minor effect in FFT mode.' },
+            { key: 'punchDepth', label: 'Punch Depth', min: 0.1, max: 1, step: 0.1, default: 0.6,
+              tip: 'Amplify strong hits, preserve weak ones.' },
+            { key: 'punchFloor', label: 'Punch Floor', min: 0.1, max: 1, step: 0.1, default: 0.3,
+              tip: 'Minimum punch level when a hit lands, even if the bass level is low. Higher means weak hits still produce a visible punch.' },
+            { key: 'accentFloor', label: 'Accent Floor', min: 0.1, max: 1, step: 0.1, default: 0.55,
+              tip: 'Discrete effects floor (e.g. ripples): Higher means they remain visible.' },
+        ].forEach((paramDef) => this.createSliderControl(advanced, paramDef, config.response));
+        responseGroup.appendChild(advanced);
         panel.appendChild(responseGroup);
 
         // Circle style
@@ -4692,6 +4724,7 @@ newsBtn.addEventListener('click', () => {
         showView('setup');
         lyricsInput.value = '';
         dropZone.innerHTML = 'DROP AUDIO FILE<div class="dz-hint">MP3 · WAV · OGG · FLAC</div>';
+        nowPlaying.innerHTML = '';
         fileInput.value = '';  // Without it, re-selecting the same file fires no change event
         dropZone.classList.remove('loaded');
         state.audioFile = null;
@@ -4729,6 +4762,7 @@ function setAudioFile(file) {
     // update UI
     dropZone.innerHTML = `${file.name}<div class="dz-hint">${(file.size/1048576).toFixed(1)} MB</div>`;
     dropZone.classList.add('loaded');
+    nowPlaying.innerHTML = `${file.name.toUpperCase().replace(/\.[^/.]+$/, "")}`;
 }
 
 dropZone.addEventListener('click',     () => fileInput.click());

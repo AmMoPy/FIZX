@@ -35,65 +35,140 @@ function exponentialApproach(currentValue, targetValue, timeConstantMs, deltaTim
 // Returns { bass, vocal, treble, hitDetected } — hitDetected is true on
 // any frame where a rise crossed the punch threshold, used by callers
 // that want to trigger something once per hit (e.g. the scan effect).
+//
+// Note: the worker's onsets serve a different purpose even if the animation 
+// path barely needs them separately. That's a feature, not a redundancy. 
+// Two consumers, two uses.
 function createResponseModel(responseConfig) {
     let sustainedLevel = 0;
     let punchValue = 0;
-    let previousBassTarget = 0;
     let punchCooldownMs = 0;
     let bassValue = 0;
     let vocalValue = 0;
     let trebleValue = 0;
 
-    const PUNCH_COOLDOWN_MS = 70; // minimum gap between retriggers, prevents one real hit from firing twice across a couple of noisy frames
+    let onsetBaseline = 0;      // follows the bass target down instantly and up slowly: "what the bass was a moment ago"
+    let onsetArmed = true;
+    let peakSinceHit = 0;
+    let msSinceHit = 0;
+    let recentIntervals = [];   // folded hit-to-hit gaps, newest last
+    // tempo estimate from hit spacing, median of folded hit gaps. 
+    // It’s accurate on steady kicks but will wander on syncopated or 
+    // sparse hits (e.g.: The dancer keeps going at the last tempo through breaks)
+    // TODO: is a noisy tempo estimate, not a beat clock. It's fine as a "how fast roughly" 
+    // input for continuous motion, and bad as a "fire at exactly this moment" input for discrete events.
+    let beatPeriodMs = 500;
+
+    const PUNCH_COOLDOWN_MS = 70;   // minimum gap between retriggers, prevents one real hit from firing twice across a couple of noisy frames
+    const HIT_FLOOR = 0.15;         // a rise below this absolute level is noise whatever its size
+    const BASELINE_MS = 90;         // smaller = only sharper attacks count as hits
+    const REARM_FRACTION = 0.6;     // after a hit, bass must fall by this fraction of punchSensitivity to re-arm
+    const MIN_PERIOD_MS = 300, MAX_PERIOD_MS = 760;   // tempo is folded into this range (about 79-200 BPM)
 
     return {
         reset() {
-            sustainedLevel = 0;
-            punchValue = 0;
-            previousBassTarget = 0;
-            punchCooldownMs = 0;
-            bassValue = 0;
-            vocalValue = 0;
-            trebleValue = 0;
+            sustainedLevel = 0; punchValue = 0; punchCooldownMs = 0; bassValue = 0; vocalValue = 0; trebleValue = 0;
+            onsetBaseline = 0; onsetArmed = true; peakSinceHit = 0; msSinceHit = 0; recentIntervals = []; beatPeriodMs = 500;
         },
 
         step(targetBass, targetVocal, targetTreble, deltaTimeMs) {
             punchCooldownMs = Math.max(0, punchCooldownMs - deltaTimeMs);
-            const rise = targetBass - previousBassTarget;
-            previousBassTarget = targetBass;
-            const hitDetected = rise > responseConfig.punchSensitivity && targetBass > 0.15 && punchCooldownMs <= 0;
-            if (hitDetected) punchCooldownMs = PUNCH_COOLDOWN_MS;
+            msSinceHit += deltaTimeMs;
+
+            onsetBaseline = targetBass < onsetBaseline
+                ? targetBass
+                : exponentialApproach(onsetBaseline, targetBass, BASELINE_MS, deltaTimeMs);
+            const rise = targetBass - onsetBaseline; // how much higher is the current value than the recent floor
+
+            let hitDetected = false;
+            if (onsetArmed) {
+                if (rise > responseConfig.punchSensitivity && targetBass > HIT_FLOOR && punchCooldownMs <= 0) {
+                    hitDetected = true;
+                    onsetArmed = false;
+                    peakSinceHit = targetBass;
+                    punchCooldownMs = PUNCH_COOLDOWN_MS;
+                }
+            } else {
+                peakSinceHit = Math.max(peakSinceHit, targetBass);
+                // one sustained loud passage can't fire repeated hits. Hits have to be separated by a genuine dip.
+                if (peakSinceHit - targetBass > responseConfig.punchSensitivity * REARM_FRACTION) {
+                    onsetArmed = true;
+                    onsetBaseline = targetBass;
+                }
+            }
+
+            if (hitDetected) {
+                let interval = msSinceHit;
+                msSinceHit = 0;
+                if (interval < 2500) {                                   // a gap this long is a break in the music, not a beat
+                    while (interval < MIN_PERIOD_MS) interval *= 2;      // 16th/8th-note hits fold up to the beat
+                    while (interval > MAX_PERIOD_MS) interval /= 2;      // sparse hits fold down
+                    recentIntervals.push(interval);
+                    if (recentIntervals.length > 8) recentIntervals.shift();
+                    if (recentIntervals.length >= 3) {
+                        const sorted = recentIntervals.slice().sort((a, b) => a - b);
+                        beatPeriodMs = sorted[sorted.length >> 1];
+                    }
+                }
+            }
 
             let outputBass;
+            const s = Math.min(1, Math.max(0, responseConfig.smoothness));
+            // Smoothness modulates four things, all in the bass *level* shaping.
+            // hitDetected and hitStrength below stay exactly as they were — this
+            // knob only affects what the user perceives as "how soft the pulse is",
+            // not when hits fire or how strong discrete accents are.
+            const attackMs   = responseConfig.attackMs + 45 * s;              // rounds the leading edge
+            const sDecayMs   = responseConfig.decayMs * (1 + s);              // longer tail
+            const punchDepth = responseConfig.punchDepth * (1 - 0.5 * s);     // flatter hits
+            const punchFloor = responseConfig.punchFloor + (0.5 - responseConfig.punchFloor) * s * 0.5;  // softened, not fully 0.5
+            // strong hits get near targetBass, the weak hits get something closer to the floor
+            const hitLevel = targetBass * ((1 - punchDepth) + punchDepth * Math.min(1, rise / 0.5));
             if (responseConfig.model === 'punch') {
+                // Sustained level: attack respects attackMs (0 = instant snap, else exponential),
+                // release uses the smoothed decay. This is the change that makes smoothness
+                // visible on sustained content, not just on punchy hits.
                 sustainedLevel = targetBass > sustainedLevel
-                    ? targetBass
-                    : exponentialApproach(sustainedLevel, targetBass, 70, deltaTimeMs);
+                    ? (attackMs > 0
+                        ? exponentialApproach(sustainedLevel, targetBass, attackMs, deltaTimeMs)
+                        : targetBass)
+                    // 75% for punchValue and 117% for the sustained level so default decayMs (60) 
+                    // reproduce the existing defaults (70 / 45) while enabling the slider here too
+                    : exponentialApproach(sustainedLevel, targetBass, sDecayMs * 1.17, deltaTimeMs);
                 punchValue = hitDetected
-                    ? Math.max(0.55, targetBass)
-                    : exponentialApproach(punchValue, 0, 45, deltaTimeMs);
+                    ? (attackMs > 0 
+                        ? exponentialApproach(punchValue, Math.max(punchFloor, hitLevel), attackMs, deltaTimeMs)
+                        : Math.max(punchFloor, hitLevel))
+                    : exponentialApproach(punchValue, 0, sDecayMs * 0.75, deltaTimeMs);
                 outputBass = Math.max(sustainedLevel * 0.8, punchValue);
-            } else {
+            } else { // baseline / fastdecay
                 const decayMs = responseConfig.model === 'fastdecay'
-                    ? Math.min(responseConfig.decayMs, 28)
-                    : responseConfig.decayMs;
+                    ? Math.min(sDecayMs, 28)
+                    : sDecayMs;
                 bassValue = targetBass > bassValue
-                    ? targetBass
+                    ? (attackMs > 0 
+                        ? exponentialApproach(bassValue, targetBass, attackMs, deltaTimeMs) 
+                        : targetBass) // attackMs = 0 means instant snap
                     : exponentialApproach(bassValue, targetBass, decayMs, deltaTimeMs);
                 outputBass = bassValue;
             }
 
             vocalValue = exponentialApproach(vocalValue, targetVocal, 90, deltaTimeMs);
             trebleValue = exponentialApproach(trebleValue, targetTreble, 60, deltaTimeMs);
-
-            // Write into the shared output object (no per-frame allocation)
-            // this means any caller holding a reference sees the values mutate
-            // on the next step() but since the caller reads them synchronously 
-            // after renderFrame, this is fine in a single-instance setup.
-            return { bass: outputBass, vocal: vocalValue, treble: trebleValue, hitDetected };
+            
+            // Write into the shared output object, this means any caller holding a
+            // reference sees the values mutate on the next step() but since the caller
+            // reads them synchronously after renderFrame, this is fine in a single-instance setup.
+            return {
+                bass: outputBass, vocal: vocalValue, treble: trebleValue, hitDetected,
+                // higher floor so discrete effects remain visible
+                hitStrength: hitDetected ? Math.max(responseConfig.accentFloor, hitLevel) : 0, // Accents stay exact. Smoothing only the displayed bass level keeps ripples and strikes on the true hit.
+                beatPeriodMs,
+            };
         },
     };
 }
+
 
 // Drives both the circle canvas and the animated text block from one LUT
 // data source and one response model. Owns the circle's canvas element and
@@ -168,7 +243,14 @@ class AnimCore {
             this.responseModel = createResponseModel(config.response);
             this.responseConfigSource = config.response;
         }
-        this.circleStyle = CIRCLE_STYLES[config.circle.style] || CIRCLE_STYLES.sweep;
+        // State is rebuilt only when the style itself changes, because rebuilding it on slider ticks would reset the springs
+        const styleId = CIRCLE_STYLES[config.circle.style] ? config.circle.style : 'sweep';
+        this.circleStyle = CIRCLE_STYLES[styleId];
+        // Per-style state (springs, particles) must survive slider tweaks, so it is only rebuilt when the style changes.
+        if (styleId !== this.circleStyleId) {
+            this.circleStyleId = styleId;
+            this.circleStyleState = this.circleStyle.createState ? this.circleStyle.createState() : null;
+        }
         const defaultStyleParams = {};
         this.circleStyle.params.forEach((paramDef) => { defaultStyleParams[paramDef.key] = paramDef.default; });
         this.circleStyleParams = Object.assign(defaultStyleParams, config.circle.params);
@@ -232,6 +314,7 @@ class AnimCore {
             this.bassTrailHistory.shift();
 
             this.drawContext.nowMs = nowMs;
+            this.drawContext.deltaTimeMs = deltaTimeMs;
             this.drawContext.colors = this.hostElements.getColors ? this.hostElements.getColors() : DEFAULT_COLORS;
 
             const offsets = this.accumulateEffectOffsets(this.circleEffects, frameValues, nowMs, this.circleEffectOffsets);
@@ -244,7 +327,7 @@ class AnimCore {
             ctx.rotate(offsets.rotation);
             ctx.scale(offsets.scale, offsets.scale);
             ctx.translate(-centerX, -centerY);
-            this.circleStyle.draw(ctx, frameValues, this.circleStyleParams, this.drawContext);
+            this.circleStyle.draw(ctx, frameValues, this.circleStyleParams, this.drawContext, this.circleStyleState);
             ctx.restore();
         }
 

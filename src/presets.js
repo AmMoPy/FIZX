@@ -997,7 +997,7 @@ export const PRESETS = {
             { className:'fx-neon-buzz',   duration:120, useFlash:true,  useScan:false },
             { className:'fx-neon-flat',   duration:130, useFlash:true,  useScan:false },
             { className:'fx-neon-ghost',  duration:150, useFlash:false, useScan:false },
-            // { className:'fx-neon-buzz-LUT',  duration:1000, useFlash:true,  useScan:false },
+            { className:'fx-flicker-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 
