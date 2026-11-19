@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>FIZX VISUALIZER</title>
+    <title>[[TITLE_DATA]]</title>
     <!-- Self-hosted subsetted fonts — no network request, works fully offline.
          Base64 strings injected by compile.py from generated .b64 files in assets/fonts/.-->    
     <style>
@@ -48,6 +48,20 @@
             vertical-align: middle; /* SVGs often sit slightly "higher" than text */
             margin-bottom: 0.125em; /* Fine-tune to align with font baseline */
         }
+
+        /* ── MP4 Export ───────────────────────────────────────────────── */
+        body.mp4-exporting .seekbar-container,
+        body.mp4-exporting .stats,
+        body.mp4-exporting .controls,
+        body.mp4-exporting .status-text { visibility: hidden; }
+        #mp4-export-overlay {
+            display: none;
+            position: fixed; inset: 0; z-index: 9999;
+            background: #000;
+            color: #fff; font: 14px/1.5 monospace;
+            align-items: center; justify-content: center; flex-direction: column; gap: 12px;
+        }
+        body.mp4-exporting #mp4-export-overlay { display: flex; }
 
         /* ── STAGE ────────────────────────────────────────────────────
            9:16 default. .ar-landscape flips to 16:9.
@@ -432,17 +446,24 @@
 
         <div class="controls">
             <div class="controls-row-main">
-                <button class="btn-util" id="arBtn"    data-tip="Aspect ratio"></button>
                 <button id="playBtn"   data-tip="Play / Pause"></button>
                 <button id="resetBtn"  data-tip="Reset + new file"></button>
                 <button id="modeBtn"   data-tip="Sync mode A/B"></button>
                 <button id="presetBtn" data-tip="Switch preset"></button>
-                <button class="btn-util" id="vizBtn"   data-tip="Visualizer"></button>
-                <button class="btn-util" id="lcBtn"    data-tip="Lyrics / Circle"></button>
+                <button id="arBtn"    data-tip="Aspect ratio"></button>
+                <button id="vizBtn"   data-tip="Visualizer"></button>
+                <button id="lcBtn"    data-tip="Lyrics / Circle"></button>
+                <button class="btn-util" id="eMp4Btn"  data-tip="EXPORT MP4"></button>
             </div>
         </div>
         <div class="status-text" id="statusText"></div>
     </div>
+</div>
+
+<div id="mp4-export-overlay">
+    <div id="mp4-export-status"></div>
+    <div id="mp4-export-detail"></div>
+    <button id="mp4-export-cancel"  data-tip="Cancel">X</button>
 </div>
 
 <script>
@@ -491,6 +512,12 @@ const VV = { // `primary` is a hex string; `glow` and `secondary` are strings be
 /* @@ANIM@@ */
 /* @@END_ANIM@@ */
 
+/* @@MP4MUXER@@ */
+/* @@END_MP4MUXER@@ */
+
+/* @@EXPORT@@ */
+/* @@END_EXPORT@@ */
+
 // ═══════════════════════════════════════════════════════════════════
 // DOM REFS
 // ═══════════════════════════════════════════════════════════════════
@@ -518,6 +545,7 @@ const vizBtn       = document.getElementById('vizBtn');
 const seekBar      = document.getElementById('seekBar');
 const lyricAreaEl  = document.querySelector('.lyric-area');
 const lcBtn        = document.getElementById('lcBtn');
+const exportBtn    = document.getElementById('eMp4Btn');
 const ROOT_STYLE   = document.documentElement; // Cached reference to :root for CSS var reads — avoids repeated DOM lookup.
 
 // ═══════════════════════════════════════════════════════════════════
@@ -585,6 +613,11 @@ core.setLutData(
 let _lastFrame = performance.now();
 let _exited = false;
 
+// Cap for resizeMasterCanvas's backing-store size. Live playback uses this
+// limit (protects fill rate on 2-core CPUs). MP4 Export could override this
+// via FizxExport.begin() so the master canvas renders at export resolution.
+let _masterCanvasCap = 1920;
+
 // ── Effect class removal debounce ─────────────────────────────────
 // Short-lived CSS cleanup timers only — beat scheduling is rAF-driven.
 const effectRemovalTimers = {};
@@ -596,6 +629,7 @@ let audioContext  = null;
 let analyserNode  = null;
 let sourceNode    = null;
 let audioBuffer   = null;
+let _audioName    = 'fizx';
 let startOffset   = 0;
 let startedAt     = 0;
 let audioDuration = 0;
@@ -628,10 +662,10 @@ function resizeMasterCanvas() {
     const dpr  = window.devicePixelRatio || 1;
     let w = (rect.width  * dpr + 0.5) | 0;
     let h = (rect.height * dpr + 0.5) | 0;
-    // Cap longer dimension at 1920 — keeps fill rate manageable on 2-core GPU
+    // Cap longer dimension at 1920 — keeps fill rate manageable on 2-core CPU
     const longer = Math.max(w, h);
-    if (longer > 1920) {
-        const s = 1920 / longer;
+    if (longer > _masterCanvasCap) {
+        const s = _masterCanvasCap / longer;
         w = (w * s + 0.5) | 0;
         h = (h * s + 0.5) | 0;
     }
@@ -775,6 +809,7 @@ const ICONS = {
     record:  `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><circle cx="8" cy="8" r="2.5" fill="currentColor"/></svg>`,
     star:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l2.16 4.38 4.84.7-3.5 3.41.83 4.82L8 12.04l-4.33 2.27.83-4.82-3.5-3.41 4.84-.7z"/></svg>`,
     bolt:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M10 1L3 9h4l-1 6 7-8H9z"/></svg>`,
+    download: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v8m-4-4 4 4 4-4"/><path d="M2 13h12"/></svg>`,
 };
 
 function icon(name) { return ICONS[name] || ''; }
@@ -789,6 +824,7 @@ function icon(name) { return ICONS[name] || ''; }
     vizBtn.innerHTML    = icon('record');
     statusMsg.innerHTML = `click ${icon('play')} to load audio`;
     lcBtn.innerHTML     = icon('star');
+    exportBtn.innerHTML = icon('download');
 })();
 
 // ═══════════════════════════════════════════════════════════════════
@@ -947,11 +983,7 @@ function triggerVisual() {
     }
 
     if (effect.useScan && screenEl.classList.contains('crt-on')) {
-        screenEl.classList.remove('scan-active');
-        requestAnimationFrame(() => {
-            screenEl.classList.add('scan-active');
-            setTimeout(() => screenEl.classList.remove('scan-active'), 280);
-        });
+        startScan(performance.now());
     }
 
     if (vizs) vizs.pulse();
@@ -1069,20 +1101,34 @@ function seekTo(pct) {
 // nor scrubbing would drives intensity via a the keyframe directly and
 // will cause freeze, thus retrigger on bass rise, the same onset-synthesis 
 // idea already used for the event-based visualizers (Particles/Ripple/Heartbeat)
-let _scanUntil = 0;
-const SCAN_MS = 280; 
+let _scanUntil = 0;        // retrigger guard (performance.now timebase)
+let _scanStart = -1;       // when .scan-active was really added (virtual clock during export)
+let _scanEndAt = 0;
+const SCAN_MS = 280;
 
-function triggerLutScan(bass) {
-    if (!activeLutEffect || !activeLutEffect.useScan || !screenEl.classList.contains('crt-on') || now < _scanUntil) return;   // never restart mid-sweep
-    _scanUntil = now + SCAN_MS + 60;
+function startScan(now) {
+    _scanEndAt = now + SCAN_MS;
     screenEl.classList.remove('scan-active');
     requestAnimationFrame(() => {
+        _scanStart = performance.now();
+        _scanEndAt = _scanStart + SCAN_MS;
         screenEl.classList.add('scan-active');
-        setTimeout(() => screenEl.classList.remove('scan-active') , SCAN_MS)
-    });  // no forced reflow, and never left frozen
+    });
+}
+
+function tickScan(now) {
+    if (_scanEndAt && now >= _scanEndAt) { _scanEndAt = 0; screenEl.classList.remove('scan-active'); }
+}
+
+function triggerLutScan(now) {
+    if (!activeLutEffect || !activeLutEffect.useScan || !screenEl.classList.contains('crt-on') || now < _scanUntil) return;
+    _scanUntil = now + SCAN_MS + 60;
+    startScan(now);
 }
 
 function displayLoop() {
+    tickScan(performance.now());
+
     // Current playback position derived from AudioContext wall clock.
     // Accurate to ~1ms — tied to sound card driver, not JS event queue.
     const t = (isPlaying && audioContext)
@@ -1194,36 +1240,37 @@ async function loadAudioBuffer(file) {
     _ensureContext();
     statusMsg.textContent = 'decoding';
     const arrayBuf = await file.arrayBuffer();
+    _audioName     = file.name.replace(/\.[^/.]+$/, '') || 'fizx';
     audioBuffer    = await audioContext.decodeAudioData(arrayBuf);
     audioDuration  = audioBuffer.duration;
     bpmDisplay.textContent = `${bpm} BPM`;
     statusMsg.innerHTML    = `${icon('bolt')} ${file.name.slice(0, 22)}`;
 }
 
+async function applyAudioFile(file) {
+    // Tear down any running source before replacing the buffer
+    if (sourceNode) {
+        isPlaying = false;
+        sourceNode.onended = null;
+        try { sourceNode.stop(); } catch (_) {}
+        sourceNode.disconnect();
+        sourceNode = null;
+    }
+    startOffset = 0; lastFiredBeatIdx = 0; currentLyricIdx = -1;
+    await loadAudioBuffer(file);
+    updateLyrics(0);
+    timeDisplay.textContent = fmt(0);
+    _updateSeekBarVisual(0);
+    statusMsg.textContent = LUT_MODE
+        ? `LUT \u00b7 ${BEAT_DATA.beats.length} frames \u00b7 ${LYRICS.length} lines`
+        : `${beatTimestamps.length} beats \u00b7 ${LYRICS.length} lines`;
+}
+
 function selectAudio() {
     const input  = document.createElement('input');
     input.type   = 'file';
     input.accept = 'audio/mpeg,audio/wav,audio/ogg,audio/mp3';
-    input.onchange = async e => {
-        const file = e.target.files[0];
-        if (!file) return;
-        // Tear down any running source before replacing the buffer
-        if (sourceNode) {
-            isPlaying = false;
-            sourceNode.onended = null;
-            try { sourceNode.stop(); } catch (_) {}
-            sourceNode.disconnect();
-            sourceNode = null;
-        }
-        startOffset = 0; lastFiredBeatIdx = 0; currentLyricIdx = -1;
-        await loadAudioBuffer(file);
-        updateLyrics(0);
-        timeDisplay.textContent = fmt(0);
-        _updateSeekBarVisual(0);
-        statusMsg.textContent = LUT_MODE
-            ? `LUT \u00b7 ${BEAT_DATA.beats.length} frames \u00b7 ${LYRICS.length} lines`
-            : `${beatTimestamps.length} beats \u00b7 ${LYRICS.length} lines`;
-    };
+    input.onchange = (e) => { const file = e.target.files[0]; if (file) applyAudioFile(file); };
     input.click();
 }
 
@@ -1335,6 +1382,73 @@ function toggleAR() {
     requestAnimationFrame(() => { resizeMasterCanvas(); _readPresetVars(); _readVizVars(); });
 }
 
+// ── MP4 Export toggle ─────────────────────────────────────────────
+function pickExportOptions(anchor) {
+    return new Promise((resolve) => {
+        if (document.getElementById('xo-menu')) return resolve(null);
+        const r = anchor.getBoundingClientRect();
+        const menu = document.createElement('div');
+        menu.id = 'xo-menu';
+        menu.style.cssText = `position:fixed;left:${Math.max(8, Math.min(r.left, innerWidth - 236))}px;bottom:${innerHeight - r.top + 6}px;z-index:9998;display:grid;gap:8px;min-width:220px;padding:10px;background:#111;color:#ddd;border:1px solid #444;border-radius:6px;font:12px monospace`;
+        menu.innerHTML = `
+            <label>Resolution <select id="xo-res"><option value="720">720p</option><option value="1080" selected>1080p</option><option value="1440">1440p</option><option value="2160">4K</option></select></label>
+            <label>Quality <select id="xo-bpp"><option value="0.08">Draft</option><option value="0.14" selected>Standard</option><option value="0.22">High</option></select></label>
+            <label>FPS <select id="xo-fps"><option value="24">24</option><option value="30" selected>30</option><option value="60">60</option></select></label>
+            <div style="display:flex;gap:8px"><button id="xo-go" data-tip="Export">✓</button><button id="xo-cancel" data-tip="Cancel">X</button></div>`;
+        const outside = (e) => { if (!menu.contains(e.target) && !anchor.contains(e.target)) close(null); };
+        const onKey = (e) => { if (e.key === 'Escape') close(null); };
+        const close = (val) => {
+            document.removeEventListener('mousedown', outside, true);
+            document.removeEventListener('keydown', onKey);
+            menu.remove(); resolve(val);
+        };
+        menu.querySelector('#xo-go').onclick = () => close({
+            shortSide: +menu.querySelector('#xo-res').value,
+            bitsPerPixel: +menu.querySelector('#xo-bpp').value,
+            fps: +menu.querySelector('#xo-fps').value,
+        });
+        menu.querySelector('#xo-cancel').onclick = () => close(null);
+        document.body.appendChild(menu);
+        setTimeout(() => {
+            document.addEventListener('mousedown', outside, true);
+            document.addEventListener('keydown', onKey);
+        }, 0);
+    });
+}
+
+let _exportAbort = null;
+const _notifyOpener = (msg) => { try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); } catch (_) {} };
+window.addEventListener('pagehide', () => { if (_exportAbort) _notifyOpener({ cmd: 'mp4-export-error', message: 'preview tab closed' }); });
+document.getElementById('mp4-export-cancel').onclick = () => { if (_exportAbort) _exportAbort.abort(); };
+
+async function exportMp4() {
+    if (_exportAbort) return;                                          // an export is already running
+    if (typeof FizxExport === 'undefined' || typeof Mp4Muxer === 'undefined' || !Mp4Muxer) { statusMsg.textContent = 'EXPORT UNAVAILABLE'; return; }
+    if (!audioBuffer) { statusMsg.textContent = 'LOAD AUDIO FIRST'; return; }
+    if (isPlaying) await togglePlay();                                 // stop live playback before the virtual clock takes over
+    const choice = await pickExportOptions(exportBtn);
+    if (!choice) { _notifyOpener({ cmd: 'mp4-export-cancelled' }); return; }
+
+    _exportAbort = new AbortController();
+    _notifyOpener({ cmd: 'mp4-export-start' });
+    try {
+        const blob = await FizxExport.exportMp4({
+            ...choice, seed: 1, signal: _exportAbort.signal,
+            onProgress: (p) => _notifyOpener({ cmd: 'mp4-export-progress', frame: p.frame, frames: p.frames, fps: p.fps, etaSec: p.etaSec }),
+        });
+        const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${_audioName}.mp4` });
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        statusMsg.textContent = `MP4 saved \u00b7 ${(blob.size / 1048576).toFixed(1)} MB`;
+        _notifyOpener({ cmd: 'mp4-export-done', size: blob.size });
+    } catch (err) {
+        if (err && err.name === 'AbortError') { statusMsg.textContent = 'EXPORT CANCELLED'; _notifyOpener({ cmd: 'mp4-export-cancelled' }); }
+        else { statusMsg.textContent = 'EXPORT FAILED'; console.error(err); _notifyOpener({ cmd: 'mp4-export-error', message: String(err && err.message || err) }); }
+    } finally {
+        _exportAbort = null;
+    }
+}
+
 // ── Utilities ─────────────────────────────────────────────────────
 function fmt(sec) {
     if (isNaN(sec) || sec < 0) return '0:00';
@@ -1370,6 +1484,7 @@ presetBtn.onclick = togglePreset;
 arBtn.onclick     = toggleAR;
 vizBtn.onclick    = cycleVisualizer;
 lcBtn.onclick     = cycleLyricsCircle;
+exportBtn.onclick = exportMp4;
 
 // ── Resize observer — keeps dust canvas sized to screen ──────────
 const _resizeObs = new ResizeObserver(() => {
@@ -1515,6 +1630,22 @@ window.addEventListener('beforeunload', () => {
     if (vizs)           vizs.destroy();
     _resizeObs.disconnect();
 });
+
+// ── Cleanup on unload ─────────────────────────────────────────────
+(function initStudioLink() {
+    if (!window.opener) return;                                  // opened standalone: nothing to link
+    window.addEventListener('message', async (event) => {
+        const data = event.data;
+        if (!data || data.cmd !== 'mp4-export' || event.source !== window.opener) return;
+        try {
+            if (data.file) await applyAudioFile(data.file);
+            exportMp4();                                         // opens the quality picker; progress is reported by exportMp4 itself
+        } catch (err) {
+            _notifyOpener({ cmd: 'mp4-export-error', message: String(err && err.message || err) });
+        }
+    });
+    _notifyOpener({ cmd: 'template-ready' });
+})();
 </script>
 </body>
 </html>

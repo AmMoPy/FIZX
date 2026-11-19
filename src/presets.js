@@ -156,7 +156,7 @@ export const PRESETS = {
             { className:'fx-chroma',  duration:200, useFlash:false, useScan:true  },
             { className:'fx-flicker', duration:220, useFlash:false, useScan:false },
             { className:'fx-zoom',    duration:160, useFlash:true,  useScan:false },
-            { className:'fx-flicker-LUT',  duration:1000, useFlash:true,  useScan:false },
+            { className:'fx-flicker-LUT',  duration:1000, useFlash:true,  useScan:true },
         ],
     },
 
@@ -983,11 +983,11 @@ export const PRESETS = {
             .fx-neon-buzz   { animation:kNeonBuzz   0.12s linear; }
             .fx-neon-flat   { animation:kNeonFlat   0.13s ease-out; }
             .fx-neon-ghost  { animation:kNeonGhost  0.15s ease-out; }
-            // .fx-neon-buzz-LUT  {
-            //     animation: kNeonBuzz 1000ms linear paused;
-            //     animation-direction: reverse;
-            //     animation-fill-mode: both;
-            // }
+            .fx-neon-buzz-LUT  {
+                animation: kNeonBuzz 1000ms linear paused;
+                animation-direction: reverse;
+                animation-fill-mode: both;
+            }
         `,
         dustColor:  'rgba(255,40,120,0.20)',
         flashColor: 'rgba(255,20,100,0.35)',
@@ -997,7 +997,7 @@ export const PRESETS = {
             { className:'fx-neon-buzz',   duration:120, useFlash:true,  useScan:false },
             { className:'fx-neon-flat',   duration:130, useFlash:true,  useScan:false },
             { className:'fx-neon-ghost',  duration:150, useFlash:false, useScan:false },
-            { className:'fx-flicker-LUT',  duration:1000, useFlash:true,  useScan:false },
+            { className:'fx-neon-buzz-LUT',  duration:1000, useFlash:true,  useScan:false },
         ],
     },
 

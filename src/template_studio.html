@@ -145,7 +145,8 @@
             transition: 0.15s; }
         .mode-card:hover { border-color: #8ea2ff; transform: translateY(-2px); }
 
-        .control-group { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px 10px; }
+        .control-group { display: grid; gap: 10px; border: 1px solid rgba(255, 255, 255, 0.08); 
+                         border-radius: 12px; padding: 20px 10px; }
         .control-group summary { cursor: pointer; font-weight: 600; font-size: 0.8rem; }
 
         .slider-control {
@@ -222,7 +223,7 @@
         .stats-row { display: flex; justify-content: space-between; align-items: center; font-family: var(--prim); font-size: 0.9rem; color: var(--text-dim); }
         .stat-val { color: var(--accent); font-weight: 700; }
         .bpm-badge { background: var(--accent-dim); border: 1px solid var(--border-accent); padding: 3px 10px; border-radius: 4px; letter-spacing: 0.08em; color: var(--accent); }
-        .session-controls { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; }
+        .session-controls { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
 
         /* ── Floating preview ────────────────────────────────────────
          *
@@ -623,7 +624,7 @@
         .output-header h2 { font-family: var(--prim); font-size: 1.3rem; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); }
         .output-summary { font-size: 0.9rem; color: var(--text-dim); font-family: var(--prim); }
         .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-        .export-controls {margin:16px auto; display:grid; gap: 10px;}
+        .export-controls {margin:16px auto; display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;}
 
         /* ── Toast ───────────────────────────────────────────────── */
         #toast {
@@ -743,7 +744,7 @@
                 <input type="radio" name="mode" id="mode-beats" value="beats">
                 <label for="mode-beats">
                     <span class="mode-title">Beats Only</span>
-                    <span class="mode-desc">Skip lyrics — design circle/text animations for one text block</span>
+                    <span class="mode-desc">Jump straight into design animations</span>
                 </label>
             </div>
         </div>
@@ -787,6 +788,7 @@
                     </div>
                     <div class="export-controls">
                         <button id="design-back-btn" class="btn btn-nav">CANCEL</button>
+                        <button class="btn btn-nav" data-action="resume-session" data-icon="back">RESUME SESSION</button>
                         <button id="design-export-btn" class="btn btn-primary">EXPORT DESIGN</button>
                     </div> 
                 </div>
@@ -841,11 +843,17 @@
 
         <!-- session-controls auto-assign is disabled until beats are available (set in startBtn handler). -->
         <div class="session-controls">
-            <button id="preview-btn" class="btn btn-ghost"></button>
-            <button id="auto-assign-btn" class="btn btn-ghost" disabled title="Approximate lyrics timing for manual adjustment"></button>
-            <button id="reanalyze-btn" class="btn btn-ghost"></button>
-            <button id="finish-btn" class="btn btn-nav">FINISH & EXPORT</button>
-            <button id="cancel-btn" class="btn btn-muted">CANCEL</button>
+            <div class="export-grid">
+                <!-- <button id="preview-btn" class="btn btn-ghost"></button> -->
+                <button id="drag-lyrics-btn" class="btn btn-ghost"></button>
+                <button id="reanalyze-btn" class="btn btn-ghost"></button>
+            </div>
+            <div class="divider"></div>
+            <div class="export-grid">
+                <button class="btn btn-nav" data-action="nav-design" data-icon="design">DESIGN ANIMATIONS</button>
+                <button id="finish-btn" class="btn btn-primary">FINISH & EXPORT</button>
+                <button id="cancel-btn" class="btn btn-muted">CANCEL</button>
+            </div>
         </div>
 
         <!-- Floating preview panel -->
@@ -855,6 +863,7 @@
             <div id="preview-titlebar" title="LYRICS SYNC EDITOR">
                 <span id="preview-title">PREVIEW</span>
                 <div class="preview-titlebar-btns">
+                    <button class="ptb-btn" id="auto-assign-btn" title="Approximate lyrics timing for manual adjustment"></button>
                     <button class="ptb-btn accent" id="preview-refresh-btn" title="Apply Lyrics Timing"></button>
                     <button class="ptb-btn" id="preview-add-btn" title="Insert New Lyrics Line">+</button>
                     <button class="ptb-btn" id="toggle-onsets-btn" title="Show/hide onset dots"></button>
@@ -884,7 +893,10 @@
                 <h2>EXPORT</h2>
                 <span class="output-summary" id="export-summary"></span>
             </div>
-            <button id="generate-fizx-btn" class="btn btn-ghost btn-full" style="height:52px;">GENERATE FIZIX.HTML</button>
+            <div class="export-grid">
+                <button id="generate-fizx-btn" class="btn btn-ghost btn-full" style="height:52px;">EXPORT HTML</button>
+                <button id="export-mp4-btn" class="btn btn-ghost btn-full">EXPORT MP4</button>
+            </div>
             <div class="divider"></div>
             <div class="export-grid">
                 <button id="download-beats-btn" class="btn btn-ghost"></button>
@@ -894,9 +906,9 @@
             </div>
             <div class="divider"></div>
             <div class="export-controls">
-                <button id="cnt-session-btn" class="btn btn-nav"></button>
+                <button class="btn btn-nav" data-action="resume-session" data-icon="back">RESUME SESSION</button>
+                <button class="btn btn-nav" data-action="nav-design" data-icon="design">DESIGN ANIMATIONS</button>
                 <button id="new-session-btn" class="btn btn-primary"></button>
-                <button id="design-animations-btn" class="btn btn-ghost">DESIGN ANIMATIONS</button>
             </div>
         </div>
     </div>
@@ -1917,7 +1929,7 @@ self.onmessage = async function(e) {
 
         const loopStart = performance.now();
         const analyzedFrameCount = runAnalysisLoop(analysis, frameCount, frameStride, (done, total) => {
-            prog(10 + Math.round(done / total * 85), 'BASS / VOCAL / TREBLE');
+            prog(10 + Math.round(done / total * 85), 'Extracting Bands');
         });
         const loopMs = performance.now() - loopStart;
 
@@ -2102,7 +2114,7 @@ const PARAM_SPECS = {
                 type:  'toggle',
                 hint:  'On: time-domain kick detection with a simpler envelope. ' +
                        'Off: full FFT vocal/treble band analysis. ' +
-                       'Turn on for faster, bass-focused results.',
+                       'Turn on for snappier, bass-focused results.',
             },
             {
                 // Toggles FFT band pipeline between JS and WASM pipeline
@@ -2284,22 +2296,22 @@ function updateParamVisibility() {
     document.getElementById('session-params')?.classList.toggle('visible', isSnap);
 }
 
-// When out of tokens but you still wanna code
-function updateToggles() {
-    // Reset state.vocalBeats when deactivated
-    // So autoassBtn uses beats instead
-    if (!PARAMS.stem) {
-        state.vocalBeats = [];
-    }
+// // When out of tokens but you still wanna code
+// function updateToggles() {
+//     // Reset state.vocalBeats when deactivated
+//     // So autoassBtn uses beats instead
+//     if (!PARAMS.stem) {
+//         state.vocalBeats = [];
+//     }
 
-    // // Vocal stem proxy params independent of which analysis engine is selected
-    // const vocalLabel = document.getElementById('vocal-params-label');
-    // if (vocalLabel) vocalLabel.style.display = PARAMS.stem ? 'block' : 'none';
+//     // // Vocal stem proxy params independent of which analysis engine is selected
+//     // const vocalLabel = document.getElementById('vocal-params-label');
+//     // if (vocalLabel) vocalLabel.style.display = PARAMS.stem ? 'block' : 'none';
     
-    // Object.entries(vocalPanels).forEach(([label, id]) => {
-    //     id?.classList.toggle('visible', PARAMS.stem);
-    // });
-}
+//     // Object.entries(vocalPanels).forEach(([label, id]) => {
+//     //     id?.classList.toggle('visible', PARAMS.stem);
+//     // });
+// }
 
 // ═══════════════════════════════════════════════════════════════════
 // STATE
@@ -2359,11 +2371,11 @@ const cancelBtn       = document.getElementById('cancel-btn');
 const reanalBtn       = document.getElementById('reanalyze-btn');
 const previewBtn      = document.getElementById('preview-btn');
 const autoassBtn      = document.getElementById('auto-assign-btn');
+const dragLBtn        = document.getElementById('drag-lyrics-btn');
 const dbeatBtn        = document.getElementById('download-beats-btn');
 const dlyricsBtn      = document.getElementById('download-lyrics-btn');
 const cbeatBtn        = document.getElementById('copy-beats-btn');
 const clyricsBtn      = document.getElementById('copy-lyrics-btn');
-const cntsBtn         = document.getElementById('cnt-session-btn');
 const newsBtn         = document.getElementById('new-session-btn');
 const currLine        = document.getElementById('curr-line');
 const lineCounterSpan = document.getElementById('line-counter');
@@ -2451,6 +2463,10 @@ const ICONS = {
     </svg>`,
     // ⚡ High Voltage / Lightning
     bolt: `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M10 1L3 9h4l-1 6 7-8H9l1-6z"/></svg>`,
+    // 
+    drag: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M2 8h12"/><path d="M5 5L2 8l3 3"/><path d="M11 5l3 3-3 3"/></svg>`,
+    // 
+    design: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M11.5 2.5l2 2-8 8-2.5.5.5-2.5 8-8z"/><path d="M9.5 4.5l2 2"/></svg>`,
 };
 
 // Helper used wherever an icon is needed dynamically (e.g. play/pause toggle)
@@ -2458,22 +2474,27 @@ function icon(name) { return ICONS[name] || ''; }
 
 // Set initial icon state — called once after DOM refs are established
 (function initIcons() {
-    pbPlay.innerHTML       = icon('play');
-    pbStop.innerHTML       = icon('stop');
-    reslyBtn.innerHTML     = icon('refresh');
+    // Static, multi-instance driven by markup, one loop fills all.
+    document.querySelectorAll('[data-icon]').forEach(el => {
+        el.insertAdjacentHTML('afterbegin', icon(el.dataset.icon) + ' ');
+    });
+
     // Buttons that never change can be set directly in HTML,
     // but setting via JS keeps the single ICONS registry as source of truth
-    previewBtn.innerHTML   = icon('preview')  + ' PREVIEW';
-    reanalBtn.innerHTML    = icon('reanalyze') + ' RE-ANALYZE';
-    autoassBtn.innerHTML   = icon('bolt') + ' AUTO-ASSIGN'
+    pbPlay.innerHTML       = icon('play')
+    pbStop.innerHTML       = icon('stop')
+    reslyBtn.innerHTML     = icon('refresh')
+    // previewBtn.innerHTML   = icon('preview')  + ' PREVIEW'
+    reanalBtn.innerHTML    = icon('reanalyze') + ' RE-ANALYZE'
+    autoassBtn.innerHTML   = icon('bolt')
+    dragLBtn.innerHTML     = icon('drag') + ' Drag Lyrics'
     dbeatBtn.innerHTML     = icon('download') + ' beats.json'
     dlyricsBtn.innerHTML   = icon('download') + ' lyrics.js'
     cbeatBtn.innerHTML     = icon('copy') + ' copy beats'
     clyricsBtn.innerHTML   = icon('copy') + ' copy lyrics'
-    cntsBtn.innerHTML      = icon('back') + ' RESUME SESSION'
     newsBtn.innerHTML      = icon('refresh') + ' NEW SESSION'
     applyBtn.innerHTML     = icon('check')
-    onsetBtn.innerHTML     = icon('record') 
+    onsetBtn.innerHTML     = icon('record')
 })();
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2584,7 +2605,7 @@ function syncSessionUi() {
     currLine.innerHTML = state.lyrics.length > 0
         ? (state.lyrics[state.index] ?? `${icon('check')} ALL LYRICS MARKED`)
         : (state.index > 0 ? `${icon('beat')} ${state.index} BEATS MARKED` : `${icon('beat')} NO LYRICS — TAPS MARK BEATS`);
-    autoassBtn.disabled = state.beats.length === 0 || state.lyrics.length === 0;
+    // autoassBtn.disabled = state.beats.length === 0 || state.lyrics.length === 0;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2690,7 +2711,10 @@ const DesignStep = {
         this.stopKickPreviewWorker();
         if (this.animCore) { this.animCore.destroy(); this.animCore = null; }
         this.frameTimeSamplesMs.length = 0;
-        this.textState();
+        // Only fill from design text when there is no real lyric timing to
+        // preserve. Taps and edits in state.results are the user's committed
+        // intent and must win over the design placeholder.
+        if (state.results.length === 0) { this.textState(); }
     },
 
     // use input text as final lyrics for studio > output workflow
@@ -2872,9 +2896,9 @@ const DesignStep = {
 
     // Append processing spinner to targeted element
     appendSpinner(appendEl, spinnerEl) {
-        // appendEl.style.display = 'flex';
-        // appendEl.style.alignItems = 'center';
-        // appendEl.style.justifyContent = 'space-between';
+        // appendEl is a <summary>: it MUST keep display:list-item or the
+        // ::marker (▸/▾) disappears. The child is positioned with
+        // float:right by the caller, not by layout on the summary itself.
         appendEl.append(spinnerEl);
     },
 
@@ -2895,66 +2919,53 @@ const DesignStep = {
         }
     },
 
-    buildControlPanel() {
-        const panel = document.getElementById('design-controls');
-        panel.innerHTML = '';
-        const config = this.config;
+    // Resets only the response config to DEFAULT_ANIM_CONFIG's response values.
+    // Other config (circle style, effects, text) is untouched — this button lives
+    // in the Response group, so it should only affect the knobs shown there.
+    resetResponseDefaults() {
+        const defaults = DEFAULT_ANIM_CONFIG.response;
+        const exclude = new Set(['offsetMs']);
+        Object.keys(defaults).forEach((key) => { // mutates this.config.response in place, which is a copy so defaults not corrupted
+            // A/V offset is a calibration, not a style choice
+            // if users often switching between Bluetooth and wired devices, 
+            // they'd adjust after every reset, which is annoying.
+            if (exclude.has(key)) return;
+            this.config.response[key] = defaults[key];
+        });
+        this.animCore.setConfig(this.config);       // triggers a redraw
+        // Replace only the response group in-place
+        const oldGroup = document.getElementById('design-controls').querySelector('[data-group="response"]');
+        if (oldGroup) {
+            const newGroup = this.buildResponseGroup(this.config);
+            oldGroup.replaceWith(newGroup);
+            newGroup.open = true;
+        }
+    },
 
-        // studio processing spinners
-        const bassSpinner = this.makeSpinner();
-
-        // Bass extraction mode
-        const bassModeGroup = document.createElement('details');
-        bassModeGroup.className = 'control-group';
-        // bassModeGroup.open = true;
-        bassModeGroup.innerHTML = '<summary>Bass extraction</summary>';    
-        const bmSummary = bassModeGroup.querySelector('summary');
-        this.appendSpinner(bmSummary, bassSpinner);
-        bmSummary.dataset.tip = 'Kick: applies filtering — sharper, less bleed. FFT: use original spectrum — smoothed, quieter.';  
-        const bassModeSelect = document.createElement('select');
-        bassModeSelect.add(new Option('Kick (time-domain, recommended)', 'kick'));
-        bassModeSelect.add(new Option('FFT slice (43-258Hz)', 'fft'));
-        bassModeSelect.value = PARAMS.kickBass ? 'kick' : 'fft';
-        bassModeSelect.onchange = () => {
-            this.setBassMode(bassModeSelect.value === 'kick');
-        };
-        bassModeGroup.appendChild(bassModeSelect);
-        panel.appendChild(bassModeGroup);
-        // stride sliders
-        [
-            { key: 'fftStride', label: 'Stride', min: 1, max: 4, step: 1, default: 2,
-              fmt: v => Number(v) === 1 ? '1 (exact)' : `${v} (≈${Math.round(100 / Number(v))}% analyzed)`,
-              tip: 'Frames analyzed per FFT. 1 = every frame (exact, slowest). Higher values interpolate between analyzed frames — faster, no visible difference on most tracks.' },
-        ].forEach((paramDef) => this.createSliderControl(bassModeGroup, paramDef, PARAMS, {
-            onCommit: () => this.withSpinner(bassSpinner, () => this.reanalyzeFullTrack())
-        })); 
-
-        // Kick detection — only affects the time-domain bass channel
-        const kickGroup = document.createElement('details');
-        kickGroup.className = 'control-group';
-        kickGroup.innerHTML = '<summary>Kick detection</summary>';
-        const kgSummary = kickGroup.querySelector('summary');
-        kgSummary.dataset.tip = 'Adjusts the kick channel live. In FFT mode it updates the comparison line, so you can tune it before switching.';
-        [
-            { key: 'kickLp', label: 'LP cutoff (Hz)', min: 70, max: 250, step: 5, default: 120,
-              tip: 'Upper edge of the kick band. Lower isolates sub/kick only; higher lets bass guitar and snare body in.' },
-            { key: 'kickRej', label: 'Sustain reject', min: 0, max: 1.5, step: 0.05, default: 1,
-              tip: 'Subtracts the slow bass level so held notes vanish and only sharp hits remain. Too high can erase soft kicks.' },
-        ].forEach((paramDef) => this.createSliderControl(kickGroup, paramDef, PARAMS, {
-            onInput: () => this.requestKickPreview()
-        }));
-        // pre-warm the worker on hover/focus
-        kickGroup.addEventListener('pointerenter', () => this.ensureKickPreviewWorker(), { once: true });
-        kickGroup.addEventListener('focusin', () => this.ensureKickPreviewWorker(), { once: true });
-        panel.appendChild(kickGroup);
-
-        // Response model
+    buildResponseGroup(config) {
         const responseGroup = document.createElement('details');
         responseGroup.className = 'control-group';
         // responseGroup.open = true;
         responseGroup.innerHTML = '<summary>Response</summary>';
+        responseGroup.dataset.group = 'response';
         const rgSummary = responseGroup.querySelector('summary');
         rgSummary.dataset.tip = 'Controls how animations reacts to bass value, smooth or snappy.';
+        
+        // reset button
+        const resetResponseBtn = document.createElement('button');
+        resetResponseBtn.className = 'ptb-btn';
+        resetResponseBtn.type = 'button';
+        resetResponseBtn.innerHTML = icon('refresh');
+        resetResponseBtn.title = 'Restore response settings to defaults';
+        resetResponseBtn.style.float = 'right'
+        resetResponseBtn.onclick = (e) => {
+            e.preventDefault();                                          // don't toggle the <details>
+            e.stopPropagation();                                         // don't trigger the summary's own handlers
+            this.resetResponseDefaults();
+        };
+        this.appendSpinner(rgSummary, resetResponseBtn);                 // reuse the flex layout helper
+
+        // Model select
         const modelSelect = document.createElement('select');
         [['baseline', 'Baseline (snap + decay)'], ['fastdecay', 'Fast decay'], ['punch', 'Level + Punch']]
             .forEach(([value, label]) => modelSelect.add(new Option(label, value)));
@@ -2962,6 +2973,7 @@ const DesignStep = {
         modelSelect.onchange = () => { config.response.model = modelSelect.value; this.applyConfig(); };
         responseGroup.appendChild(modelSelect);
 
+        // Main knobs
         [
             { key: 'smoothness', label: 'Kick Smoothness', min: 0, max: 1, step: 0.1, default: 0,
               tip: 'Smooths the kick response. 0 = snappy and precise, 1 = soft and rounded. Use this to tame harsh hits on kick-driven tracks.' },            
@@ -2990,8 +3002,69 @@ const DesignStep = {
               tip: 'Discrete effects floor (e.g. ripples): Higher means they remain visible.' },
         ].forEach((paramDef) => this.createSliderControl(advanced, paramDef, config.response));
         responseGroup.appendChild(advanced);
-        panel.appendChild(responseGroup);
 
+        return responseGroup;
+    },
+
+    buildControlPanel() {
+        const panel = document.getElementById('design-controls');
+        panel.innerHTML = '';
+        const config = this.config;
+
+        // studio processing spinners
+        const bassSpinner = this.makeSpinner();
+
+        // Bass extraction mode
+        const bassModeGroup = document.createElement('details');
+        bassModeGroup.className = 'control-group';
+        // bassModeGroup.open = true;
+        bassModeGroup.innerHTML = '<summary>Bass extraction</summary>';    
+
+        // stride sliders
+        [
+            { key: 'fftStride', label: 'Stride', min: 1, max: 4, step: 1, default: 2,
+              fmt: v => Number(v) === 1 ? '1 (exact)' : `${v} (≈${Math.round(100 / Number(v))}% analyzed)`,
+              tip: 'Frames analyzed per FFT. 1 = every frame (exact, slowest). Higher values interpolate between analyzed frames — faster, no visible difference on most tracks.' },
+        ].forEach((paramDef) => this.createSliderControl(bassModeGroup, paramDef, PARAMS, {
+            onCommit: () => this.withSpinner(bassSpinner, () => this.reanalyzeFullTrack())
+        })); 
+
+        const bmSummary = bassModeGroup.querySelector('summary'); 
+        bmSummary.dataset.tip = 'Kick: applies filtering — sharper, less bleed. FFT: use original spectrum — smoothed, quieter.';  
+        this.appendSpinner(bmSummary, bassSpinner);
+
+        const bassModeSelect = document.createElement('select');
+        bassModeSelect.add(new Option('Kick (time-domain, recommended)', 'kick'));
+        bassModeSelect.add(new Option('FFT slice (43-258Hz)', 'fft'));
+        bassModeSelect.value = PARAMS.kickBass ? 'kick' : 'fft';
+        bassModeSelect.onchange = () => {
+            this.setBassMode(bassModeSelect.value === 'kick');
+        };
+        bassModeGroup.appendChild(bassModeSelect);
+        panel.appendChild(bassModeGroup);
+
+        // Kick detection — only affects the time-domain bass channel
+        const kickGroup = document.createElement('details');
+        kickGroup.className = 'control-group';
+        kickGroup.innerHTML = '<summary>Kick detection</summary>';
+        const kgSummary = kickGroup.querySelector('summary');
+        kgSummary.dataset.tip = 'Adjusts the kick channel live. In FFT mode it updates the comparison line, so you can tune it before switching.';
+        [
+            { key: 'kickLp', label: 'LP cutoff (Hz)', min: 70, max: 250, step: 5, default: 120,
+              tip: 'Upper edge of the kick band. Lower isolates sub/kick only; higher lets bass guitar and snare body in.' },
+            { key: 'kickRej', label: 'Sustain reject', min: 0, max: 1.5, step: 0.05, default: 1,
+              tip: 'Subtracts the slow bass level so held notes vanish and only sharp hits remain. Too high can erase soft kicks.' },
+        ].forEach((paramDef) => this.createSliderControl(kickGroup, paramDef, PARAMS, {
+            onInput: () => this.requestKickPreview()
+        }));
+        // pre-warm the worker on hover/focus
+        kickGroup.addEventListener('pointerenter', () => this.ensureKickPreviewWorker(), { once: true });
+        kickGroup.addEventListener('focusin', () => this.ensureKickPreviewWorker(), { once: true });
+        panel.appendChild(kickGroup);
+
+        // Response model
+        panel.appendChild(this.buildResponseGroup(config));
+        
         // Circle style
         const circleStyleSlot = {
             get id() { return config.circle.style; }, set id(value) { config.circle.style = value; },
@@ -3003,6 +3076,7 @@ const DesignStep = {
         const buildEffectRow = (title, effectArray, index, scope) => {
             const row = this.createStyleOrEffectPicker(panel, title, EFFECTS, effectArray[index], scope);
             const removeButton = document.createElement('button');
+            removeButton.className = 'ptb-btn';
             removeButton.textContent = 'Remove';
             removeButton.onclick = () => {
                 effectArray.splice(index, 1);
@@ -3019,6 +3093,7 @@ const DesignStep = {
 
         [['circle', config.circle.effects], ['text', config.text.effects]].forEach(([scope, effectArray]) => {
             const addButton = document.createElement('button');
+            addButton.className = 'ptb-btn';
             addButton.textContent = `+ ${scope} effect`;
             addButton.dataset.tip = 'Stack another effect. Effects combine.';
             addButton.onclick = () => {
@@ -3199,11 +3274,6 @@ const AnimationGate = {
     },
 };
 
-document.getElementById('design-animations-btn').addEventListener('click', () => {
-    showView('design');
-    DesignStep.init();    
-});
-
 document.getElementById('design-back-btn').addEventListener('click', () => {
     DesignStep.reset();
     showView('setup');
@@ -3280,7 +3350,7 @@ document.getElementById('design-export-btn').onclick = () => {
 
     // Set initial visibility
     updateParamVisibility();
-    updateToggles();
+    // updateToggles();
 })();
 
 // update all matching PARAM elements at once
@@ -3628,8 +3698,6 @@ startBtn.addEventListener('click', async () => {
 
         if (!state.player && state.audioFile) creatPLayer(state.audioFile);
 
-        // Enable auto-assign now that beats are available
-        autoassBtn.disabled = false;
         refreshUI();
 
         showView('session');
@@ -3659,9 +3727,14 @@ function recordTap() {
         t = Math.max(0, t - (state.isTouchDevice ? 0.07 : 0.2));
     } else if (state.mode === 'snap') {
         // Snap lyric lines to vocalBeats (vocal stem proxy) when available.
-        // vocalBeats is populated by extractVocalProxy() and represents
-        // vocal attack onsets rather than full-mix transients.
-        // Falls back to state.beats if vocalBeats is empty.
+        // Falls back to full-mix beats if vocalBeats is empty.
+        //
+        // KNOWN LIMITATION: two taps that land closest to the same beat both
+        // receive that beat's time. This is intentional — the user's tap is
+        // the input, and the snap is the nearest-beat projection of it.
+        // Silently moving the second tap to the next unused beat would
+        // override the user's timing with the algorithm's guess. Users
+        // correct collisions by dragging in the preview editor.
         const snapTarget = (state.vocalBeats.length ? state.vocalBeats : state.beats);
         if (snapTarget.length) {
             t = snapTarget.reduce((p, c) => Math.abs(c - t) < Math.abs(p - t) ? c : p);
@@ -3783,8 +3856,18 @@ function populateEditor() {
             }));
 
         } else if (snapBeats.length > 0) {
-            // Sparse mode: distribute evenly by time, snap to nearest beat.
-            // lastUsedIdx prevents multiple lyrics from sharing the same beat.
+            // Sparse mode: distribute lyrics evenly by time, snap each to its nearest beat.
+            // lastUsedIdx advances monotonically to prevent multiple lyrics from sharing the same beat.
+            //
+            // KNOWN LIMITATION: when n > snapBeats.length, or when lyric targets
+            // cluster near the end of the range, lastUsedIdx clamps at the last
+            // beat and every remaining lyric collides there. This is not fixed
+            // because no algorithmic fix improves accuracy: distributing the
+            // extras across beats pulls lyrics away from their true delivery
+            // time, and rejecting the assignment just moves the work to the
+            // user. Collisions are honest — the beat grid genuinely cannot
+            // distinguish lyrics closer than one beat apart. Users correct
+            // these by dragging in the preview editor.
             const first = snapBeats[0], last = snapBeats[snapBeats.length - 1];
             const range = last - first;
             let lastUsedIdx = 0;
@@ -3818,10 +3901,9 @@ function populateEditor() {
     currLine.innerHTML = `${icon('bolt')} EDITOR POPULATED — DRAG SLIDERS TO ADJUST`;
     updateProgress();
     renderPreviewEditor();
-    previewWrap.classList.contains('visible') ? requestRedraw() : showPreview();
+    // previewWrap.classList.contains('visible') ? requestRedraw() : showPreview();
+    requestRedraw();
 }
-
-autoassBtn.addEventListener('click', populateEditor);
 
 // ═══════════════════════════════════════════════════════════════════
 // PREVIEW 
@@ -3886,7 +3968,9 @@ function buildFizxHtml() {
         'ONSETS_DATA': `${onsetsArray}\n`,
         'VOCAL_ONSETS_DATA': `${vocalOnsetsArray}\n`,
         'ANIM_CONFIG_DATA': `${animConfigs}\n`,
-        'BPM_DATA':  String(state.bpm || 0)
+        'BPM_DATA':  String(state.bpm || 0),
+        // If the filename contains <, >, or &, it would break the HTML. However, most OSes reject < and > in filenames
+        'TITLE_DATA': `FIZX · ${state.audioFile ? state.audioFile.name.toUpperCase().replace(/\.[^/.]+$/, "") : 'Visualizer'}`,
     };
 
     // Single-pass replacement — avoids multiple scans of a large string
@@ -4477,6 +4561,18 @@ function initPreviewResize() {
 }
 
 // ── PREVIEW Controls ─────────────────────────────────────────────
+dragLBtn.addEventListener('click', () => {
+    previewWrap.classList.contains('visible') ? requestRedraw() : showPreview();
+});
+
+autoassBtn.addEventListener('click', () => {
+    if (state.mode === "buffer") {
+        toast('Auto Assign not available in manual mode');
+        return;
+    }
+    populateEditor();
+});
+
 // Add blank line at current playback position.
 // start = player.currentTime (captured at click, not typed).
 // end omitted — implicit. User adjusts start via slider.
@@ -4493,7 +4589,7 @@ document.getElementById('preview-add-btn')?.addEventListener('click', () => {
 
 onsetBtn.addEventListener('click', function() {
     if (!state.waveformData) {
-        toast('Beatsdata not available in manual mode');
+        toast('Show Beats not available in manual mode');
         return;
     }
     _showOnsets = !_showOnsets;
@@ -4521,14 +4617,14 @@ document.getElementById('zoom-reset-btn')?.addEventListener('click', () => {
     requestRedraw();
 });
 
-// Full visual preview in a new tab
-previewBtn.addEventListener('click', () => {
-    if (state.player) state.player.pause();
-    const url = URL.createObjectURL(new Blob([buildFizxHtml()], { type: 'text/html' }));
-    window.open(url, '_blank');
-    // Revoke after a delay — tab has already loaded the document by then.
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-});
+// // Full template preview in a new tab
+// previewBtn.addEventListener('click', () => {
+//     if (state.player) state.player.pause();
+//     const url = URL.createObjectURL(new Blob([buildFizxHtml()], { type: 'text/html' }));
+//     window.open(url, '_blank');
+//     // Revoke after a delay — tab has already loaded the document by then.
+//     setTimeout(() => URL.revokeObjectURL(url), 5000);
+// });
 
 // ── Unified rAF scheduler ─────────────────────────────────────────
 // Instead of perpetual loops, we schedule exactly one frame whenever
@@ -4692,10 +4788,74 @@ reanalBtn.addEventListener('click', async () => {
 // ═══════════════════════════════════════════════════════════════════
 // EXPORT
 // ═══════════════════════════════════════════════════════════════════
+// single delegated listener dispatching on a
+// stable action attribute for N instances buttons
+const ACTIONS = {
+    'resume-session': () => {     
+        // Restore session view — player already exists, just resume UI state.
+        // Does not restart analysis or reset taps.
+        showView('session');
+        // Restart seek loop (was stopped by finishBtn handler)
+        startRafLoop();
+        // Re-sync session-params visibility in case engine changed in output view
+        updateParamVisibility(); 
+    },
+    'nav-design': () => {
+        showView('design');
+        DesignStep.init();
+    },
+};
+
+document.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    const handler = ACTIONS[target.dataset.action];
+    if (handler) handler(e);
+});
+
+// single instance buttons
 document.getElementById('generate-fizx-btn').addEventListener('click', () => {
     download('fizx_compiled.html', buildFizxHtml());
 });
 
+// EXPORT MP4 Opens the compiled FIZX template in a new tab 
+// (same as PREVIEW), and listen to the progress
+const previewWins = new Set();
+const pendingExports = new Map(); 
+
+document.getElementById('export-mp4-btn').addEventListener('click', () => {
+    if (!state.audioFile) { toast('Drop an audio file first'); return; }
+    if (state.player) state.player.pause();
+    const url = URL.createObjectURL(new Blob([buildFizxHtml()], { type: 'text/html' }));
+    for (const w of previewWins) if (w.closed) previewWins.delete(w);
+    for (const w of pendingExports.keys()) if (w.closed) pendingExports.delete(w);
+    const win = window.open(url, '_blank');
+    if (!win) { toast('Popup blocked: allow popups to export'); URL.revokeObjectURL(url); return; }
+    previewWins.add(win);
+    pendingExports.set(win, state.audioFile);
+    exportSummary.textContent = 'MP4 export · choose options in the preview tab';
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+});
+
+// Persistent listener
+window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (!d || typeof d.cmd !== 'string' || !previewWins.has(e.source)) return;
+    if (d.cmd === 'template-ready') {
+        const file = pendingExports.get(e.source);
+        if (file) { pendingExports.delete(e.source); e.source.postMessage({ cmd: 'mp4-export', file }, '*'); }
+        return;                                                             // plain previews have no pending file and are ignored
+    }
+    if (!d.cmd.startsWith('mp4-export')) return;
+    else if (d.cmd === 'mp4-export-progress') {
+        const pct = Math.round(100 * d.frame / d.frames);
+        exportSummary.textContent = `EXPORTING MP4 · ${pct}% · ${d.fps.toFixed(1)} fps · ETA ${Math.round(d.etaSec)}s`;
+    } else if (d.cmd === 'mp4-export-done') exportSummary.textContent = `MP4 saved · ${(d.size / 1048576).toFixed(1)} MB`;
+    else if (d.cmd === 'mp4-export-cancelled') exportSummary.textContent = 'MP4 export cancelled';
+    else if (d.cmd === 'mp4-export-error') { exportSummary.textContent = 'MP4 export failed'; toast('Export failed: ' + d.message); }
+});
+
+// extracted data listeners
 dbeatBtn.addEventListener('click', () =>
     // beats.json includes bpm so it matches ex_beats.py output format exactly
     download('beats.json', JSON.stringify({
@@ -4708,15 +4868,19 @@ dbeatBtn.addEventListener('click', () =>
         bpm: state.bpm
     }, null, 2))
 );
+
 dlyricsBtn.addEventListener('click', () =>
     download('lyrics.js', state.lyricsJs)
 );
+
 cbeatBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(state.beatsRaw); toast(`${icon('copy')} Beats copied`);
 });
+
 clyricsBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(state.lyricsRaw); toast(`${icon('copy')} Lyrics copied`);
 });
+
 newsBtn.addEventListener('click', () => {
     const confirmed = window.confirm("This will force a fresh start (data wipe), continue?");
     if (confirmed) {
@@ -4729,15 +4893,6 @@ newsBtn.addEventListener('click', () => {
         dropZone.classList.remove('loaded');
         state.audioFile = null;
     }
-});
-cntsBtn.addEventListener('click', () => {
-    // Restore session view — player already exists, just resume UI state.
-    // Does not restart analysis or reset taps.
-    showView('session');
-    // Restart seek loop (was stopped by finishBtn handler)
-    startRafLoop();
-    // Re-sync session-params visibility in case engine changed in output view
-    updateParamVisibility();
 });
 
 // download() creates and immediately revokes the blob URL to avoid memory leaks

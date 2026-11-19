@@ -63,14 +63,14 @@ Here I am, making a video bragging about my broken [RAG](https://github.com/AmMo
 │       │                            │                        │
 │       ├── --beats    (librosa)     ├── Drop audio           │
 │       ├── --lyrics   (ONNX/aeneas) ├── Design animations    │
-│       ├── --both     (one pass)    ├── Paste lyrics         │
-│       └── --out fizx.html          ├── Tap spacebar         │
-│                │                   ├── Auto-populate        │
-│                │                   └── Edit in preview      │
+│       ├── --both     (one pass)    ├── Sync lyrics          │
+│       └── --out fizx.html          └── Export               │
+│                │                          │                 │
+│                │                          │                 │
 │                └──────────────────────────┘                 │
 │                              │                              │
-│                        fizx.html                            │
-│                      Works offline                          │
+│                         html + MP4                          │
+│                        Works offline                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -105,7 +105,7 @@ Here I am, making a video bragging about my broken [RAG](https://github.com/AmMo
 
 #### Peasants (Non-Developers)
 
-Open studio.html > paste lyrics > drop audio > select mode > start session > tap spacebar > preview > export > screen record > post > go viral.
+Open studio.html > paste lyrics > drop audio > select mode > start session > tap spacebar > preview > export > post > go viral.
 
 #### Elites (Developers)
 

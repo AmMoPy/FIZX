@@ -67,8 +67,9 @@ logger = logging.getLogger("[FIZX]")
 # Paths
 ROOT = Path(__file__).parent
 SRC  = ROOT / "src"
-FD   = ROOT / 'assets' / 'fonts' # fonts directory, base64 subsets
-WD   = ROOT / 'assets' / 'wasm'  # wasm directory, base64 subsets
+FD   = ROOT / 'assets' / 'fonts'  # fonts directory, base64 subsets
+WD   = ROOT / 'assets' / 'wasm'   # wasm directory, base64 subsets
+MD   = ROOT / 'assets' / 'muxer'  # muxer directory
 
 # @font-face configs
 FONT_MAP = {
@@ -76,13 +77,17 @@ FONT_MAP = {
     'deja': {'p': FD / 'DejaVuSans.b64', 'w': 'normal', 's': 'normal'}, # arabic support
 }
 
-# @font-face configs
+# WASM configs
 WASM_MAP = {
     'glue': {'p': WD / 'pffft-glue.js.b64'}, # identical between simd/non-simd builds — only one copy needed
     'nosimd': {'p': WD / 'pffft-nosimd.b64'},
     'simd': {'p': WD / 'pffft-simd.b64'},
 }
 
+# MP4 muxer configs
+MP4MUXER_MAP = {
+    'umd': {'p': MD / 'mp4-muxer.js'},   # raw JS, inlined verbatim
+}
 
 # ─────────────────────────────────────────────────────────────────
 # SOURCE HELPERS
@@ -242,7 +247,7 @@ def extract_preset_data(src: str, preset_keys: list[str]) -> tuple[str, str]:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# VISUALIZERS EXTRACTION
+# VISUALIZERS EXTRACTION AND BUILD
 # Extracts:
 #   - All text before the first class declaration (CANVAS_SCALE, utils,
 #     easeOutSine, makeCanvas etc.) — always included
@@ -326,30 +331,8 @@ def build_visualizers_block(src: str, viz_keys: list[str], fltr: bool) -> str:
     return '\n\n'.join(parts)
 
 # ═══════════════════════════════════════════════════════════════════
-# BLOCK INJECTION AND REWRITE
+# FONTS BUILD
 # ═══════════════════════════════════════════════════════════════════
-
-def load_b64(path: Path) -> str:
-    """load b64 strings"""
-    b64 = path.read_text().strip()
-    
-    return b64
-
-def inline_blocks(template: str, data_map: dict[str, str], is_studio_prep: bool = False) -> str:
-    """
-    Replace all /* @@TAG@@ */ ... /* @@END_TAG@@ */ blocks in one pass.
-    Ensures no whitespace bloat by stripping content before injection.
-    """
-    # Build a pattern that captures TAG and the inner content (non-greedy)
-    pattern = r'/\* @@(\w+)@@ \*/(.*?)/\* @@END_\1@@ \*/'
-
-    return re.sub(
-        pattern, 
-        lambda m: _replace_tag(m, data_map, is_studio_prep), 
-        template, 
-        flags=re.DOTALL
-    )
-
 def build_fonts(font_names: list[str]):
     """Build @font-face blocks from base64-encoded .b64 files."""
     replacement = ""
@@ -382,6 +365,52 @@ def build_fonts(font_names: list[str]):
         replacement = "/* Inline fonts not available — using system fallback */"
     
     return replacement
+
+# ═══════════════════════════════════════════════════════════════════
+# MP4 MUXER BUILD
+# ═══════════════════════════════════════════════════════════════════
+def build_mp4muxer():
+    """
+    Inline the Mp4Muxer UMD bundle as raw JS. Mp4Muxer's UMD is plain
+    ES5-compatible IIFE — no backticks, no </script> sequences — so it
+    can be inlined verbatim without escaping, unlike the WASM base64.
+    switch to base64 + atob like WASM_MAP and eval it, If muxer build 
+    does contain those 
+    """
+    entry = MP4MUXER_MAP.get('umd')
+    if not entry or not entry['p'].exists():
+        logger.warning('mp4-muxer missing — export MP4 will fail at runtime')
+        return "/* Mp4Muxer not available */\nwindow.Mp4Muxer = null;"
+    src = entry['p'].read_text()
+    # guard against accidental </script> in the bundle
+    if '</script' in src.lower():
+        raise SystemExit('mp4-muxer file contains </script — base64-encode it instead of raw inline')
+    logger.info(f"Mp4Muxer injected ({len(src)//1024} KB)")
+    return src
+
+# ═══════════════════════════════════════════════════════════════════
+# BLOCK INJECTION AND REWRITE
+# ═══════════════════════════════════════════════════════════════════
+def load_b64(path: Path) -> str:
+    """load b64 strings"""
+    b64 = path.read_text().strip()
+    
+    return b64
+
+def inline_blocks(template: str, data_map: dict[str, str], is_studio_prep: bool = False) -> str:
+    """
+    Replace all /* @@TAG@@ */ ... /* @@END_TAG@@ */ blocks in one pass.
+    Ensures no whitespace bloat by stripping content before injection.
+    """
+    # Build a pattern that captures TAG and the inner content (non-greedy)
+    pattern = r'/\* @@(\w+)@@ \*/(.*?)/\* @@END_\1@@ \*/'
+
+    return re.sub(
+        pattern, 
+        lambda m: _replace_tag(m, data_map, is_studio_prep), 
+        template, 
+        flags=re.DOTALL
+    )
 
 # ═══════════════════════════════════════════════════════════════════
 # STUDIO BUILD
@@ -561,6 +590,7 @@ def main():
     viz_src         = (SRC / "visualizers.js").read_text()
     stylekit_src    = (SRC / "stylekit.js").read_text()
     rendercore_src  = (SRC / "rendercore.js").read_text()
+    mp4_export_src  = (SRC / "mp4_export.js").read_text()
     template        = (SRC / "template.html").read_text()
 
     all_preset_keys     = extract_array_values(presets_src, 'PRESET_ORDER')
@@ -620,6 +650,8 @@ def main():
     lyrics_block     = _format_lyrics_json(lyrics_data)
     stylekit_block   = _strip(stylekit_src) # will break any // inside a string literal  (e.g. regex like /\/\//). TODO: ignore if not an issue
     rendercore_block = _strip(rendercore_src)
+    mp4muxer_block   = build_mp4muxer()
+    export_block     = _strip(mp4_export_src)
 
     # ── Compile FIZIX template ──────────────────────────────────────
     out = template
@@ -632,19 +664,21 @@ def main():
         'BEATS': beats_block,
         'LYRICS': lyrics_block,
         'STYLEKIT': stylekit_block,
-        'RENDERCORE': rendercore_block
+        'RENDERCORE': rendercore_block,
+        'MP4MUXER': mp4muxer_block,
+        'EXPORT': export_block
     }
     out = inline_blocks(out, inj_blocks)
-    # Update title
-    out = out.replace('<title>FIZX VISUALIZER</title>',
-                      f'<title>FIZX · {audio_path.stem}</title>')
     # Safety: strip type="module" if present (compiled file is plain JS)
     out = re.sub(r'<script\s+type=["\']module["\']>', '<script>', out)
 
     # ── Write FIZX output (optional) ────────────────────────────────
     if args.out:
+        # resolve title from the compile-time audio file
+        fizx_out = out.replace('[[TITLE_DATA]]', f'FIZX · {audio_path.stem.upper()}')
+        # Write file
         out_path = ROOT / args.out
-        out_path.write_text(out)
+        out_path.write_text(fizx_out)
         size_kb = out_path.stat().st_size / 1024
         logger.info(
             f"VISUALIZER GENERATED\n"
