@@ -93,6 +93,13 @@ MP4MUXER_MAP = {
 # SOURCE HELPERS
 # ─────────────────────────────────────────────────────────────────
 
+def js_string(src: str) -> str:
+    """
+    Embed source text as a JS string literal inside an inline 
+    <script> (no escaping pitfalls, no </script> break-out).
+    """
+    return json.dumps(src).replace('</', '<\\/').replace('<!--', '<\\!--')
+
 def _strip(src: str) -> str:
     """Remove // comments, ES module exports, and empty lines."""
     text = re.sub(r"//.*", "", src)
@@ -452,11 +459,15 @@ def build_studio(
     stylekit_block: str,
     rendercore_block: str,
     wasm_block: str,
+    analysis_common_src: str, 
+    analysis_worker_src: str,
     template_marker: str = '/* @@FIZX_TEMPLATE@@ */',
     fonts_marker: str = '/* @@FONTS@@ */',
     stylekit_marker: str = '/* @@STYLEKIT@@ */',
     rendercore_marker: str = '/* @@RENDERCORE@@ */',
-    wasm_marker: str = '/* @@WASM@@ */'
+    wasm_marker: str = '/* @@WASM@@ */',
+    analysis_common_marker: str = '/* @@ANALYSIS_COMMON@@ */',
+    analysis_worker_marker: str = '/* @@ANALYSIS_WORKER@@ */',
     ) -> str:
     """
     Produce studio.html by injecting into template_studio.html:
@@ -502,14 +513,20 @@ def build_studio(
     else:
         studio = studio.replace(rendercore_marker, rendercore_block)
 
-    # ── Inject Rendercore ───────────────────────────────
+    # ── Inject WASM ─────────────────────────────────────
     if wasm_marker not in studio:
         logger.warning(f"{wasm_marker} not found in template_studio.html — skipping wasm injection")
     else:
         studio = studio.replace(wasm_marker, wasm_block)
 
-    return studio
+    # ── Inject WORKER ─────────────────────────────────────
+    for marker, src in ((analysis_common_marker, analysis_common_src), (analysis_worker_marker, analysis_worker_src)):
+        if marker not in studio:
+            logger.warning(f"{marker} not found in template_studio.html — skipping")
+        else:
+            studio = studio.replace(marker, js_string(src))
 
+    return studio
 
 # ─────────────────────────────────────────────────────────────────
 # ARGUMENT PARSING HELPERS
@@ -592,6 +609,8 @@ def main():
     rendercore_src  = (SRC / "rendercore.js").read_text()
     mp4_export_src  = (SRC / "mp4_export.js").read_text()
     template        = (SRC / "template.html").read_text()
+    analysis_common_src = (SRC / 'analysis_common.js').read_text()
+    analysis_worker_src = (SRC / 'analysis_worker.js').read_text()
 
     all_preset_keys     = extract_array_values(presets_src, 'PRESET_ORDER')
     default_preset_keys = extract_array_values(presets_src, 'DEFAULT_PRESETS')
@@ -652,6 +671,7 @@ def main():
     rendercore_block = _strip(rendercore_src)
     mp4muxer_block   = build_mp4muxer()
     export_block     = _strip(mp4_export_src)
+    analysis_common_block = _strip(analysis_common_src)
 
     # ── Compile FIZIX template ──────────────────────────────────────
     out = template
@@ -666,7 +686,8 @@ def main():
         'STYLEKIT': stylekit_block,
         'RENDERCORE': rendercore_block,
         'MP4MUXER': mp4muxer_block,
-        'EXPORT': export_block
+        'EXPORT': export_block,
+        'ANALYSIS_COMMON': analysis_common_block,
     }
     out = inline_blocks(out, inj_blocks)
     # Safety: strip type="module" if present (compiled file is plain JS)
@@ -703,7 +724,10 @@ def main():
         'LYRICS': 'const LYRICS = [[LYRICS_DATA]];'
     }
     studio_template = inline_blocks(studio_template, placeholders)
-    studio_html = build_studio(studio_template, fonts_block, stylekit_block, rendercore_block, wasm_block)
+    studio_html = build_studio(
+        studio_template, fonts_block, stylekit_block, rendercore_block, 
+        wasm_block, analysis_common_src, analysis_worker_src
+    )
 
     # ── Write Studio output ────────────────────────────────────────
     studio_out  = ROOT / "studio.html"

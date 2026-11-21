@@ -11,7 +11,9 @@
 //   4. The canvas goes to a WebCodecs encoder with an explicit timestamp; audio is encoded alongside; mp4-muxer writes the file.
 //
 // Needs: the template's globals (stageEl, screenEl, masterCanvas, core, vizs, displayLoop, audioBuffer ...), the mp4-muxer UMD (Mp4Muxer).
-// Not painted (v1): the control row under the screen (seek bar, stats, buttons).
+// Not painted: the control row under the screen (seek bar, stats, buttons).
+//
+// Limitation: Export time on a machine without hardware H.264 encoding is dominated by the software encoder, which is slow!
 // ═══════════════════════════════════════════════════════════════════════════════════
 const FizxExport = (() => {
     'use strict';
@@ -601,10 +603,13 @@ const FizxExport = (() => {
             beganRun = true;
             const realNow = clock.realNow;
             const wall0 = realNow();
+            
+            // profiling
             const T = { step: 0, paint: 0, encode: 0, wait: 0, yield: 0 }, sec = {};
             let tMark = 0;
             const probe = (name) => { const t = realNow(); sec[name] = (sec[name] || 0) + (t - tMark); tMark = t; };
             const per = (v, f) => +(v / (f + 1)).toFixed(1);
+
             for (let frame = 0; frame < totalFrames; frame++) {
                 if (o.signal && o.signal.aborted) throw new DOMException('Export cancelled', 'AbortError');
                 if (encoderError) throw encoderError;
@@ -629,11 +634,14 @@ const FizxExport = (() => {
                 if (frame % 15 === 0) {
                     const elapsed = (realNow() - wall0) / 1000;
                     if (o.onProgress) o.onProgress({
-                        frame, frames: totalFrames, fps: frame / Math.max(elapsed, 1e-3), etaSec: elapsed / Math.max(frame, 1) * (totalFrames - frame),
+                        frame, 
+                        frames: totalFrames, 
+                        fps: frame / Math.max(elapsed, 1e-3), 
+                        etaSec: elapsed / Math.max(frame, 1) * (totalFrames - frame),
                         timing: { step: per(T.step, frame), paint: per(T.paint, frame), encode: per(T.encode, frame), wait: per(T.wait, frame), yield: per(T.yield, frame),
                                   sections: Object.fromEntries(Object.entries(sec).map(([k, v]) => [k, per(v, frame)])) },
                     });
-                    if (statusEl) statusEl.textContent = `EXPORTING MP4… ${Math.round(100 * frame / totalFrames)}%`;
+                    if (statusEl) statusEl.textContent = `EXPORTING MP4…${Math.round(100 * frame / totalFrames)}%`;
                     if (detailEl) detailEl.textContent = `ETA ${Math.round(elapsed / Math.max(frame, 1) * (totalFrames - frame))}s`;                   
                     const ty = realNow(); await yieldToEventLoop(); T.yield += realNow() - ty;
                 }

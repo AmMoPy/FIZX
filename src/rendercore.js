@@ -273,6 +273,8 @@ class AnimCore {
         this.lutData = lutData; // { stepMs, bass: [...], vocal: [...], treble: [...] }
     }
 
+    resetResponse() { this.responseModel = createResponseModel(this.config.response); }   // fresh baseline on track change
+    
     setVisibility(visibility) {
         this.visibility = visibility;
         this.circleCanvasEl.style.display = visibility.circle ? '' : 'none';
@@ -302,13 +304,17 @@ class AnimCore {
     // on hitDetected).
     renderFrame(playbackTimeSec, deltaTimeMs, nowMs) {
         const lutIndex = Math.max(0, Math.floor((playbackTimeSec * 1000 + this.config.response.offsetMs) / this.lutData.stepMs));
-        const frameValues = this.responseModel.step(
+        return this.renderValues(
             this.lutData.bass[lutIndex] || 0,
             this.lutData.vocal[lutIndex] || 0,
             this.lutData.treble[lutIndex] || 0,
-            deltaTimeMs,
+            deltaTimeMs, nowMs,
         );
+    }
 
+    // Same frame with the band values supplied directly (live path: no LUT, no time lookup)
+    renderValues(bass, vocal, treble, deltaTimeMs, nowMs) {
+        const frameValues = this.responseModel.step(bass, vocal, treble, deltaTimeMs);
         if (this.visibility.circle && this.config.circle.enabled) {
             this.bassTrailHistory.push(frameValues.bass);
             this.bassTrailHistory.shift();

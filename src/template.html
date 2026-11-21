@@ -341,6 +341,14 @@
             gap: 10px;
             justify-content: center;
         }
+        .controls-row-sel { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+        .controls-row-sel select {
+            background: var(--bg-btn); color: var(--color-btn); border: 1px solid var(--border-btn);
+            border-radius: 6px; font: bold 0.7rem monospace; height: 26px; max-width: 120px; padding: 0 4px;
+            cursor: pointer; transition: border-color 0.4s, color 0.4s, background 0.4s;
+        }
+        .controls-row-sel select:hover { border-color: var(--color-primary); }
+        .controls-row-sel select option { background: var(--bg-btn); color: var(--color-btn); }
         /* Icon-only circular buttons — tooltip via data-tip + ::after */
         button {
             background: var(--bg-btn);
@@ -446,14 +454,19 @@
 
         <div class="controls">
             <div class="controls-row-main">
+                <button id="arBtn"     data-tip="Aspect ratio" class="btn-util"></button>
                 <button id="playBtn"   data-tip="Play / Pause"></button>
                 <button id="resetBtn"  data-tip="Reset + new file"></button>
+                <button id="plBtn"     data-tip="Playlist (real-time)"></button>
                 <button id="modeBtn"   data-tip="Sync mode A/B"></button>
-                <button id="presetBtn" data-tip="Switch preset"></button>
-                <button id="arBtn"    data-tip="Aspect ratio"></button>
-                <button id="vizBtn"   data-tip="Visualizer"></button>
-                <button id="lcBtn"    data-tip="Lyrics / Circle"></button>
-                <button class="btn-util" id="eMp4Btn"  data-tip="EXPORT MP4"></button>
+                <button id="lcBtn"     data-tip="Lyrics / Circle"></button>
+                <button id="eMp4Btn"   data-tip="EXPORT MP4" class="btn-util"></button>
+            </div>
+            <div class="controls-row-sel">
+                <select id="presetSel" title="Preset"></select>
+                <select id="circleSel" title="Circle style"></select>
+                <select id="vizSel"    title="Visualizer"></select>
+                <select id="trackSel"  title="Track" hidden></select>
             </div>
         </div>
         <div class="status-text" id="statusText"></div>
@@ -539,12 +552,15 @@ const statusMsg    = document.getElementById('statusMsg');
 const playBtn      = document.getElementById('playBtn');
 const resetBtn     = document.getElementById('resetBtn');
 const modeBtn      = document.getElementById('modeBtn');
-const presetBtn    = document.getElementById('presetBtn');
 const arBtn        = document.getElementById('arBtn');
-const vizBtn       = document.getElementById('vizBtn');
 const seekBar      = document.getElementById('seekBar');
 const lyricAreaEl  = document.querySelector('.lyric-area');
 const lcBtn        = document.getElementById('lcBtn');
+const plBtn        = document.getElementById('plBtn');
+const presetSel    = document.getElementById('presetSel');
+const vizSel       = document.getElementById('vizSel');
+const circleSel    = document.getElementById('circleSel');
+const trackSel     = document.getElementById('trackSel');
 const exportBtn    = document.getElementById('eMp4Btn');
 const ROOT_STYLE   = document.documentElement; // Cached reference to :root for CSS var reads — avoids repeated DOM lookup.
 
@@ -557,6 +573,7 @@ const LUT_MODE       = BEAT_DATA.step_ms > 0;
 
 let beatTimestamps   = LUT_MODE ? [] : [...BEAT_DATA.beats];  // skip copying a 20k-float array we won't use. TODO: wire to Onsets for a new mode ?
 let activeLutEffect  = null;
+let liveMode         = false;   // true: bands come from LiveBands (real-time) instead of the LUT
 let bpm              = BEAT_DATA.bpm;
 let currentMode      = 'A'; // 'A' = beat triggers, 'B' = lyric start triggers
 let currentPreset    = PRESET_ORDER[0];
@@ -809,7 +826,14 @@ const ICONS = {
     record:  `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><circle cx="8" cy="8" r="2.5" fill="currentColor"/></svg>`,
     star:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l2.16 4.38 4.84.7-3.5 3.41.83 4.82L8 12.04l-4.33 2.27.83-4.82-3.5-3.41 4.84-.7z"/></svg>`,
     bolt:    `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M10 1L3 9h4l-1 6 7-8H9z"/></svg>`,
-    download: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v8m-4-4 4 4 4-4"/><path d="M2 13h12"/></svg>`,
+    download: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m-4-4 4 4 4-4"/><path d="M2 13h12"/></svg>`,
+    orient: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" 
+        stroke-linecap="round" stroke-linejoin="round" aria-label="Rotate device orientation">
+        <rect x="6" y="3" width="12" height="18" rx="2" />
+        <path d="M11 18h2" />
+        <path d="M19 7a7 7 0 0 1 2 5" />
+        <path d="M5 17a7 7 0 0 1-2-5" />
+        </svg>`
 };
 
 function icon(name) { return ICONS[name] || ''; }
@@ -819,11 +843,10 @@ function icon(name) { return ICONS[name] || ''; }
     playBtn.innerHTML   = icon('play');
     resetBtn.innerHTML  = icon('refresh');
     modeBtn.innerHTML   = icon('swap');
-    presetBtn.innerHTML = icon('theme');
-    arBtn.innerHTML     = icon('grid');
-    vizBtn.innerHTML    = icon('record');
+    arBtn.innerHTML     = icon('orient');
     statusMsg.innerHTML = `click ${icon('play')} to load audio`;
     lcBtn.innerHTML     = icon('star');
+    plBtn.innerHTML     = icon('grid');
     exportBtn.innerHTML = icon('download');
 })();
 
@@ -835,17 +858,17 @@ function buildVisualizer(key) {
     // destroy() in BaseVisualizer zeros canvas dimensions -> immediate GPU release.
     if (vizs) { vizs.destroy(); vizs = null; }
     if (key === 'off' || !key || typeof VISUALIZERS === 'undefined' || !VISUALIZERS[key]) {
-        vizBtn.setAttribute('data-tip', 'off');
+        vizSel.value = 'off';
         return;
     }
     vizs = new VISUALIZERS[key](visWrap);
-    vizBtn.setAttribute('data-tip', key);
+    vizSel.value = key;
 }
 
-function cycleVisualizer() {
-    vizIndex = (vizIndex + 1) % VIZ_ORDER.length;
-    buildVisualizer(VIZ_ORDER[vizIndex]);
-}
+// function cycleVisualizer() {
+//     vizIndex = (vizIndex + 1) % VIZ_ORDER.length;
+//     buildVisualizer(VIZ_ORDER[vizIndex]);
+// }
 
 // dedicated lyrics/circle toggle
 function setLyricsCircleMode(mode) {
@@ -926,8 +949,7 @@ function applyPreset(key) {
     // and the running visualizer reads them on its next draw frame automatically.
     // This is zero-coupling contract: preset switch = CSS vars only.
 
-    const nextKey = PRESET_ORDER[(PRESET_ORDER.indexOf(key) + 1) % PRESET_ORDER.length];
-    presetBtn.setAttribute('data-tip', `\u27a1 ${PRESETS[nextKey].label}`);
+    if (presetSel) presetSel.value = key;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1010,8 +1032,8 @@ function updateLyrics(t) {
     if (!LYRICS.length) {
         currentLineEl.innerHTML = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
         nextLineEl.innerHTML    = !beatTimestamps.length && !LUT_MODE
-            ? `${icon('warning')} No lyrics or beats detected`
-            : `${icon('warning')} No lyrics detected`;
+            ? `${icon('warning')} No lyrics or beats detected click ${icon('grid')} for live playback`
+            : `${icon('warning')} No lyrics detected click ${icon('grid')} for live playback`;
         return;
     }
 
@@ -1064,6 +1086,7 @@ function _updateSeekBarVisual(t) {
 }
 
 function seekTo(pct) {
+    if (playlistMode) { if (mediaEl && audioDuration) mediaEl.currentTime = (pct / 100) * audioDuration; return; }
     const target = (pct / 100) * audioDuration;
     // Reset pointers and fast-forward to target without firing triggers
     lastFiredBeatIdx = 0;
@@ -1126,29 +1149,139 @@ function triggerLutScan(now) {
     startScan(now);
 }
 
+/* @@ANALYSIS_COMMON@@ */
+/* @@END_ANALYSIS_COMMON@@ */
+
+const LiveBands = (() => {
+    const HOP_MS = ANALYSIS.hop / 44100 * 1000;                         // nominal hop the per-hop coefficients were defined at (~11.6 ms)
+    const tau = (a) => -HOP_MS / Math.log(1 - a);                       // per-hop coefficient -> time constant (ms)
+    const BANDS = ['bass', 'vocal', 'treble'].map((key) => {
+        const b = ANALYSIS.bands[key];
+        return { key, hp: b.lo, lp: b.hi, att: tau(b.att), rel: tau(b.rel) };
+    });
+    const KICK = { ...ANALYSIS.kick, fft: 2048, sub: 128, headroom: 0.85, seedCeil: 0.02, floorFrac: 0.15, ceilRelMs: 6000, peakRelMs: 60000 };
+    const FFT_SIZE = 2048;
+    const DB_MIN = -80, HEADROOM_DB = 2, MIN_SPAN_DB = 10;
+    const TRACK_UP_MS = 150, TRACK_BACK_MS = 6000, WARM_MS = 4000;
+    const out = { bass: 0, vocal: 0, treble: 0, kick: 0 };
+    let source = null, chains = [], kickChain = null, buf = null, kickBuf = null, elapsedMs = 0;
+
+    const biquad = (ac, type, hz) => {
+        const n = ac.createBiquadFilter();
+        n.type = type; n.frequency.value = hz;
+        n.Q.value = -3.0103;                                            // Butterworth (Q = 0.707); Q is in dB on lowpass/highpass nodes
+        return n;
+    };
+    const wire = (src, nodes) => {
+        src.connect(nodes[0]);
+        for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]);
+    };
+    const analyserNode = (ac, size) => {
+        const a = ac.createAnalyser();
+        a.fftSize = size; a.smoothingTimeConstant = 0;
+        return a;
+    };
+    function reset() {
+        elapsedMs = 0;
+        for (const c of chains) { c.floor = -60; c.ceil = -20; c.value = 0; }
+        if (kickChain) { kickChain.slow = 0; kickChain.ceil = KICK.seedCeil; kickChain.peakMax = KICK.seedCeil; }
+        out.bass = out.vocal = out.treble = out.kick = 0;
+    }
+    function detach() {
+        for (const c of [...chains, kickChain]) {
+            if (!c) continue;
+            try { source.disconnect(c.nodes[0]); } catch (_) {}
+            for (const n of c.nodes) n.disconnect();
+        }
+        chains = []; kickChain = null; source = null;
+    }
+    function attach(ac, src) {
+        if (source) detach();
+        source = src;
+        buf = new Float32Array(FFT_SIZE);
+        kickBuf = new Float32Array(KICK.fft);
+        const nyq = ac.sampleRate * 0.45;
+        chains = BANDS.map((b) => {
+            const lp = Math.min(b.lp, nyq);
+            // two identical Butterworth biquads per edge = Linkwitz-Riley 4th order
+            const nodes = [biquad(ac, 'highpass', b.hp), biquad(ac, 'highpass', b.hp), biquad(ac, 'lowpass', lp), biquad(ac, 'lowpass', lp), analyserNode(ac, FFT_SIZE)];
+            wire(src, nodes);
+            return { ...b, nodes, analyser: nodes[nodes.length - 1], floor: -60, ceil: -20, value: 0 };
+        });
+        const kLp = Math.min(KICK.lp, nyq);
+        const kNodes = [biquad(ac, 'highpass', KICK.hp), biquad(ac, 'lowpass', kLp), biquad(ac, 'lowpass', kLp), analyserNode(ac, KICK.fft)];
+        wire(src, kNodes);
+        kickChain = { nodes: kNodes, analyser: kNodes[kNodes.length - 1], slow: 0, ceil: KICK.seedCeil, peakMax: KICK.seedCeil };
+        reset();
+    }
+    // Causal stand-in for windowedNormalize: floor/ceiling followers in dB (fast to move outward, slow to come back).
+    function read(dtMs) {
+        if (!chains.length) return out;
+        elapsedMs += dtMs;
+        const warm = 0.25 + 0.75 * Math.min(1, elapsedMs / WARM_MS);       // adapts faster during the first seconds of a track
+        const k = (tauMs) => 1 - Math.exp(-dtMs / tauMs);
+        for (const c of chains) {
+            c.analyser.getFloatTimeDomainData(buf);
+            let sum = 0;
+            for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+            const db = Math.max(DB_MIN, 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-6));
+            c.ceil  += (db - c.ceil)  * k(db > c.ceil  ? TRACK_UP_MS : TRACK_BACK_MS * warm);
+            c.floor += (db - c.floor) * k(db < c.floor ? TRACK_UP_MS : TRACK_BACK_MS * warm);
+            const span = Math.max(c.ceil - HEADROOM_DB - c.floor, MIN_SPAN_DB);
+            const raw = Math.min(1, Math.max(0, (db - c.floor) / span));
+            c.value += (raw - c.value) * k(raw > c.value ? c.att : c.rel);
+            out[c.key] = c.value;
+        }
+        // Kick channel: causal version of the worker's extractKick (band-pass -> envelope -> minus slow level -> ceiling)
+        const kc = kickChain;
+        kc.analyser.getFloatTimeDomainData(kickBuf);
+        let peak = 0;                                                       // peak-hold over short sub-blocks: sharp attack, and no missed transients if frames drop
+        for (let s = 0; s < KICK.fft; s += KICK.sub) {
+            let sum = 0;
+            for (let i = s; i < s + KICK.sub; i++) sum += kickBuf[i] * kickBuf[i];
+            if (sum > peak) peak = sum;
+        }
+        const env = Math.sqrt(peak / KICK.sub);
+        kc.slow += (env - kc.slow) * k(env > kc.slow ? KICK.slowAttMs : KICK.slowRelMs);
+        const transient = Math.max(0, env - KICK.rej * kc.slow);
+        kc.peakMax = Math.max(transient, kc.peakMax * Math.exp(-dtMs / KICK.peakRelMs));
+        kc.ceil    = Math.max(transient, kc.ceil    * Math.exp(-dtMs / (KICK.ceilRelMs * warm)));
+        const ceil = Math.max(kc.ceil, KICK.floorFrac * kc.peakMax, 1e-9) * KICK.headroom;
+        out.kick = Math.min(1, transient / ceil);
+        return out;
+    }
+    return { attach, detach, reset, read, KICK, kickMode: true };
+})();
+
 function displayLoop() {
     tickScan(performance.now());
 
     // Current playback position derived from AudioContext wall clock.
     // Accurate to ~1ms — tied to sound card driver, not JS event queue.
-    const t = (isPlaying && audioContext)
-        ? Math.min(audioContext.currentTime - startedAt + startOffset, audioDuration)
-        : startOffset;
+    const t = playlistMode
+        ? (mediaEl ? mediaEl.currentTime : 0)
+        : (isPlaying && audioContext)
+            ? Math.min(audioContext.currentTime - startedAt + startOffset, audioDuration)
+            : startOffset;
 
     if (isPlaying && !isSeeking) {
         timeDisplay.textContent = t.toFixed(3);
         _updateSeekBarVisual(t);
-        updateLyrics(t);
+        if (!playlistMode) updateLyrics(t);
 
-        if (LUT_MODE) {
-            // continuous path — no scheduler pointer, direct index every frame
+        if (LUT_MODE || liveMode) {
+            // continuous path: direct index every frame (LUT) or live band values (playlist mode)
             const now = performance.now();
             const dt = Math.min(50, now - _lastFrame);
             _lastFrame = now;
-            const f = core.renderFrame(t, dt, now);
+            let f;
+            if (liveMode) { 
+                const b = LiveBands.read(dt); f = core.renderValues(LiveBands.kickMode ? b.kick : b.bass, b.vocal, b.treble, dt, now); 
+            }
+            else f = core.renderFrame(t, dt, now);
             const nl = LYRICS[currentLyricIdx + 1]; 
             
-            if (nl && !_exited && core.getExitDurationSec() && t >= nl.start - core.getExitDurationSec()) {
+            if (!playlistMode && nl && !_exited && core.getExitDurationSec() && t >= nl.start - core.getExitDurationSec()) {
                 core.playTextExit();
                 _exited=true;
             }
@@ -1276,6 +1409,12 @@ function selectAudio() {
 
 // ── Play / Pause ──────────────────────────────────────────────────
 async function togglePlay() {
+    if (playlistMode) {
+        if (!mediaEl || !mediaEl.src) { plPick(); return; }
+        if (audioContext.state === 'suspended') await audioContext.resume();
+        if (mediaEl.paused) await mediaEl.play(); else mediaEl.pause();
+        return;
+    }
     if (!audioBuffer) { selectAudio(); return; }
     _ensureContext();
     if (audioContext.state === 'suspended') await audioContext.resume();
@@ -1309,6 +1448,7 @@ async function togglePlay() {
 //   7. Restart display loop and visualizer (display-only, no audio)
 //   8. Prompt for new file
 async function resetAudio() {
+    plExit(); 
     // 1.
     if (sourceNode) {
         isPlaying = false;
@@ -1343,7 +1483,7 @@ async function resetAudio() {
     seekBar.style.background  = '';
     playBtn.innerHTML         = icon('play');
     currentLineEl.innerHTML   = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
-    nextLineEl.innerHTML      = `${icon('play')} select audio file`;
+    nextLineEl.innerHTML      = `${icon('play')} select audio file ${icon('grid')} live playback`;
     statusMsg.innerHTML       = `${icon('refresh')} select new file`;
 
     // 7.
@@ -1352,6 +1492,81 @@ async function resetAudio() {
 
     // 8.
     selectAudio();
+}
+
+// ── Playlist (real-time, no LUT) ──────────────────────────────────
+let playlistMode = false;
+let playlist = [], plIndex = -1;
+let mediaEl = null, mediaSrc = null, _plUrl = null;
+
+function _stopBufferSource() {
+    if (!sourceNode) return;
+    isPlaying = false;
+    sourceNode.onended = null;
+    try { sourceNode.stop(); } catch (_) {}
+    sourceNode.disconnect();
+    sourceNode = null;
+}
+
+function _ensureMedia() {
+    _ensureContext();
+    if (mediaEl) return;
+    mediaEl = new Audio();
+    mediaEl.preload = 'auto';
+    mediaSrc = audioContext.createMediaElementSource(mediaEl);
+    mediaSrc.connect(analyserNode);                  // speakers + legacy visualizers
+    LiveBands.attach(audioContext, mediaSrc);        // attached once: this node persists across tracks
+    mediaEl.onloadedmetadata = () => { audioDuration = mediaEl.duration || 0; };
+    mediaEl.onplay  = () => { isPlaying = true;  playBtn.innerHTML = icon('pause'); };
+    mediaEl.onpause = () => { if (!mediaEl.ended) { isPlaying = false; playBtn.innerHTML = icon('play'); } };
+    mediaEl.onended = () => plPlay(plIndex + 1);     // repeat-all
+}
+
+function plPick() {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'audio/*'; input.multiple = true;
+    input.onchange = (e) => { if (e.target.files.length) plLoad(e.target.files); };
+    input.click();
+}
+
+async function plLoad(files) {
+    const list = [...files].filter((f) => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac|opus)$/i.test(f.name));
+    if (!list.length) { statusMsg.textContent = 'NO AUDIO FILES'; return; }
+    _stopBufferSource();                             // leave song mode
+    playlist = list; playlistMode = true; liveMode = true;
+    // Track dropdown
+    _fillSelect(trackSel, playlist.map((f, i) => [String(i), `${i + 1}. ${f.name.replace(/\.[^/.]+$/, '')}`]), '0');
+    trackSel.hidden = false;
+    
+    _ensureMedia();
+    setLyricsCircleMode('circle');                   // compiled lyrics belong to the song, not to the playlist
+    await plPlay(0);
+}
+
+async function plPlay(i) {
+    if (!playlist.length || !mediaEl) return;
+    plIndex = ((i % playlist.length) + playlist.length) % playlist.length;
+    trackSel.value = String(plIndex);
+    const file = playlist[plIndex];
+    if (_plUrl) URL.revokeObjectURL(_plUrl);
+    _plUrl = URL.createObjectURL(file);
+    mediaEl.src = _plUrl;
+    LiveBands.reset(); core.resetResponse();
+    startOffset = 0; lastFiredBeatIdx = 0; currentLyricIdx = -1;
+    bpmDisplay.textContent = 'LIVE MODE ON'; // TODO: frameValues.beatPeriodMs can drive it
+    statusMsg.textContent = `${plIndex + 1}/${playlist.length} \u00b7 ${file.name.toUpperCase().replace(/\.[^/.]+$/, "")}`;
+    if (audioContext.state === 'suspended') await audioContext.resume();
+    try { await mediaEl.play(); } catch (err) { console.warn('[playlist] play failed', err); }
+}
+
+function plExit() {
+    if (!playlistMode) return;
+    playlistMode = false; liveMode = false; isPlaying = false;
+    playlist = []; plIndex = -1; trackSel.hidden = true; trackSel.textContent = '';
+    if (mediaEl) { mediaEl.onended = null; mediaEl.onpause = null; mediaEl.pause(); mediaEl.removeAttribute('src'); mediaEl.load(); }
+    LiveBands.detach();
+    mediaEl = null; mediaSrc = null;
+    if (_plUrl) { URL.revokeObjectURL(_plUrl); _plUrl = null; }
 }
 
 // ── Mode toggle ───────────────────────────────────────────────────
@@ -1367,11 +1582,11 @@ function toggleMode() {
     statusMsg.textContent = `MODE ${currentMode}`;
 }
 
-// ── Preset toggle ─────────────────────────────────────────────────
-function togglePreset() {
-    const next = PRESET_ORDER[(PRESET_ORDER.indexOf(currentPreset) + 1) % PRESET_ORDER.length];
-    applyPreset(next);
-}
+// // ── Preset toggle ─────────────────────────────────────────────────
+// function togglePreset() {
+//     const next = PRESET_ORDER[(PRESET_ORDER.indexOf(currentPreset) + 1) % PRESET_ORDER.length];
+//     applyPreset(next);
+// }
 
 // ── AR toggle ─────────────────────────────────────────────────────
 function toggleAR() {
@@ -1422,6 +1637,7 @@ window.addEventListener('pagehide', () => { if (_exportAbort) _notifyOpener({ cm
 document.getElementById('mp4-export-cancel').onclick = () => { if (_exportAbort) _exportAbort.abort(); };
 
 async function exportMp4() {
+    if (playlistMode) { statusMsg.textContent = 'EXPORT DISABLED IN LIVE MODE'; return; }
     if (_exportAbort) return;                                          // an export is already running
     if (typeof FizxExport === 'undefined' || typeof Mp4Muxer === 'undefined' || !Mp4Muxer) { statusMsg.textContent = 'EXPORT UNAVAILABLE'; return; }
     if (!audioBuffer) { statusMsg.textContent = 'LOAD AUDIO FIRST'; return; }
@@ -1434,7 +1650,9 @@ async function exportMp4() {
     try {
         const blob = await FizxExport.exportMp4({
             ...choice, seed: 1, signal: _exportAbort.signal,
-            onProgress: (p) => _notifyOpener({ cmd: 'mp4-export-progress', frame: p.frame, frames: p.frames, fps: p.fps, etaSec: p.etaSec }),
+            onProgress: (p) => _notifyOpener(
+                { cmd: 'mp4-export-progress', frame: p.frame, frames: p.frames, fps: p.fps, etaSec: p.etaSec, timing: p.timing }
+            ),
         });
         const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${_audioName}.mp4` });
         a.click();
@@ -1455,6 +1673,30 @@ function fmt(sec) {
     const m = (sec / 60) | 0;
     const s = (sec % 60) | 0;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+function _fillSelect(sel, items, current) { // items: [[value, label], ...]
+    sel.textContent = '';
+    for (const [value, label] of items) sel.add(new Option(label, value));
+    if (current !== undefined) sel.value = current;
+}
+
+function setCircleStyle(id) {
+    if (!CIRCLE_STYLES[id]) return;
+    const cfg = core.config;
+    core.setConfig({ ...cfg, circle: { ...cfg.circle, style: id, params: {} } });
+}
+
+function initSelectors() {
+    const circleId = CIRCLE_STYLES[core.config.circle.style] ? core.config.circle.style : 'sweep';   // core falls back to 'sweep' for unknown ids
+    _fillSelect(presetSel, PRESET_ORDER.filter((k) => PRESETS[k]).map((k) => [k, PRESETS[k].label || k]), currentPreset);
+    _fillSelect(vizSel, VIZ_ORDER.map((k) => [k, k.toUpperCase()]), VIZ_ORDER[vizIndex]);
+    _fillSelect(circleSel, Object.keys(CIRCLE_STYLES).map((k) => [k, CIRCLE_STYLES[k].label || k]), circleId);
+    presetSel.onchange = () => applyPreset(presetSel.value);
+    vizSel.onchange    = () => { vizIndex = VIZ_ORDER.indexOf(vizSel.value); buildVisualizer(vizSel.value); };
+    circleSel.onchange = () => setCircleStyle(circleSel.value);
+    trackSel.onchange  = () => plPlay(+trackSel.value);
+    for (const s of [presetSel, vizSel, circleSel, trackSel]) s.addEventListener('change', () => s.blur());   // hand keyboard focus back
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1480,11 +1722,11 @@ seekBar.addEventListener('pointerup', () => { isSeeking = false; });
 playBtn.onclick   = togglePlay;
 resetBtn.onclick  = resetAudio;
 modeBtn.onclick   = toggleMode;
-presetBtn.onclick = togglePreset;
 arBtn.onclick     = toggleAR;
-vizBtn.onclick    = cycleVisualizer;
 lcBtn.onclick     = cycleLyricsCircle;
+plBtn.onclick     = plPick;  
 exportBtn.onclick = exportMp4;
+initSelectors();
 
 // ── Resize observer — keeps dust canvas sized to screen ──────────
 const _resizeObs = new ResizeObserver(() => {
