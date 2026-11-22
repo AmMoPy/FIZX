@@ -181,6 +181,17 @@ function traceSmoothCurve(ctx, xs, ys, offset, count) {
     ctx.lineTo(xs[offset + count - 1], ys[offset + count - 1]);
 }
 
+// Appends a closed, slightly wobbling circle to the current path (hand-drawn look). wobble = fraction of the radius.
+function traceWobblyCircle(ctx, cx, cy, radius, wobble, phase, segments = 96) {
+    for (let i = 0; i <= segments; i++) {
+        const a = (i / segments) * Math.PI * 2;
+        const r = radius * (1 + wobble * (0.6 * Math.sin(3 * a + phase) + 0.4 * Math.sin(7 * a - phase * 1.3)));
+        const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+}
+
 // ═══ STAGE WALKER (shared by every roaming character) ═══════════════════════
 // A character's place on the canvas. x is in character units (same units as the figure), 0 = centre of the canvas.
 //   vel   units/second           facing  +1 / -1, the way it is heading      turn  eased facing (-1..1), squashes through 0 on a turn
@@ -497,8 +508,8 @@ const DUEL_MOVES = [
 const CAT_TRICKS = [
     { name: 'chase',  minEnergy: 0,   mode: 'chase', ticks: 0.5, roams: true },
     { name: 'carry',  minEnergy: 0.3, mode: 'carry', ticks: 2,   roams: true, speed: 0.9 },
-    { name: 'juggle', minEnergy: 0.2, mode: 'stay',  ticks: 1 },
-    { name: 'sing',   minEnergy: 0,   mode: 'stay',  ticks: 0 },
+    { name: 'juggle', minEnergy: 0.2, mode: 'stay',  ticks: 1,   roams: true },
+    { name: 'sing',   minEnergy: 0,   mode: 'stay',  ticks: 0,   roams: true },
 ];
 // Leg layout in body space (+x = the way it faces). near = drawn in front of the torso. Diagonal pairs share a gait offset.
 const CAT_LEGS = [
@@ -849,6 +860,265 @@ const CIRCLE_STYLES = {
             // ctx.globalAlpha = 0.55 + frameValues.bass * 0.45;
             // ctx.fill();
             // ctx.globalAlpha = 1;
+        },
+    },
+
+    portal: {
+        label: 'Portal',
+        tip: 'Hand-drawn ring: beat pulses the ring and sends shock rings, vocal fills the haze inside, treble grows needles around the rim.',
+        params: [
+            { key: 'size', label: 'Size', min: 0.5, max: 1, step: 0.05, default: 1, tip: 'Ring size inside its frame. Kept at 1 or below so the needles never clip the canvas edge.' },
+            { key: 'needles', label: 'Needles', min: 24, max: 120, step: 4, default: 72, tip: 'Number of needles around the rim. They cluster on one side.' },
+            { key: 'sketch', label: 'Sketchiness', min: 0, max: 1, step: 0.05, default: 0.5, tip: 'How hand-drawn the ring looks: wobble and doubled outline.' },
+            { key: 'glow', label: 'Glow', min: 0, max: 1, step: 0.05, default: 0.6, tip: 'Halo strength around the ring and needles.' },
+            { key: 'glowWidth', label: 'Glow width', min: 0.5, max: 4, step: 0.1, default: 1.5,
+              tip: 'How wide the halo spreads. Lower = tighter and cheaper to draw, higher = softer and more expensive.' },
+        ],
+        createState() {
+            // Per-needle values are fixed once (seeded), so nothing random happens per frame: stable and smooth.
+            let seed = 1234567;
+            const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+            const needles = [];
+            for (let i = 0; i < 120; i++) needles.push({ jitter: rand(), len: 0.35 + 0.65 * rand(), phase: rand() * Math.PI * 2, tick: rand() < 0.35, dot: rand() < 0.12 });
+            return { bass: createSpring(), vocal: createSpring(), treble: createSpring(), ripples: createRipples(3), needles };
+        },
+        draw(ctx, frameValues, styleParams, drawContext, state) {
+            const { centerX, centerY, nowMs, colors } = drawContext;
+            const dt = frameSeconds(drawContext);
+
+            if (frameValues.hitDetected) spawnRipple(state.ripples, frameValues.hitStrength || frameValues.bass);
+            stepSpring(state.bass,   frameValues.bass,   6, 0.9, dt);
+            stepSpring(state.vocal,  frameValues.vocal,  3, 1,   dt);
+            stepSpring(state.treble, frameValues.treble, 5, 1,   dt);
+            advanceRipples(state.ripples, dt, 0.6);
+            const bass = clamp(state.bass.value, 0, 1.2), vocal = clamp(state.vocal.value, 0, 1), treble = clamp(state.treble.value, 0, 1);
+
+            const t = nowMs * 0.001;
+            const radius = drawContext.baseRadius * styleParams.size * (0.96 + 0.08 * bass);
+            const wobble = 0.012 * styleParams.sketch * (1 + 0.8 * bass);
+            const haloStyle = createBloomGradient(ctx, centerX, centerY, colors);
+            ctx.save();
+
+            // 1. outer fog
+            const fog = ctx.createRadialGradient(centerX, centerY, radius * 0.9, centerX, centerY, radius * 2.1);
+            fog.addColorStop(0, withAlpha(colors.glow, 0.10 + 0.12 * bass));
+            fog.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = fog;
+            ctx.beginPath(); ctx.arc(centerX, centerY, radius * 2.1, 0, Math.PI * 2); ctx.fill();
+
+            // 2. faint guide arcs on the left
+            ctx.strokeStyle = colors.secondary; ctx.lineWidth = 1;
+            const guideStart = Math.PI * 0.55 - t * 0.02;
+            ctx.globalAlpha = 0.16 + 0.10 * bass;
+            ctx.beginPath(); ctx.arc(centerX, centerY, radius * 1.14, guideStart, guideStart + Math.PI * 0.9); ctx.stroke();
+            ctx.globalAlpha = 0.10 + 0.08 * bass;
+            ctx.beginPath(); ctx.arc(centerX, centerY, radius * 1.27, guideStart + 0.3, guideStart + 0.3 + Math.PI * 0.7); ctx.stroke();
+
+            // 3. shock rings on each beat
+            for (const ripple of state.ripples) {
+                if (ripple.age >= 1) continue;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius * (1 + ripple.age * 0.8), 0, Math.PI * 2);
+                ctx.strokeStyle = colors.primary;
+                ctx.lineWidth = 0.5 + 1.8 * (1 - ripple.age);
+                ctx.globalAlpha = (1 - ripple.age) * (1 - ripple.age) * 0.5 * ripple.strength;
+                ctx.stroke();
+            }
+
+            // 4. full circle (beat): hand-drawn outline, doubled
+            const lineWidth = 1.3 + 1.3 * bass;
+            ctx.beginPath();
+            traceWobblyCircle(ctx, centerX, centerY, radius, wobble, t * 0.5);
+            strokeWithGlow(ctx, colors.primary, lineWidth, 0.22 * styleParams.glow, haloStyle, { haloWidth: lineWidth * styleParams.glowWidth });
+            ctx.strokeStyle = colors.secondary; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.35;
+            ctx.beginPath(); traceWobblyCircle(ctx, centerX, centerY, radius * 1.018, wobble * 1.6, t * 0.5 + 2.1); ctx.stroke();
+
+            // 5. crescent moon inside the full circle (vocal lives here)
+            const tilt = 0.35 - 0.80 * Math.sin(t * 0.17);              // thick side faces right/upper-right and drifts gently
+            const ux = Math.cos(tilt), uy = Math.sin(tilt);
+            const moonOuter = radius, moonInner = radius * 0.89;        // moonInner closer to moonOuter = longer, sharper horns
+            const cut = radius * (0.12 + 0.05 * bass);                  // cutout slides toward the thin side; the beat fattens the moon
+            const cutX = centerX - ux * cut, cutY = centerY - uy * cut;
+            const thick = moonOuter - moonInner + cut;                  // thickness at the middle of the thick side
+            const box = radius * 1.2;
+            ctx.save();
+            ctx.beginPath(); traceWobblyCircle(ctx, centerX, centerY, moonOuter, wobble, t * 0.5 + 0.7); ctx.clip();
+            ctx.beginPath(); ctx.rect(centerX - box, centerY - box, box * 2, box * 2);
+            traceWobblyCircle(ctx, cutX, cutY, moonInner, wobble, t * 0.5 + 1.6);
+            ctx.clip('evenodd');                                               // outer disc minus the cutout = the crescent
+            ctx.globalAlpha = 0.14 + 0.10 * bass; ctx.fillStyle = colors.secondary;
+            ctx.fillRect(centerX - box, centerY - box, box * 2, box * 2);
+            if (vocal > 0.01) {                                                // vocal: light gathers in the thick middle of the moon
+                const mx = centerX + ux * (moonOuter - thick * 0.5), my = centerY + uy * (moonOuter - thick * 0.5);
+                const spot = ctx.createRadialGradient(mx, my, 0, mx, my, radius); // radius * 0.60
+                spot.addColorStop(0,   withAlpha(colors.glow, 0.15 + 0.65 * vocal));
+                spot.addColorStop(0.5, withAlpha(colors.glow, 0.05 + 0.25 * vocal));
+                spot.addColorStop(1,   'rgba(0, 0, 0, 0)');
+                ctx.globalAlpha = 1; ctx.fillStyle = spot;
+                ctx.fillRect(centerX - box, centerY - box, box * 2, box * 2);
+            }
+            const edgeW = 2 * (0.9 + 0.7 * bass);                               // doubled: the half outside the moon is clipped away
+            ctx.beginPath();
+            traceWobblyCircle(ctx, centerX, centerY, moonOuter, wobble, t * 0.5 + 0.7);
+            traceWobblyCircle(ctx, cutX, cutY, moonInner, wobble, t * 0.5 + 1.6);
+            strokeWithGlow(ctx, colors.primary, edgeW, (0.10 + 0.45 * vocal) * styleParams.glow, haloStyle, { alpha: 0.75, haloWidth: edgeW * styleParams.glowWidth });
+            ctx.restore();
+
+            // 6. needles (treble): one batched path
+            const count = Math.min(styleParams.needles | 0, state.needles.length);
+            const clusterAngle = tilt;
+            const r0 = radius * 1.02;
+            ctx.beginPath();
+            for (let i = 0; i < count; i++) {
+                const needle = state.needles[i];
+                const angle = ((i + (needle.jitter - 0.5) * 0.8) / count) * Math.PI * 2;
+                const cluster = 0.2 + 0.8 * ((1 + Math.cos(angle - clusterAngle)) * 0.5) ** 2;
+                const shimmer = 0.6 + 0.4 * Math.sin(nowMs * 0.005 * (0.6 + needle.jitter) + needle.phase);
+                const length = radius * needle.len * cluster * (0.03 + 0.34 * treble * shimmer);
+                const cos = Math.cos(angle), sin = Math.sin(angle);
+                ctx.moveTo(centerX + cos * r0, centerY + sin * r0);
+                ctx.lineTo(centerX + cos * (r0 + length), centerY + sin * (r0 + length));
+                if (needle.tick && length > radius * 0.06) {                       // crossbar
+                    const mid = r0 + length * 0.6, half = radius * 0.025;
+                    ctx.moveTo(centerX + cos * mid - sin * half, centerY + sin * mid + cos * half);
+                    ctx.lineTo(centerX + cos * mid + sin * half, centerY + sin * mid - cos * half);
+                }
+            }
+            strokeWithGlow(ctx, colors.secondary, 1, 0.12 * styleParams.glow * treble, haloStyle, 
+                           { alpha: 0.35 + 0.5 * treble , haloWidth: 2 * styleParams.glowWidth });
+
+            // floating dots past the needle tips fade in with treble (no hard threshold)
+            if (treble > 0.2) {
+                ctx.lineCap = 'round'; ctx.lineWidth = 2.2; ctx.strokeStyle = colors.primary;
+                ctx.globalAlpha = (treble - 0.2) * 1.1;
+                ctx.beginPath();
+                for (let i = 0; i < count; i++) {
+                    const needle = state.needles[i];
+                    if (!needle.dot) continue;
+                    const angle = ((i + (needle.jitter - 0.5) * 0.8) / count) * Math.PI * 2;
+                    const reach = r0 + radius * (0.10 + 0.30 * treble * needle.len);
+                    const x = centerX + Math.cos(angle) * reach, y = centerY + Math.sin(angle) * reach;
+                    ctx.moveTo(x, y); ctx.lineTo(x + 0.01, y);
+                }
+                ctx.stroke();
+            }
+            ctx.restore();
+        },
+    },
+
+    mandala: {
+        label: 'Mandala',
+        tip: 'Concentric rings of smoky repeating shapes. Beat sends a wave out from the centre, vocal lights the core and speeds the morphing, treble adds wisps and sparkles to the outer rings.',
+        params: [
+            { key: 'size', label: 'Size', min: 0.5, max: 1, step: 0.05, default: 1, tip: 'Pattern size. At 1 it fills the whole frame.' },
+            { key: 'rings', label: 'Rings', min: 4, max: 12, step: 1, default: 8, tip: 'Number of concentric rings. More rings = more shapes to draw.' },
+            { key: 'wisp', label: 'Wisp', min: 0, max: 1, step: 0.05, default: 0.6, tip: 'How wild and smoky the shapes are; treble pushes it further on the outer rings.' },
+            { key: 'glow', label: 'Glow', min: 0, max: 1, step: 0.05, default: 0.6, tip: 'Halo strength on the three inner rings.' },
+            { key: 'glowWidth', label: 'Glow width', min: 0.5, max: 4, step: 0.1, default: 1.5,
+              tip: 'How wide the halo spreads. Lower = tighter and cheaper to draw, higher = softer and more expensive.' },
+        ],
+        createState() {
+            return { bass: createSpring(), vocal: createSpring(), treble: createSpring(), ripples: createRipples(3), phase: 0, spin: 0 };
+        },
+        draw(ctx, frameValues, styleParams, drawContext, state) {
+            const { centerX, centerY, colors } = drawContext;
+            const dt = frameSeconds(drawContext);
+
+            if (frameValues.hitDetected) spawnRipple(state.ripples, frameValues.hitStrength || frameValues.bass);
+            stepSpring(state.bass,   frameValues.bass,   6, 0.9, dt);
+            stepSpring(state.vocal,  frameValues.vocal,  3, 1,   dt);
+            stepSpring(state.treble, frameValues.treble, 5, 1,   dt);
+            advanceRipples(state.ripples, dt, 0.5);
+            const bass = clamp(state.bass.value, 0, 1.2), vocal = clamp(state.vocal.value, 0, 1), treble = clamp(state.treble.value, 0, 1);
+
+            state.phase += dt * (0.25 + 0.9 * vocal);        // the shapes morph faster when the vocal is up
+            state.spin  += dt * 0.05;
+
+            const maxR = Math.min(ctx.canvas.width, ctx.canvas.height) * 0.5 * 0.97 * styleParams.size * (1 + 0.03 * bass);
+            const rings = styleParams.rings | 0;
+            const SAMPLES = 14;
+            const gx = scratchBuffer('mandalaGx', SAMPLES), gy = scratchBuffer('mandalaGy', SAMPLES);   // one glyph in ring-local space
+            const px = scratchBuffer('mandalaPx', SAMPLES), py = scratchBuffer('mandalaPy', SAMPLES);   // the same glyph in canvas space
+            const dots = scratchBuffer('mandalaDots', 512);
+            let dotCount = 0;
+            const haloStyle = createBloomGradient(ctx, centerX, centerY, colors);
+
+            ctx.save();
+            ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+            // central wash (vocal)
+            const wash = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxR * 0.4);
+            wash.addColorStop(0, withAlpha(colors.glow, 0.12 + 0.35 * vocal));
+            wash.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = wash;
+            ctx.beginPath(); ctx.arc(centerX, centerY, maxR * 0.4, 0, Math.PI * 2); ctx.fill();
+
+            for (let k = 0; k < rings; k++) {
+                const u = (k + 0.6) / rings;
+                const rk = maxR * Math.pow(u, 1.35);                              // rings are denser near the centre
+                const spacing = maxR * Math.pow((k + 1.6) / rings, 1.35) - rk;
+                const n = 6 + 4 * k;                                              // repeats per ring
+                const amp = Math.min((2 * Math.PI * rk) / n, spacing * 1.6) * 0.5; // glyph size is bounded by its neighbours
+                const innerW = Math.max(0, 1 - u * 1.6), outerW = u * u;
+
+                // beat wave: each shock ring lights up and swells the ring it passes
+                let boost = 0;
+                for (const ripple of state.ripples) {
+                    if (ripple.age >= 1) continue;
+                    const d = u - ripple.age;
+                    boost += ripple.strength * (1 - ripple.age) * Math.exp(-(d * d) / 0.012);
+                }
+                boost = Math.min(boost, 1.2);
+
+                const scale = 0.6 + 0.25 * bass * (1 - 0.5 * u) + 0.5 * boost + 0.35 * vocal * innerW;
+                const wispAmp = styleParams.wisp * (0.35 + 0.9 * treble * outerW);
+                const alpha = clamp((0.30 + 0.45 * (1 - u)) * (0.6 + 0.3 * bass) + 0.65 * boost + 0.3 * vocal * innerW, 0, 1);
+                const dir = k % 2 ? -1 : 1;
+                const rot = state.spin * dir / (1 + 0.3 * k);
+                const p1 = state.phase * dir + k * 0.9, p2 = state.phase * 1.7 * dir + k * 1.7, p3 = state.phase * 0.8 + k * 2.3;
+
+                for (let i = 0; i < SAMPLES; i++) {                               // one smoky Lissajous-style loop, computed once per ring
+                    const s = (i / SAMPLES) * Math.PI * 2;
+                    gx[i] = amp * scale * (0.5 * Math.sin(s + p1) + 0.35 * wispAmp * Math.sin(3 * s + p2));
+                    gy[i] = amp * scale * (0.9 * Math.sin(2 * s + p3) + 0.30 * wispAmp * Math.cos(5 * s - p1));
+                }
+
+                ctx.beginPath();
+                for (let j = 0; j < n; j++) {                                     // N-fold repeats of the same glyph
+                    const a = rot + (j / n) * Math.PI * 2;
+                    const ca = Math.cos(a), sa = Math.sin(a);
+                    for (let i = 0; i < SAMPLES; i++) {
+                        const radial = rk + gx[i];
+                        px[i] = centerX + ca * radial - sa * gy[i];
+                        py[i] = centerY + sa * radial + ca * gy[i];
+                    }
+                    ctx.moveTo((px[SAMPLES - 1] + px[0]) * 0.5, (py[SAMPLES - 1] + py[0]) * 0.5);
+                    for (let i = 0; i < SAMPLES; i++) {                           // closed smooth curve through the midpoints
+                        const ni = (i + 1) % SAMPLES;
+                        ctx.quadraticCurveTo(px[i], py[i], (px[i] + px[ni]) * 0.5, (py[i] + py[ni]) * 0.5);
+                    }
+                    if (outerW > 0.25 && treble > 0.05 && (j + k) % 3 === 0 && dotCount < 256) {
+                        dots[dotCount * 2] = px[0]; dots[dotCount * 2 + 1] = py[0]; dotCount++;
+                    }
+                }
+                const style = k < rings * 0.5 ? colors.primary : colors.secondary;
+                const lineWidth = 0.8 + 0.9 * (1 - u) + 0.8 * boost;
+                ctx.strokeStyle = style; ctx.lineWidth = lineWidth; ctx.globalAlpha = alpha;
+                if (k < 3) strokeWithGlow(ctx, style, lineWidth, 0.18 * styleParams.glow * (0.4 + 0.6 * (0.6 * vocal + 0.4 * bass)), haloStyle, { haloWidth: lineWidth * styleParams.glowWidth });
+                else ctx.stroke();
+
+                ctx.strokeStyle = style; ctx.lineWidth = 0.7; ctx.globalAlpha = alpha * 0.45;   // thin guide circle through the glyphs
+                ctx.beginPath(); ctx.arc(centerX, centerY, rk, 0, Math.PI * 2); ctx.stroke();
+            }
+
+            // treble sparkles on the outer rings: one batched path of zero-length round-capped segments
+            if (dotCount) {
+                ctx.beginPath();
+                for (let d = 0; d < dotCount; d++) { ctx.moveTo(dots[d * 2], dots[d * 2 + 1]); ctx.lineTo(dots[d * 2] + 0.01, dots[d * 2 + 1]); }
+                ctx.strokeStyle = colors.primary; ctx.lineWidth = 1.5 + 2.5 * treble; ctx.globalAlpha = Math.min(1, treble * 1.1);
+                ctx.stroke();
+            }
+            ctx.restore();
         },
     },
 

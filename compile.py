@@ -611,6 +611,7 @@ def main():
     template        = (SRC / "template.html").read_text()
     analysis_common_src = (SRC / 'analysis_common.js').read_text()
     analysis_worker_src = (SRC / 'analysis_worker.js').read_text()
+    analysis_live_src   = (SRC / 'analysis_live.js').read_text()
 
     all_preset_keys     = extract_array_values(presets_src, 'PRESET_ORDER')
     default_preset_keys = extract_array_values(presets_src, 'DEFAULT_PRESETS')
@@ -672,6 +673,7 @@ def main():
     mp4muxer_block   = build_mp4muxer()
     export_block     = _strip(mp4_export_src)
     analysis_common_block = _strip(analysis_common_src)
+    analysis_live_block   = _strip(analysis_live_src)
 
     # ── Compile FIZIX template ──────────────────────────────────────
     out = template
@@ -688,6 +690,7 @@ def main():
         'MP4MUXER': mp4muxer_block,
         'EXPORT': export_block,
         'ANALYSIS_COMMON': analysis_common_block,
+        'ANALYSIS_LIVE': analysis_live_block,
     }
     out = inline_blocks(out, inj_blocks)
     # Safety: strip type="module" if present (compiled file is plain JS)

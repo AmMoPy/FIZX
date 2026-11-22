@@ -147,6 +147,9 @@
             background: radial-gradient(circle at 50% 40%, transparent 50%, rgba(0,0,0,0.5) 100%);
         }
 
+        #scanBtn[aria-pressed="false"] { opacity: 0.45; }
+        #scanBtn:disabled { opacity: 0.2; cursor: default; }
+
         /* Screen flash — animates box-shadow via CSS keyframe.
            The browser GPU compositor runs this at native frame rate
            with zero JS involvement after the class is added. */
@@ -341,14 +344,31 @@
             gap: 10px;
             justify-content: center;
         }
+        /* ── Playlist controls and capped dropdowns ──── */
         .controls-row-sel { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
-        .controls-row-sel select {
-            background: var(--bg-btn); color: var(--color-btn); border: 1px solid var(--border-btn);
-            border-radius: 6px; font: bold 0.7rem monospace; height: 26px; max-width: 120px; padding: 0 4px;
-            cursor: pointer; transition: border-color 0.4s, color 0.4s, background 0.4s;
-        }
-        .controls-row-sel select:hover { border-color: var(--color-primary); }
-        .controls-row-sel select option { background: var(--bg-btn); color: var(--color-btn); }
+        .dd { position: relative; display: inline-block; }
+        .dd[hidden] { display: none; }
+        .dd-btn { display: flex; align-items: center; gap: 4px; height: 26px; max-width: 120px; padding: 0 6px; box-sizing: border-box;
+                  background: var(--bg-btn); color: var(--color-btn); border: 1px solid var(--border-btn); border-radius: 6px;
+                  font: bold 0.7rem monospace; cursor: pointer; user-select: none; transition: border-color 0.4s, color 0.4s, background 0.4s; }
+        .dd-btn:hover, .dd-btn:focus-visible { border-color: var(--color-primary); outline: none; }
+        .dd-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dd-caret { opacity: 0.7; font-size: 0.6rem; }
+        .dd-pop { position: fixed; z-index: 9998; background: var(--bg-btn); color: var(--color-btn); border: 1px solid var(--border-btn);
+                  border-radius: 6px; font: bold 0.7rem monospace; box-shadow: 0 6px 18px rgba(0,0,0,0.45); overflow: hidden; }
+        .dd-bar { display: flex; justify-content: flex-end; gap: 4px; padding: 3px 4px; border-bottom: 1px solid var(--border-btn); }
+        .dd-tool { min-width: 20px; height: 18px; line-height: 18px; text-align: center; padding: 0 4px; border: 1px solid var(--border-btn);
+                   border-radius: 4px; cursor: pointer; font-size: 0.62rem; }
+        .dd-tool:hover { border-color: var(--color-primary); color: var(--color-primary); }
+        .dd-scroll { overflow-y: auto; overscroll-behavior: contain; }
+        .dd-spacer { position: relative; }
+        .dd-rows { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
+        .dd-row { display: flex; align-items: center; gap: 4px; padding: 0 6px; box-sizing: border-box; cursor: pointer; }
+        .dd-row:hover, .dd-row.act { background: rgba(255,255,255,0.08); }
+        .dd-row.sel { color: var(--color-primary); }
+        .dd-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dd-x { opacity: 0.55; padding: 0 3px; cursor: pointer; }
+        .dd-x:hover { opacity: 1; color: #f66; }
         /* Icon-only circular buttons — tooltip via data-tip + ::after */
         button {
             background: var(--bg-btn);
@@ -458,15 +478,16 @@
                 <button id="playBtn"   data-tip="Play / Pause"></button>
                 <button id="resetBtn"  data-tip="Reset + new file"></button>
                 <button id="plBtn"     data-tip="Playlist (real-time)"></button>
-                <button id="modeBtn"   data-tip="Sync mode A/B"></button>
+                <button id="scanBtn"   data-tip="Scan"></button>
+                <!-- <button id="modeBtn"   data-tip="Sync mode A/B"></button> -->
                 <button id="lcBtn"     data-tip="Lyrics / Circle"></button>
                 <button id="eMp4Btn"   data-tip="EXPORT MP4" class="btn-util"></button>
             </div>
             <div class="controls-row-sel">
-                <select id="presetSel" title="Preset"></select>
-                <select id="circleSel" title="Circle style"></select>
-                <select id="vizSel"    title="Visualizer"></select>
-                <select id="trackSel"  title="Track" hidden></select>
+                <div id="presetSel" title="Preset"></div>
+                <div id="circleSel" title="Circle style"></div>
+                <div id="vizSel"    title="Visualizer"></div>
+                <div id="trackSel"  title="Track" hidden></div>
             </div>
         </div>
         <div class="status-text" id="statusText"></div>
@@ -551,16 +572,13 @@ const bpmDisplay   = document.getElementById('bpmDisplay');
 const statusMsg    = document.getElementById('statusMsg');
 const playBtn      = document.getElementById('playBtn');
 const resetBtn     = document.getElementById('resetBtn');
-const modeBtn      = document.getElementById('modeBtn');
+// const modeBtn      = document.getElementById('modeBtn');
 const arBtn        = document.getElementById('arBtn');
 const seekBar      = document.getElementById('seekBar');
 const lyricAreaEl  = document.querySelector('.lyric-area');
 const lcBtn        = document.getElementById('lcBtn');
 const plBtn        = document.getElementById('plBtn');
-const presetSel    = document.getElementById('presetSel');
-const vizSel       = document.getElementById('vizSel');
-const circleSel    = document.getElementById('circleSel');
-const trackSel     = document.getElementById('trackSel');
+const scanBtn      = document.getElementById('scanBtn');
 const exportBtn    = document.getElementById('eMp4Btn');
 const ROOT_STYLE   = document.documentElement; // Cached reference to :root for CSS var reads — avoids repeated DOM lookup.
 
@@ -573,6 +591,8 @@ const LUT_MODE       = BEAT_DATA.step_ms > 0;
 
 let beatTimestamps   = LUT_MODE ? [] : [...BEAT_DATA.beats];  // skip copying a 20k-float array we won't use. TODO: wire to Onsets for a new mode ?
 let activeLutEffect  = null;
+let scanEnabled      = true;    // user switch; the preset still decides whether a scan exists at all
+let presetOffersScan = false;   // set by applyPreset()
 let liveMode         = false;   // true: bands come from LiveBands (real-time) instead of the LUT
 let bpm              = BEAT_DATA.bpm;
 let currentMode      = 'A'; // 'A' = beat triggers, 'B' = lyric start triggers
@@ -833,7 +853,8 @@ const ICONS = {
         <path d="M11 18h2" />
         <path d="M19 7a7 7 0 0 1 2 5" />
         <path d="M5 17a7 7 0 0 1-2-5" />
-        </svg>`
+        </svg>`,
+    scan: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 10h16M4 18h16" opacity="0.45"/><path d="M4 14h16" stroke-width="3.5"/></svg>`,
 };
 
 function icon(name) { return ICONS[name] || ''; }
@@ -842,11 +863,12 @@ function icon(name) { return ICONS[name] || ''; }
 (function _initIcons() {
     playBtn.innerHTML   = icon('play');
     resetBtn.innerHTML  = icon('refresh');
-    modeBtn.innerHTML   = icon('swap');
+    // modeBtn.innerHTML   = icon('swap');
     arBtn.innerHTML     = icon('orient');
     statusMsg.innerHTML = `click ${icon('play')} to load audio`;
     lcBtn.innerHTML     = icon('star');
     plBtn.innerHTML     = icon('grid');
+    scanBtn.innerHTML   = icon('scan');
     exportBtn.innerHTML = icon('download');
 })();
 
@@ -891,6 +913,16 @@ function setLyricsCircleMode(mode) {
 function cycleLyricsCircle() {
     const idx = (LC_ORDER.indexOf(lyricsCircleMode) + 1) % LC_ORDER.length;
     setLyricsCircleMode(LC_ORDER[idx]);
+}
+
+function _syncScanBtn() {
+    scanBtn.disabled = !presetOffersScan;
+    scanBtn.setAttribute('aria-pressed', String(scanEnabled));
+    scanBtn.setAttribute('data-tip', !presetOffersScan ? 'This preset has no scan' : (scanEnabled ? 'Scan: on' : 'Scan: off'));
+}
+
+function toggleScan() {
+    if (presetOffersScan) { scanEnabled = !scanEnabled; _syncScanBtn(); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -948,6 +980,10 @@ function applyPreset(key) {
     // Do NOT rebuild the visualizer here. CSS vars are now injected above,
     // and the running visualizer reads them on its next draw frame automatically.
     // This is zero-coupling contract: preset switch = CSS vars only.
+
+    const _p = PRESETS[key];
+    presetOffersScan = !!(_p && _p.cssVars && _p.cssVars['--scan-anim'] && _p.cssVars['--crt-on'] === '1' && _p.effects && _p.effects.some((fx) => fx.useScan));
+    _syncScanBtn();
 
     if (presetSel) presetSel.value = key;
 }
@@ -1032,8 +1068,8 @@ function updateLyrics(t) {
     if (!LYRICS.length) {
         currentLineEl.innerHTML = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
         nextLineEl.innerHTML    = !beatTimestamps.length && !LUT_MODE
-            ? `${icon('warning')} No lyrics or beats detected click ${icon('grid')} for live playback`
-            : `${icon('warning')} No lyrics detected click ${icon('grid')} for live playback`;
+            ? `${icon('warning')} No lyrics or beats detected click ${icon('grid')} for live animation`
+            : `${icon('warning')} No lyrics detected click ${icon('grid')} for live animation`;
         return;
     }
 
@@ -1130,6 +1166,7 @@ let _scanEndAt = 0;
 const SCAN_MS = 280;
 
 function startScan(now) {
+    if (!scanEnabled) return; // Both the LUT-hit path and the beat-effect path go through it, so this is the single gate
     _scanEndAt = now + SCAN_MS;
     screenEl.classList.remove('scan-active');
     requestAnimationFrame(() => {
@@ -1152,106 +1189,8 @@ function triggerLutScan(now) {
 /* @@ANALYSIS_COMMON@@ */
 /* @@END_ANALYSIS_COMMON@@ */
 
-const LiveBands = (() => {
-    const HOP_MS = ANALYSIS.hop / 44100 * 1000;                         // nominal hop the per-hop coefficients were defined at (~11.6 ms)
-    const tau = (a) => -HOP_MS / Math.log(1 - a);                       // per-hop coefficient -> time constant (ms)
-    const BANDS = ['bass', 'vocal', 'treble'].map((key) => {
-        const b = ANALYSIS.bands[key];
-        return { key, hp: b.lo, lp: b.hi, att: tau(b.att), rel: tau(b.rel) };
-    });
-    const KICK = { ...ANALYSIS.kick, fft: 2048, sub: 128, headroom: 0.85, seedCeil: 0.02, floorFrac: 0.15, ceilRelMs: 6000, peakRelMs: 60000 };
-    const FFT_SIZE = 2048;
-    const DB_MIN = -80, HEADROOM_DB = 2, MIN_SPAN_DB = 10;
-    const TRACK_UP_MS = 150, TRACK_BACK_MS = 6000, WARM_MS = 4000;
-    const out = { bass: 0, vocal: 0, treble: 0, kick: 0 };
-    let source = null, chains = [], kickChain = null, buf = null, kickBuf = null, elapsedMs = 0;
-
-    const biquad = (ac, type, hz) => {
-        const n = ac.createBiquadFilter();
-        n.type = type; n.frequency.value = hz;
-        n.Q.value = -3.0103;                                            // Butterworth (Q = 0.707); Q is in dB on lowpass/highpass nodes
-        return n;
-    };
-    const wire = (src, nodes) => {
-        src.connect(nodes[0]);
-        for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]);
-    };
-    const analyserNode = (ac, size) => {
-        const a = ac.createAnalyser();
-        a.fftSize = size; a.smoothingTimeConstant = 0;
-        return a;
-    };
-    function reset() {
-        elapsedMs = 0;
-        for (const c of chains) { c.floor = -60; c.ceil = -20; c.value = 0; }
-        if (kickChain) { kickChain.slow = 0; kickChain.ceil = KICK.seedCeil; kickChain.peakMax = KICK.seedCeil; }
-        out.bass = out.vocal = out.treble = out.kick = 0;
-    }
-    function detach() {
-        for (const c of [...chains, kickChain]) {
-            if (!c) continue;
-            try { source.disconnect(c.nodes[0]); } catch (_) {}
-            for (const n of c.nodes) n.disconnect();
-        }
-        chains = []; kickChain = null; source = null;
-    }
-    function attach(ac, src) {
-        if (source) detach();
-        source = src;
-        buf = new Float32Array(FFT_SIZE);
-        kickBuf = new Float32Array(KICK.fft);
-        const nyq = ac.sampleRate * 0.45;
-        chains = BANDS.map((b) => {
-            const lp = Math.min(b.lp, nyq);
-            // two identical Butterworth biquads per edge = Linkwitz-Riley 4th order
-            const nodes = [biquad(ac, 'highpass', b.hp), biquad(ac, 'highpass', b.hp), biquad(ac, 'lowpass', lp), biquad(ac, 'lowpass', lp), analyserNode(ac, FFT_SIZE)];
-            wire(src, nodes);
-            return { ...b, nodes, analyser: nodes[nodes.length - 1], floor: -60, ceil: -20, value: 0 };
-        });
-        const kLp = Math.min(KICK.lp, nyq);
-        const kNodes = [biquad(ac, 'highpass', KICK.hp), biquad(ac, 'lowpass', kLp), biquad(ac, 'lowpass', kLp), analyserNode(ac, KICK.fft)];
-        wire(src, kNodes);
-        kickChain = { nodes: kNodes, analyser: kNodes[kNodes.length - 1], slow: 0, ceil: KICK.seedCeil, peakMax: KICK.seedCeil };
-        reset();
-    }
-    // Causal stand-in for windowedNormalize: floor/ceiling followers in dB (fast to move outward, slow to come back).
-    function read(dtMs) {
-        if (!chains.length) return out;
-        elapsedMs += dtMs;
-        const warm = 0.25 + 0.75 * Math.min(1, elapsedMs / WARM_MS);       // adapts faster during the first seconds of a track
-        const k = (tauMs) => 1 - Math.exp(-dtMs / tauMs);
-        for (const c of chains) {
-            c.analyser.getFloatTimeDomainData(buf);
-            let sum = 0;
-            for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-            const db = Math.max(DB_MIN, 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-6));
-            c.ceil  += (db - c.ceil)  * k(db > c.ceil  ? TRACK_UP_MS : TRACK_BACK_MS * warm);
-            c.floor += (db - c.floor) * k(db < c.floor ? TRACK_UP_MS : TRACK_BACK_MS * warm);
-            const span = Math.max(c.ceil - HEADROOM_DB - c.floor, MIN_SPAN_DB);
-            const raw = Math.min(1, Math.max(0, (db - c.floor) / span));
-            c.value += (raw - c.value) * k(raw > c.value ? c.att : c.rel);
-            out[c.key] = c.value;
-        }
-        // Kick channel: causal version of the worker's extractKick (band-pass -> envelope -> minus slow level -> ceiling)
-        const kc = kickChain;
-        kc.analyser.getFloatTimeDomainData(kickBuf);
-        let peak = 0;                                                       // peak-hold over short sub-blocks: sharp attack, and no missed transients if frames drop
-        for (let s = 0; s < KICK.fft; s += KICK.sub) {
-            let sum = 0;
-            for (let i = s; i < s + KICK.sub; i++) sum += kickBuf[i] * kickBuf[i];
-            if (sum > peak) peak = sum;
-        }
-        const env = Math.sqrt(peak / KICK.sub);
-        kc.slow += (env - kc.slow) * k(env > kc.slow ? KICK.slowAttMs : KICK.slowRelMs);
-        const transient = Math.max(0, env - KICK.rej * kc.slow);
-        kc.peakMax = Math.max(transient, kc.peakMax * Math.exp(-dtMs / KICK.peakRelMs));
-        kc.ceil    = Math.max(transient, kc.ceil    * Math.exp(-dtMs / (KICK.ceilRelMs * warm)));
-        const ceil = Math.max(kc.ceil, KICK.floorFrac * kc.peakMax, 1e-9) * KICK.headroom;
-        out.kick = Math.min(1, transient / ceil);
-        return out;
-    }
-    return { attach, detach, reset, read, KICK, kickMode: true };
-})();
+/* @@ANALYSIS_LIVE@@ */
+/* @@END_ANALYSIS_LIVE@@ */
 
 function displayLoop() {
     tickScan(performance.now());
@@ -1495,6 +1434,9 @@ async function resetAudio() {
 }
 
 // ── Playlist (real-time, no LUT) ──────────────────────────────────
+const isAudioFile = (f) => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac|opus)$/i.test(f.name);
+const _plName = (f) => f.name.replace(/\.[^/.]+$/, '');
+let _plSortAsc = true;
 let playlistMode = false;
 let playlist = [], plIndex = -1;
 let mediaEl = null, mediaSrc = null, _plUrl = null;
@@ -1522,51 +1464,91 @@ function _ensureMedia() {
     mediaEl.onended = () => plPlay(plIndex + 1);     // repeat-all
 }
 
-function plPick() {
+function _plRefresh() {
+    trackSel.setItems(playlist.map((f, i) => [String(i), `${i + 1}. ${_plName(f)}`]), plIndex < 0 ? null : String(plIndex));
+    trackSel.hidden = !playlistMode;
+}
+
+function plPick() {                                            // always ADDS: first pick starts playlist mode, later picks append
     const input = document.createElement('input');
     input.type = 'file'; input.accept = 'audio/*'; input.multiple = true;
-    input.onchange = (e) => { if (e.target.files.length) plLoad(e.target.files); };
+    input.onchange = (e) => { if (e.target.files.length) plAdd(e.target.files); };
     input.click();
 }
 
-async function plLoad(files) {
-    const list = [...files].filter((f) => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac|opus)$/i.test(f.name));
-    if (!list.length) { statusMsg.textContent = 'NO AUDIO FILES'; return; }
-    _stopBufferSource();                             // leave song mode
-    playlist = list; playlistMode = true; liveMode = true;
-    // Track dropdown
-    _fillSelect(trackSel, playlist.map((f, i) => [String(i), `${i + 1}. ${f.name.replace(/\.[^/.]+$/, '')}`]), '0');
-    trackSel.hidden = false;
-    
-    _ensureMedia();
-    setLyricsCircleMode('circle');                   // compiled lyrics belong to the song, not to the playlist
-    await plPlay(0);
+async function plAdd(files) {
+    const key = (f) => `${f.name}|${f.size}|${f.lastModified}`;
+    const have = new Set(playlist.map(key));
+    const incoming = [...files].filter(isAudioFile);
+    if (!incoming.length) { statusMsg.textContent = 'NO AUDIO FILES'; return; }
+    const fresh = incoming.filter((f) => { const k = key(f); if (have.has(k)) return false; have.add(k); return true; });   // skips exact duplicates
+    if (!fresh.length) { statusMsg.textContent = 'ALREADY IN PLAYLIST'; return; }
+    if (!playlistMode) {
+        _stopBufferSource();                                   // leave song mode
+        playlistMode = true; liveMode = true;
+        _ensureMedia();
+        setLyricsCircleMode('circle');                         // compiled lyrics belong to the song, not to the playlist
+    }
+    playlist.push(...fresh);
+    _plRefresh();
+    if (plIndex < 0) await plPlay(0);                          // first batch, or the list was emptied: start playing
+    else statusMsg.textContent = `+${fresh.length} \u00b7 ${playlist.length} tracks`;
 }
 
-async function plPlay(i) {
+async function plPlay(i, autoplay = true) {
     if (!playlist.length || !mediaEl) return;
     plIndex = ((i % playlist.length) + playlist.length) % playlist.length;
-    trackSel.value = String(plIndex);
     const file = playlist[plIndex];
     if (_plUrl) URL.revokeObjectURL(_plUrl);
     _plUrl = URL.createObjectURL(file);
     mediaEl.src = _plUrl;
     LiveBands.reset(); core.resetResponse();
     startOffset = 0; lastFiredBeatIdx = 0; currentLyricIdx = -1;
-    bpmDisplay.textContent = 'LIVE MODE ON'; // TODO: frameValues.beatPeriodMs can drive it
-    statusMsg.textContent = `${plIndex + 1}/${playlist.length} \u00b7 ${file.name.toUpperCase().replace(/\.[^/.]+$/, "")}`;
+    bpmDisplay.textContent = 'LIVE MODE ON';
+    statusMsg.textContent = `${plIndex + 1}/${playlist.length} \u00b7 ${file.name.slice(0, 22)}`;
+    trackSel.value = String(plIndex);
+    if (!autoplay) return;
     if (audioContext.state === 'suspended') await audioContext.resume();
     try { await mediaEl.play(); } catch (err) { console.warn('[playlist] play failed', err); }
+}
+
+function plRemove(i) {
+    if (i < 0 || i >= playlist.length) return;
+    const wasCurrent = i === plIndex, wasPlaying = !!mediaEl && !mediaEl.paused;
+    playlist.splice(i, 1);
+    if (!playlist.length) { plClear(); return; }
+    if (i < plIndex) plIndex--;
+    _plRefresh();
+    if (wasCurrent) plPlay(i, wasPlaying);                     // next track (wraps), same play/pause state
+}
+
+function plSort() {                                            // toggles A-Z / Z-A; the current track keeps playing
+    const cur = playlist[plIndex];
+    const cmp = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+    playlist.sort(_plSortAsc ? cmp : (a, b) => cmp(b, a));
+    _plSortAsc = !_plSortAsc;
+    plIndex = cur ? playlist.indexOf(cur) : -1;
+    _plRefresh();
+}
+
+function plClear() {                                           // stays in playlist mode; the + button adds again
+    if (mediaEl) { mediaEl.pause(); mediaEl.removeAttribute('src'); mediaEl.load(); }
+    if (_plUrl) { URL.revokeObjectURL(_plUrl); _plUrl = null; }
+    playlist = []; plIndex = -1; isPlaying = false; audioDuration = 0;
+    playBtn.innerHTML = icon('play');
+    statusMsg.textContent = 'PLAYLIST EMPTY';
+    _plRefresh();
 }
 
 function plExit() {
     if (!playlistMode) return;
     playlistMode = false; liveMode = false; isPlaying = false;
-    playlist = []; plIndex = -1; trackSel.hidden = true; trackSel.textContent = '';
+    playlist = []; plIndex = -1;
     if (mediaEl) { mediaEl.onended = null; mediaEl.onpause = null; mediaEl.pause(); mediaEl.removeAttribute('src'); mediaEl.load(); }
     LiveBands.detach();
     mediaEl = null; mediaSrc = null;
     if (_plUrl) { URL.revokeObjectURL(_plUrl); _plUrl = null; }
+    trackSel.hidden = true; trackSel.setItems([], null);
 }
 
 // ── Mode toggle ───────────────────────────────────────────────────
@@ -1675,6 +1657,139 @@ function fmt(sec) {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
+// Playlist controls
+const DD_ROW = 24, DD_ROWS = 5, DD_BUFFER = 2;      // row height (px), visible rows cap, extra rows rendered around the window
+let _ddActive = null;                                // only one popup open at a time
+
+function makeDropdown(id, { onChange, onRemove, tools = [] } = {}) {
+    const host = document.getElementById(id);
+    host.classList.add('dd');
+    host.innerHTML = '<div class="dd-btn" tabindex="0" role="button"><span class="dd-label"></span><span class="dd-caret">&#9662;</span></div>';
+    const btn = host.firstChild, labelEl = btn.firstChild;
+    let items = [], value = null, active = -1, raf = 0;
+    let pop = null, scroller = null, spacer = null, rowsEl = null;
+
+    const indexOf = (v) => items.findIndex((it) => it[0] === v);
+    const syncLabel = () => { const i = indexOf(value); labelEl.textContent = i >= 0 ? items[i][1] : '\u2014'; };
+
+    function renderRows() {                           // windowed: only the visible rows (+ buffer) exist in the DOM
+        if (!pop) return;
+        const n = items.length, top = scroller.scrollTop, view = scroller.clientHeight;
+        const first = Math.max(0, Math.floor(top / DD_ROW) - DD_BUFFER);
+        const last  = Math.min(n, Math.ceil((top + view) / DD_ROW) + DD_BUFFER);
+        rowsEl.style.transform = `translateY(${first * DD_ROW}px)`;
+        const frag = document.createDocumentFragment();
+        for (let i = first; i < last; i++) {
+            const row = document.createElement('div');
+            row.className = 'dd-row' + (items[i][0] === value ? ' sel' : '') + (i === active ? ' act' : '');
+            row.style.height = DD_ROW + 'px';
+            row.dataset.i = i;
+            const text = document.createElement('span');
+            text.className = 'dd-text'; text.textContent = items[i][1];     // textContent: file names are never parsed as HTML
+            row.appendChild(text);
+            if (onRemove) {
+                const x = document.createElement('span');
+                x.className = 'dd-x'; x.dataset.x = i; x.title = 'Remove'; x.textContent = '\u00d7';
+                row.appendChild(x);
+            }
+            frag.appendChild(row);
+        }
+        rowsEl.replaceChildren(frag);
+    }
+    function size() {
+        scroller.style.height = Math.min(items.length, DD_ROWS) * DD_ROW + 'px';
+        spacer.style.height = items.length * DD_ROW + 'px';
+    }
+    function keepVisible() {
+        const t = scroller.scrollTop, v = scroller.clientHeight;
+        if (active * DD_ROW < t) scroller.scrollTop = active * DD_ROW;
+        else if ((active + 1) * DD_ROW > t + v) scroller.scrollTop = (active + 1) * DD_ROW - v;
+    }
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderRows(); }); };
+    function onRowClick(e) {
+        const x = e.target.closest('.dd-x');
+        if (x) { e.stopPropagation(); if (onRemove) onRemove(items[+x.dataset.x][0]); return; }
+        const row = e.target.closest('.dd-row');
+        if (row) select(+row.dataset.i);
+    }
+    const onOutside = (e) => { if (pop && !pop.contains(e.target) && !host.contains(e.target)) close(); };
+    function onKey(e) {
+        const k = e.key;
+        if (k === 'Escape') close();
+        else if (k === 'ArrowDown') active = Math.min(items.length - 1, active + 1);
+        else if (k === 'ArrowUp') active = Math.max(0, active - 1);
+        else if (k === 'Enter' || k === ' ') { if (active >= 0) select(active); }
+        else if (k === 'Tab') { close(); return; }
+        else return;
+        e.preventDefault(); e.stopPropagation();           // keep Space/Enter away from global shortcuts while the list is open
+        if (pop) { keepVisible(); renderRows(); }
+    }
+    function select(i) {
+        value = items[i][0]; syncLabel(); close();
+        if (onChange) onChange(value);
+    }
+    function open() {
+        if (pop || !items.length) return;
+        if (_ddActive) _ddActive.close();
+        pop = document.createElement('div'); pop.className = 'dd-pop';
+        if (tools.length) {
+            const bar = document.createElement('div'); bar.className = 'dd-bar';
+            for (const t of tools) {
+                const b = document.createElement('span');
+                b.className = 'dd-tool'; b.textContent = t.label; b.title = t.title;
+                b.onclick = (e) => { e.stopPropagation(); t.run(); };
+                bar.appendChild(b);
+            }
+            pop.appendChild(bar);
+        }
+        scroller = document.createElement('div'); scroller.className = 'dd-scroll';
+        spacer   = document.createElement('div'); spacer.className = 'dd-spacer';
+        rowsEl   = document.createElement('div'); rowsEl.className = 'dd-rows';
+        spacer.appendChild(rowsEl); scroller.appendChild(spacer); pop.appendChild(scroller);
+        document.body.appendChild(pop);                    // body, not the container: no clipping, no transformed ancestors
+        size();
+        const r = host.getBoundingClientRect();
+        pop.style.minWidth = Math.max(r.width, 160) + 'px'; pop.style.maxWidth = '320px';
+        const h = pop.offsetHeight, below = innerHeight - r.bottom;
+        pop.style.top  = (below >= h + 8 || below >= r.top ? r.bottom + 4 : Math.max(4, r.top - h - 4)) + 'px';
+        pop.style.left = Math.max(4, Math.min(r.left, innerWidth - pop.offsetWidth - 4)) + 'px';
+        active = Math.max(0, indexOf(value));
+        scroller.scrollTop = Math.max(0, (active - 2) * DD_ROW);
+        renderRows();
+        scroller.addEventListener('scroll', onScroll, { passive: true });
+        rowsEl.addEventListener('click', onRowClick);
+        document.addEventListener('mousedown', onOutside, true);
+        document.addEventListener('keydown', onKey, true);
+        addEventListener('resize', close);
+        _ddActive = api;
+    }
+    function close() {
+        if (!pop) return;
+        document.removeEventListener('mousedown', onOutside, true);
+        document.removeEventListener('keydown', onKey, true);
+        removeEventListener('resize', close);
+        pop.remove(); pop = scroller = spacer = rowsEl = null;
+        if (_ddActive === api) _ddActive = null;
+    }
+
+    const api = {
+        get value() { return value; },
+        set value(v) { value = v == null ? null : String(v); syncLabel(); if (pop) renderRows(); },   // programmatic set: no onChange, like <select>
+        get hidden() { return host.hidden; },
+        set hidden(h) { host.hidden = !!h; if (h) close(); },
+        setItems(list, current) {                          // items: [[value, label], ...]
+            items = list;
+            if (current !== undefined) value = current == null ? null : String(current);
+            syncLabel();
+            if (pop) { if (!items.length) close(); else { size(); renderRows(); } }
+        },
+        close,
+    };
+    btn.onclick = () => (pop ? close() : open());
+    btn.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); open(); } };
+    return api;
+}
+
 function _fillSelect(sel, items, current) { // items: [[value, label], ...]
     sel.textContent = '';
     for (const [value, label] of items) sel.add(new Option(label, value));
@@ -1687,16 +1802,11 @@ function setCircleStyle(id) {
     core.setConfig({ ...cfg, circle: { ...cfg.circle, style: id, params: {} } });
 }
 
-function initSelectors() {
-    const circleId = CIRCLE_STYLES[core.config.circle.style] ? core.config.circle.style : 'sweep';   // core falls back to 'sweep' for unknown ids
-    _fillSelect(presetSel, PRESET_ORDER.filter((k) => PRESETS[k]).map((k) => [k, PRESETS[k].label || k]), currentPreset);
-    _fillSelect(vizSel, VIZ_ORDER.map((k) => [k, k.toUpperCase()]), VIZ_ORDER[vizIndex]);
-    _fillSelect(circleSel, Object.keys(CIRCLE_STYLES).map((k) => [k, CIRCLE_STYLES[k].label || k]), circleId);
-    presetSel.onchange = () => applyPreset(presetSel.value);
-    vizSel.onchange    = () => { vizIndex = VIZ_ORDER.indexOf(vizSel.value); buildVisualizer(vizSel.value); };
-    circleSel.onchange = () => setCircleStyle(circleSel.value);
-    trackSel.onchange  = () => plPlay(+trackSel.value);
-    for (const s of [presetSel, vizSel, circleSel, trackSel]) s.addEventListener('change', () => s.blur());   // hand keyboard focus back
+function initSelectors() {                                     // still called where the old onclick lines were
+    const circleId = CIRCLE_STYLES[core.config.circle.style] ? core.config.circle.style : 'sweep';
+    presetSel.setItems(PRESET_ORDER.filter((k) => PRESETS[k]).map((k) => [k, PRESETS[k].label || k]), currentPreset);
+    vizSel.setItems(VIZ_ORDER.map((k) => [k, k.toUpperCase()]), VIZ_ORDER[vizIndex]);
+    circleSel.setItems(Object.keys(CIRCLE_STYLES).map((k) => [k, CIRCLE_STYLES[k].label || k]), circleId);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1721,11 +1831,23 @@ seekBar.addEventListener('pointerup', () => { isSeeking = false; });
 // ── Button listeners ──────────────────────────────────────────────
 playBtn.onclick   = togglePlay;
 resetBtn.onclick  = resetAudio;
-modeBtn.onclick   = toggleMode;
+// modeBtn.onclick   = toggleMode;
 arBtn.onclick     = toggleAR;
 lcBtn.onclick     = cycleLyricsCircle;
-plBtn.onclick     = plPick;  
+plBtn.onclick     = plPick;
+scanBtn.onclick   = toggleScan;
 exportBtn.onclick = exportMp4;
+const presetSel = makeDropdown('presetSel', { onChange: (v) => applyPreset(v) });
+const vizSel    = makeDropdown('vizSel',    { onChange: (v) => { vizIndex = VIZ_ORDER.indexOf(v); buildVisualizer(v); } });
+const circleSel = makeDropdown('circleSel', { onChange: (v) => setCircleStyle(v) });
+const trackSel  = makeDropdown('trackSel',  {
+    onChange: (v) => plPlay(+v),
+    onRemove: (v) => plRemove(+v),
+    tools: [
+        { label: 'A\u2193Z',  title: 'Sort A-Z / Z-A',    run: plSort  },
+        { label: '\u00d7 all', title: 'Remove all tracks', run: plClear },
+    ],
+});
 initSelectors();
 
 // ── Resize observer — keeps dust canvas sized to screen ──────────

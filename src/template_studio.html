@@ -192,6 +192,22 @@
         .tap-hint { font-family: var(--prim); font-size: 0.8rem; color: var(--text-dim); margin-top: 16px; letter-spacing: 0.12em; }
         .tap-hint kbd { background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; font-family: var(--prim); color: var(--accent); }
 
+        /* ── Stage (setup) ───────────────────────────────────────── */
+        #setup-view { position: relative; }
+        #lyrics-input { padding-right: 56px; }                          /* text never hides under the badge */
+        #preview-btn.live-fab {
+            position: absolute; top: 8px; right: 8px; z-index: 5;
+            width: 40px; height: 40px; min-width: 0; padding: 0; border: none; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: #d6264a; color: #fff; font: 700 0.6rem/1 monospace; letter-spacing: 0.06em; cursor: pointer;
+        }
+        #preview-btn.live-fab::before {                                 /* pulse ring: transform + opacity only */
+            content: ''; position: absolute; inset: 0; border-radius: 50%; border: 2px solid #d6264a;
+            animation: livePulse 2s ease-out infinite; pointer-events: none;
+        }
+        @keyframes livePulse { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.7); opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) { #preview-btn.live-fab::before { animation: none; } }
+
         /* ── Playback bar ────────────────────────────────────────── */
         .playback-bar {
             display: flex; align-items: center; gap: 12px;
@@ -716,9 +732,9 @@
     </div>
 
     <div id="setup-view">
-        <textarea class="input-text lyrics" id="lyrics-input" placeholder="Paste lyrics here (Optional), one line per entry:&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;QUICK START: drop audio > select mode > start session > tap spacebar > preview > export"></textarea>
+        <textarea class="input-text lyrics" id="lyrics-input" placeholder="Paste lyrics here (Optional), one line per entry:&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;QUICK START: drop audio > select mode > start session > tap spacebar > preview > export OR go LIVE"></textarea>
         
-        <button id="preview-btn" class="btn"></button>
+        <button id="preview-btn" class="live-fab" type="button" title="Open the live visualizer: play any songs, no setup needed" aria-label="Open live visualizer">LIVE</button>
 
         <div id="drop-zone">
             DROP AUDIO FILE
@@ -1450,7 +1466,6 @@ function icon(name) { return ICONS[name] || ''; }
     pbPlay.innerHTML       = icon('play')
     pbStop.innerHTML       = icon('stop')
     reslyBtn.innerHTML     = icon('refresh')
-    previewBtn.innerHTML   = icon('preview')  + ' Live Playback'
     reanalBtn.innerHTML    = icon('reanalyze') + ' RE-ANALYZE'
     autoassBtn.innerHTML   = icon('bolt')
     dragLBtn.innerHTML     = icon('drag') + ' Drag Lyrics'

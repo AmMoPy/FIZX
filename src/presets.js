@@ -942,7 +942,7 @@ export const PRESETS = {
             '--bg-btn':        '#120010',
             '--border-btn':    '#8a0060',
             '--color-btn':     '#ff80b0',
-            '--crt-on':        '0',
+            '--crt-on':        '1',
             '--viz-color':     '#ff2d78',
             '--viz-glow':      'rgba(255,40,120,0.55)',
             '--viz-secondary': 'rgba(0,255,220,0.4)',
@@ -997,7 +997,7 @@ export const PRESETS = {
             { className:'fx-neon-buzz',   duration:120, useFlash:true,  useScan:false },
             { className:'fx-neon-flat',   duration:130, useFlash:true,  useScan:false },
             { className:'fx-neon-ghost',  duration:150, useFlash:false, useScan:false },
-            { className:'fx-neon-buzz-LUT',  duration:1000, useFlash:true,  useScan:false },
+            { className:'fx-neon-buzz-LUT',  duration:1000, useFlash:true,  useScan:true },
         ],
     },
 
@@ -1154,7 +1154,7 @@ export const PRESETS = {
             { className:'fx-acid-strobe', duration:150, useFlash:true,  useScan:false },
             { className:'fx-acid-twitch', duration:160, useFlash:false, useScan:true  },
             { className:'fx-acid-burn',   duration:200, useFlash:false, useScan:false },
-            { className:'fx-acid-twitch-LUT',  duration:1000, useFlash:true,  useScan:false },
+            { className:'fx-acid-twitch-LUT',  duration:1000, useFlash:true,  useScan:true },
         ],
     },
 
@@ -1320,7 +1320,7 @@ export const PRESETS = {
             // { className:'fx-term-glow',  duration:320, useFlash:false, useScan:false },
             { className:'fx-term-fade',  duration:280, useFlash:true,  useScan:false },
             { className:'fx-term-pulse', duration:220, useFlash:false, useScan:false  },
-            { className:'fx-term-blink-LUT',  duration:1000, useFlash:true,  useScan:false },
+            { className:'fx-term-blink-LUT',  duration:1000, useFlash:true,  useScan:true },
         ],
     },
 
