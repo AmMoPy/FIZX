@@ -1,0 +1,14 @@
+{
+  "name": "FIZX Studio",
+  "short_name": "FIZX",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#030603",
+  "theme_color": "#030603",
+  "description": "Browser-Based Audio & Lyrics Visualizer",
+  "icons": [
+    { "src": "assets/icons/arrow.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["music"]
+}

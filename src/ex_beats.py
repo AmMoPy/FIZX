@@ -454,7 +454,7 @@ class Extractor:
 
         return lyrics_list
 
-    def extract_beats(self, bass_mode: str = 'fft') -> dict:
+    def extract_beats(self, bass_mode: str = 'kick') -> dict:
         """
         Continuous bass/vocal automation envelope — single streaming pass.
           - native SR (sr=None), not forced 44100; bin boundaries below are 
@@ -842,7 +842,7 @@ def main(cli_args=None, **kwargs):
                              "default is DTW via aeneas on the full mix.")
     parser.add_argument("--force",    "-f",      action="store_true",
                         help="Re-extract even if beats/lyrics data is fresh")
-    parser.add_argument("--bass-mode", "-bm", choices=["kick", "fft"], default="fft",
+    parser.add_argument("--bass-mode", "-bm", choices=["kick", "fft"], default="kick",
                         help="'kick' isolates percussive transients via time-domain " 
                              "filtering (sharper, less bleed). "
                              "'fft' slices from the same spectrum as vocal/treble " 

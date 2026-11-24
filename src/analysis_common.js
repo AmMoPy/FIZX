@@ -7,5 +7,5 @@ const ANALYSIS = {
         vocal:  { lo: 300,  hi: 4000,  att: 0.14, rel: 0.10 },
         treble: { lo: 4000, hi: 11000, att: 0.20, rel: 0.12 },
     },
-    kick: { hp: 35, lp: 120, rej: 0.6, slowAttMs: 120, slowRelMs: 250 },
+    kick: { hp: 35, lp: 120, rej: 1.0, slowAttMs: 120, slowRelMs: 250 },
 };

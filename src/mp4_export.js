@@ -498,11 +498,21 @@ const FizxExport = (() => {
         const { saved } = run;
         removeClock();                                                     // restores performance.now, rAF, animate and devicePixelRatio
         // _masterCanvasCap = 1920;
+        // Reset _lastFrame to the REAL clock (performance.now is real again after removeClock).
+        // Otherwise the next real displayLoop frame computes dt = realNow - virtualLastFrame,
+        // a huge negative number, which makes exponentialApproach return NaN and the
+        // circle style's createRadialGradient throw.
+        _lastFrame = performance.now();
         resizeMasterCanvas();
         if (core && typeof core.setRenderScale === 'function') core.setRenderScale(1);
         ({ isPlaying, audioContext, startedAt, startOffset, audioDuration, lastFiredBeatIdx, currentLyricIdx, flashCycleIdx } = saved);
         _exited = saved.exited;
         isPlaying = false;
+        // Repaint the UI to reflect the restored paused position. displayLoop's
+        // UI block is gated by isPlaying, so it won't do this while paused.
+        timeDisplay.textContent = startOffset.toFixed(3);
+        _updateSeekBarVisual(startOffset);
+        updateLyrics(startOffset);
         if (vizs && typeof vizs._loop === 'function') vizs._rafId = requestAnimationFrame(() => vizs._loop());
         animFrameId = requestAnimationFrame(displayLoop);
         run = null;

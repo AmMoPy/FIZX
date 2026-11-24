@@ -1070,9 +1070,9 @@ const CIRCLE_STYLES = {
                 }
                 boost = Math.min(boost, 1.2);
 
-                const scale = 0.6 + 0.25 * bass * (1 - 0.5 * u) + 0.5 * boost + 0.35 * vocal * innerW;
+                const scale = 0.6 + 0.25 * bass * (1 - 0.5 * u) + 0.9 * boost + 0.35 * vocal * innerW;
                 const wispAmp = styleParams.wisp * (0.35 + 0.9 * treble * outerW);
-                const alpha = clamp((0.30 + 0.45 * (1 - u)) * (0.6 + 0.3 * bass) + 0.65 * boost + 0.3 * vocal * innerW, 0, 1);
+                const alpha = clamp((0.30 + 0.45 * (1 - u)) * (0.6 + 0.3 * bass) + 0.9 * boost + 0.3 * vocal * innerW, 0, 1);
                 const dir = k % 2 ? -1 : 1;
                 const rot = state.spin * dir / (1 + 0.3 * k);
                 const p1 = state.phase * dir + k * 0.9, p2 = state.phase * 1.7 * dir + k * 1.7, p3 = state.phase * 0.8 + k * 2.3;
@@ -2791,15 +2791,15 @@ const DEFAULT_COLORS = {
 
 // Note: If a style is renamed or removed, the config silently holds an unknown id
 const DEFAULT_ANIM_CONFIG = {
-    response: { model: 'punch', smoothness: 0, decayMs: 60, attackMs: 0, punchDepth: 0.6, 
-                punchFloor: 0.3, accentFloor: 0.55, punchSensitivity: 0.06, offsetMs: 0 },
-    circle: { enabled: true, style: 'bars', params: {}, effects: [{ id: 'bounce', params: {} }] },
+    response: { model: 'punch', smoothness: 0.5, punchSensitivity: 0.06, offsetMs: 0, 
+                decayMs: 60, attackMs: 0, punchDepth: 0.6, punchFloor: 0.3, accentFloor: 0.55 },
+    circle: { enabled: true, style: 'mandala', params: {}, effects: [{ id: 'bounce', params: {} }] },
     text: {
         enabled: true,
         glowStrength: 0.9,
         breatheAmount: 0.08,
-        entry: { id: 'swipe', params: {} }, // empty params = use defaults
-        exit: { id: 'fade', params: {} },
+        entry: { id: 'zoom', params: {} }, // empty params = use defaults
+        exit: { id: 'stretch', params: {} },
         effects: [{ id: 'bounce', params: {} }],
     },
 };

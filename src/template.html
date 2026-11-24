@@ -53,7 +53,8 @@
         body.mp4-exporting .seekbar-container,
         body.mp4-exporting .stats,
         body.mp4-exporting .controls,
-        body.mp4-exporting .status-text { visibility: hidden; }
+        body.mp4-exporting .status-text { display: none; }
+        body.mp4-exporting .stage { box-shadow: unset; }
         #mp4-export-overlay {
             display: none;
             position: fixed; inset: 0; z-index: 9999;
@@ -86,7 +87,7 @@
             background: var(--bg-container);
             display: flex;
             flex-direction: column;
-            padding: 1px 2px 14px 2px;
+            padding: 5px 2px 14px 2px;
             transition: background 0.5s;
         }
 
@@ -149,6 +150,8 @@
 
         #scanBtn[aria-pressed="false"] { opacity: 0.45; }
         #scanBtn:disabled { opacity: 0.2; cursor: default; }
+        #beatSens { width: 64px; height: 18px; accent-color: var(--color-primary); }
+        #beatSens[hidden] { display: none; }
 
         /* Screen flash — animates box-shadow via CSS keyframe.
            The browser GPU compositor runs this at native frame rate
@@ -488,6 +491,7 @@
                 <div id="circleSel" title="Circle style"></div>
                 <div id="vizSel"    title="Visualizer"></div>
                 <div id="trackSel"  title="Track" hidden></div>
+                <input type="range" id="beatSens" min="0" max="1" step="0.05" value="0.5" title="Beat sensitivity: right reacts to softer beats, left only to strong kicks" hidden>
             </div>
         </div>
         <div class="status-text" id="statusText"></div>
@@ -579,6 +583,7 @@ const lyricAreaEl  = document.querySelector('.lyric-area');
 const lcBtn        = document.getElementById('lcBtn');
 const plBtn        = document.getElementById('plBtn');
 const scanBtn      = document.getElementById('scanBtn');
+const beatSens     = document.getElementById('beatSens');
 const exportBtn    = document.getElementById('eMp4Btn');
 const ROOT_STYLE   = document.documentElement; // Cached reference to :root for CSS var reads — avoids repeated DOM lookup.
 
@@ -1302,6 +1307,7 @@ function _startSourceAt(offset) {
         startOffset      = 0;
         lastFiredBeatIdx = 0;
         currentLyricIdx  = -1;
+        timeDisplay.textContent = fmt(0);
         playBtn.innerHTML   = icon('play');
         statusMsg.innerHTML = `${icon('stop')} done`;
         _updateSeekBarVisual(0);
@@ -1437,6 +1443,7 @@ async function resetAudio() {
 const isAudioFile = (f) => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac|opus)$/i.test(f.name);
 const _plName = (f) => f.name.replace(/\.[^/.]+$/, '');
 let _plSortAsc = true;
+// TODO: playlistMode checks are branch creep, which is fine for two modes. If a third ever appears, put a small player interface in front of buffer and media playback instead of adding branches
 let playlistMode = false;
 let playlist = [], plIndex = -1;
 let mediaEl = null, mediaSrc = null, _plUrl = null;
@@ -1467,6 +1474,7 @@ function _ensureMedia() {
 function _plRefresh() {
     trackSel.setItems(playlist.map((f, i) => [String(i), `${i + 1}. ${_plName(f)}`]), plIndex < 0 ? null : String(plIndex));
     trackSel.hidden = !playlistMode;
+    beatSens.hidden = !playlistMode;
 }
 
 function plPick() {                                            // always ADDS: first pick starts playlist mode, later picks append
@@ -1548,7 +1556,7 @@ function plExit() {
     LiveBands.detach();
     mediaEl = null; mediaSrc = null;
     if (_plUrl) { URL.revokeObjectURL(_plUrl); _plUrl = null; }
-    trackSel.hidden = true; trackSel.setItems([], null);
+    trackSel.hidden = true; beatSens.hidden = true; trackSel.setItems([], null); 
 }
 
 // ── Mode toggle ───────────────────────────────────────────────────
@@ -1837,6 +1845,8 @@ lcBtn.onclick     = cycleLyricsCircle;
 plBtn.onclick     = plPick;
 scanBtn.onclick   = toggleScan;
 exportBtn.onclick = exportMp4;
+beatSens.oninput  = () => LiveBands.setSensitivity(beatSens.value);         
+beatSens.onchange = () => beatSens.blur();                                  
 const presetSel = makeDropdown('presetSel', { onChange: (v) => applyPreset(v) });
 const vizSel    = makeDropdown('vizSel',    { onChange: (v) => { vizIndex = VIZ_ORDER.indexOf(v); buildVisualizer(v); } });
 const circleSel = makeDropdown('circleSel', { onChange: (v) => setCircleStyle(v) });

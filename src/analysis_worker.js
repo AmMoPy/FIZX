@@ -1,4 +1,16 @@
-// ANALYSIS, WASM_AVAILABLE, WASM_*_B64 and PFFFT are injected globals
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
+// LUT path used in studio for Whole-track normalisation with look-ahead, exact onset times and BPM, 
+// determinism for lyric-video export, and no adaptation period.
+//
+// Future Me: Since the LUT is just three band envelopes, the FFT/WASM stack (SIMD and non-SIMD blobs, 
+// glue, the 16384-point window) buys parity with existing LUTs and look-ahead normalisation, 
+// but not a capability the filter bank lacks, the studio could in principle generate LUTs from the same 
+// bank offline with centred percentile normalisation. That would give one code path and a much lighter 
+// studio. It's only worth exploring if the numbers support it, and I wouldn't remove the FFT path on a 
+// perceptual impression.
+//
+// Note: ANALYSIS, WASM_AVAILABLE, WASM_*_B64 and PFFFT are injected globals
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════
 'use strict';
 
 // LUT engine's table built lazily, only when 'lut' actually runs —
@@ -836,14 +848,14 @@ self.onmessage = async function(e) {
     }
 
     //'analyze' full-track path,
-    // engine: 'lut' (default) | others come from PARAMS config 
-    // on main thread via postMessage payload.
+    // engine: 'lut' (default) | others come from PARAMS 
+    // config on main thread via postMessage payload.
     const {
         samples,
         sr,
         kickLp: kickLowpassHz = ANALYSIS.kick.lp,
         kickRej: kickSustainRejection = ANALYSIS.kick.rej,
-        kickBass = false,
+        kickBass = true,
         turbo   = true,       // false for 'js' (safe) | true for 'wasm'
         engine   = 'lut',
         fftStride = 2,       

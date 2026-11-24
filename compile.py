@@ -86,7 +86,7 @@ WASM_MAP = {
 
 # MP4 muxer configs
 MP4MUXER_MAP = {
-    'umd': {'p': MD / 'mp4-muxer.js'},   # raw JS, inlined verbatim
+    'umd': {'p': MD / 'mp4-muxer.js'}, # raw JS, inlined verbatim - Mediabunny output as of release data is similar, mp4-muxer is lightweight
 }
 
 # ─────────────────────────────────────────────────────────────────
