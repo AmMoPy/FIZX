@@ -50,10 +50,9 @@
         }
 
         /* ── MP4 Export ───────────────────────────────────────────────── */
-        body.mp4-exporting .seekbar-container,
-        body.mp4-exporting .stats,
-        body.mp4-exporting .controls,
-        body.mp4-exporting .status-text { display: none; }
+        body.mp4-exporting .panel,
+        body.mp4-exporting .panel-dot,
+        body.mp4-exporting .dd-pop { display: none; }
         body.mp4-exporting .stage { box-shadow: unset; }
         #mp4-export-overlay {
             display: none;
@@ -87,7 +86,7 @@
             background: var(--bg-container);
             display: flex;
             flex-direction: column;
-            padding: 5px 2px 14px 2px;
+            padding: 3px 2px 5px 2px;
             transition: background 0.5s;
         }
 
@@ -100,7 +99,7 @@
             position: relative; /* works with current circle drag math without extra work */
             overflow: hidden;   /* hidden enables circle dragging to naturally clips at the screen edge rather than escaping it, no extra clamping needed */
             border: 1px solid var(--border-screen);
-            margin-bottom: 6px;
+            /*margin-bottom: 6px;*/
             transition: background 0.5s, border-color 0.5s, box-shadow 0.5s;
         }
 
@@ -288,6 +287,45 @@
         #spectrumCircleOuter:hover .circle-resize-handle,
         .circle-resize-handle:hover { opacity: 1; pointer-events: auto; }            
 
+        /* ── floating panel ─────────────────────────────────────────────────── */
+        .panel {
+            position: absolute; right: 8px; bottom: 8px; z-index: 50;
+            width: min(480px, calc(100% - 16px));
+            display: flex; flex-direction: column; gap: 6px; padding: 8px 8px 26px;   /* the bottom strip is reserved for the toggle */
+            border: 1px solid var(--border-btn); border-radius: 14px;
+            isolation: isolate;
+            opacity: 1; visibility: visible; transform: none;
+            transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s;
+        }
+        .panel::before {
+            content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+            background: var(--bg-stats); opacity: 0.88;
+        }
+        .stage[data-panel="closed"] .panel {
+            opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(8px) scale(0.97);
+            transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s 0.18s;
+        }
+        .stage[data-idle="true"] .panel { opacity: 0; pointer-events: none; transition: opacity 0.6s ease; }   /* auto-fade; any activity brings it back */
+        .panel .controls { margin-top: 0; }
+        .panel .controls-row-main { flex-wrap: wrap; gap: 8px; }      /* ten buttons are wider than a 9:16 stage */
+
+        /* the dot: top-right corner, toggles both ways */
+        .panel-dot {
+            position: absolute; right: 13px; bottom: 13px; z-index: 51;
+            width: 14px; height: 14px; min-width: 0; padding: 0; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--color-primary); border: 1px solid var(--border-btn);
+            color: var(--bg-stats); font: 700 13px/1 monospace;
+            opacity: 0.55; cursor: pointer;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        .panel-dot:hover, .panel-dot:focus-visible { opacity: 1; transform: scale(1.25); }
+        .stage[data-panel="open"] .panel-dot { opacity: 0.8; }
+        .stage[data-panel="open"] .panel-dot::before { content: '\00d7'; }
+        .stage[data-idle="true"] .panel-dot { opacity: 0.2; }
+        .panel-dot.ping { animation: dotPing 0.6s ease-out 2; }        /* a status message arrived while the panel was closed */
+        @keyframes dotPing { from { box-shadow: 0 0 0 0 var(--color-primary); } to { box-shadow: 0 0 0 10px transparent; } }
+
         /* ── SEEKBAR ─────────────────────────────────────────────────── */
         .seekbar-container {
             display: flex;
@@ -347,6 +385,7 @@
             gap: 10px;
             justify-content: center;
         }
+
         /* ── Playlist controls and capped dropdowns ──── */
         .controls-row-sel { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
         .dd { position: relative; display: inline-block; }
@@ -372,6 +411,7 @@
         .dd-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .dd-x { opacity: 0.55; padding: 0 3px; cursor: pointer; }
         .dd-x:hover { opacity: 1; color: #f66; }
+        
         /* Icon-only circular buttons — tooltip via data-tip + ::after */
         button {
             background: var(--bg-btn);
@@ -464,7 +504,8 @@
                 <div class="circle-resize-handle" id="circleResizeHandle"></div>
             </div>    
         </div>
-
+    </div>
+    <div class="panel" id="panel">
         <div class="seekbar-container">
             <input type="range" id="seekBar" min="0" max="100" value="0" step="0.1">
         </div>
@@ -483,6 +524,7 @@
                 <button id="plBtn"     data-tip="Playlist (real-time)"></button>
                 <button id="scanBtn"   data-tip="Scan"></button>
                 <!-- <button id="modeBtn"   data-tip="Sync mode A/B"></button> -->
+                <button id="nextLineBtn" data-tip="Next Line"></button>
                 <button id="lcBtn"     data-tip="Lyrics / Circle"></button>
                 <button id="eMp4Btn"   data-tip="EXPORT MP4" class="btn-util"></button>
             </div>
@@ -491,11 +533,12 @@
                 <div id="circleSel" title="Circle style"></div>
                 <div id="vizSel"    title="Visualizer"></div>
                 <div id="trackSel"  title="Track" hidden></div>
-                <input type="range" id="beatSens" min="0" max="1" step="0.05" value="0.5" title="Beat sensitivity: right reacts to softer beats, left only to strong kicks" hidden>
             </div>
+            <input type="range" id="beatSens" min="0" max="1" step="0.05" value="0.5" title="Beat animation sensitivity, reacts only to strong kicks when off" hidden>
         </div>
         <div class="status-text" id="statusText"></div>
     </div>
+    <button class="panel-dot" id="panelDot" type="button" data-tip="Controls" aria-expanded="true" aria-label="Hide controls"></button>
 </div>
 
 <div id="mp4-export-overlay">
@@ -577,6 +620,7 @@ const statusMsg    = document.getElementById('statusMsg');
 const playBtn      = document.getElementById('playBtn');
 const resetBtn     = document.getElementById('resetBtn');
 // const modeBtn      = document.getElementById('modeBtn');
+const nextLBtn     = document.getElementById('nextLineBtn');
 const arBtn        = document.getElementById('arBtn');
 const seekBar      = document.getElementById('seekBar');
 const lyricAreaEl  = document.querySelector('.lyric-area');
@@ -585,6 +629,7 @@ const plBtn        = document.getElementById('plBtn');
 const scanBtn      = document.getElementById('scanBtn');
 const beatSens     = document.getElementById('beatSens');
 const exportBtn    = document.getElementById('eMp4Btn');
+const panelDot     = document.getElementById('panelDot');
 const ROOT_STYLE   = document.documentElement; // Cached reference to :root for CSS var reads — avoids repeated DOM lookup.
 
 // ═══════════════════════════════════════════════════════════════════
@@ -618,8 +663,8 @@ let vizIndex = 0;    // current position in VIZ_ORDER
 let vizs     = null; // active BaseVisualizer instance or null
 
 // dedicated lyrics/circle toggle — independent of vizs/VIZ_ORDER.
-let lyricsCircleMode = 'both'; // 'both' | 'lyrics' | 'circle'
-const LC_ORDER       = ['both', 'lyrics', 'circle'];
+let lyricsCircleMode = 'both'; // 'both' | 'circle' | 'lyrics'
+const LC_ORDER       = ['both', 'circle', 'lyrics'];
 
 // Construct the animation core for this visualizer instance.
 // Host object wires the core to the DOM elements it needs to render into.
@@ -671,7 +716,7 @@ let audioContext  = null;
 let analyserNode  = null;
 let sourceNode    = null;
 let audioBuffer   = null;
-let _audioName    = 'fizx';
+let _audioName    = 'FIZX';
 let startOffset   = 0;
 let startedAt     = 0;
 let audioDuration = 0;
@@ -869,8 +914,9 @@ function icon(name) { return ICONS[name] || ''; }
     playBtn.innerHTML   = icon('play');
     resetBtn.innerHTML  = icon('refresh');
     // modeBtn.innerHTML   = icon('swap');
+    nextLBtn.innerHTML  = icon('swap');
     arBtn.innerHTML     = icon('orient');
-    statusMsg.innerHTML = `click ${icon('play')} to load audio`;
+    statusMsg.innerHTML = `${icon('bolt')} FIZX READY ${icon('bolt')}`; 
     lcBtn.innerHTML     = icon('star');
     plBtn.innerHTML     = icon('grid');
     scanBtn.innerHTML   = icon('scan');
@@ -928,6 +974,12 @@ function _syncScanBtn() {
 
 function toggleScan() {
     if (presetOffersScan) { scanEnabled = !scanEnabled; _syncScanBtn(); }
+}
+
+function toggleNextL() {
+    const hidden = nextLineEl.style.display === 'none';
+    nextLineEl.style.display = hidden ? '' : 'none';
+    nextLineBtn.setAttribute('data-tip', hidden ? 'Hide next line' : 'Show next line');
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1057,6 +1109,7 @@ function triggerVisual() {
 // Updates DOM text content only when the lyric index changes.
 // ═══════════════════════════════════════════════════════════════════
 function updateLyrics(t) {
+    if (!LYRICS.length) return;
 
     const lastLyric = LYRICS[LYRICS.length - 1];
 
@@ -1070,18 +1123,10 @@ function updateLyrics(t) {
         }
     }
 
-    if (!LYRICS.length) {
-        currentLineEl.innerHTML = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
-        nextLineEl.innerHTML    = !beatTimestamps.length && !LUT_MODE
-            ? `${icon('warning')} No lyrics or beats detected click ${icon('grid')} for live animation`
-            : `${icon('warning')} No lyrics detected click ${icon('grid')} for live animation`;
-        return;
-    }
-
     if (t < LYRICS[0].start) { // "Before Song Starts"
         if (currentLyricIdx !== -2) {
-            currentLineEl.innerHTML = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
-            nextLineEl.textContent  = `\u27a1 ${LYRICS[0].text}`;
+            // currentLineEl.innerHTML = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
+            // nextLineEl.textContent  = `\u27a1 ${LYRICS[0].text}`;
             currentLyricIdx = -2;
         }
         return;
@@ -1105,9 +1150,9 @@ function updateLyrics(t) {
     // Post-Song Credits
     // Trigger 5 seconds after the final lyric starts
     if (t > lastLyric.start + 5 && currentLyricIdx !== -3) { // -3 as unique state for "Credits"
-        core.setLyricText('@AmMoPy');
+        core.setLyricText(`${_audioName.slice(0, 22)}`);
         _exited = false;
-        nextLineEl.innerHTML      = `${icon('star')} SHOW SOME LOVE ${icon('star')}`;
+        nextLineEl.innerHTML      = `${icon('star')} ANIMATED BY FIZX ${icon('star')}`;
         currentLyricIdx = -3;
     }
 }
@@ -1271,6 +1316,8 @@ function displayLoop() {
 // ═══════════════════════════════════════════════════════════════════
 // AUDIO LIFECYCLE
 // ═══════════════════════════════════════════════════════════════════
+const _plName = (f) => f.name.replace(/\.[^/.]+$/, '');
+
 function _ensureContext() {
     if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -1318,11 +1365,11 @@ async function loadAudioBuffer(file) {
     _ensureContext();
     statusMsg.textContent = 'decoding';
     const arrayBuf = await file.arrayBuffer();
-    _audioName     = file.name.replace(/\.[^/.]+$/, '') || 'fizx';
+    _audioName     = _plName(file) || 'FIZX';
     audioBuffer    = await audioContext.decodeAudioData(arrayBuf);
     audioDuration  = audioBuffer.duration;
     bpmDisplay.textContent = `${bpm} BPM`;
-    statusMsg.innerHTML    = `${icon('bolt')} ${file.name.slice(0, 22)}`;
+    statusMsg.innerHTML    = `${icon('bolt')} ${_audioName.slice(0, 22)}`;
 }
 
 async function applyAudioFile(file) {
@@ -1441,7 +1488,6 @@ async function resetAudio() {
 
 // ── Playlist (real-time, no LUT) ──────────────────────────────────
 const isAudioFile = (f) => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac|opus)$/i.test(f.name);
-const _plName = (f) => f.name.replace(/\.[^/.]+$/, '');
 let _plSortAsc = true;
 // TODO: playlistMode checks are branch creep, which is fine for two modes. If a third ever appears, put a small player interface in front of buffer and media playback instead of adding branches
 let playlistMode = false;
@@ -1495,7 +1541,8 @@ async function plAdd(files) {
         _stopBufferSource();                                   // leave song mode
         playlistMode = true; liveMode = true;
         _ensureMedia();
-        setLyricsCircleMode('circle');                         // compiled lyrics belong to the song, not to the playlist
+        // setLyricsCircleMode('circle');                         // compiled lyrics belong to the song, not to the playlist
+        nextLBtn.click();                                      // Keep current line only if user is animating name/brand
     }
     playlist.push(...fresh);
     _plRefresh();
@@ -1629,9 +1676,19 @@ document.getElementById('mp4-export-cancel').onclick = () => { if (_exportAbort)
 async function exportMp4() {
     if (playlistMode) { statusMsg.textContent = 'EXPORT DISABLED IN LIVE MODE'; return; }
     if (_exportAbort) return;                                          // an export is already running
-    if (typeof FizxExport === 'undefined' || typeof Mp4Muxer === 'undefined' || !Mp4Muxer) { statusMsg.textContent = 'EXPORT UNAVAILABLE'; return; }
+    if (typeof FizxExport === 'undefined' || typeof Mp4Muxer === 'undefined' || !Mp4Muxer) { 
+        statusMsg.textContent = 'EXPORT UNAVAILABLE - NOT INSTALLED';
+        return; 
+    }
+    // window.isSecureContext is true on HTTPS, localhost, and file://
+    // But VideoEncoder is still undefined depending on how the caller browser classify file://
+    if (!window.isSecureContext || typeof VideoEncoder === 'undefined') { 
+        statusMsg.textContent = 'EXPORT UNAVAILABLE - NEEDS HTTPS OR LOCALHOST';
+        statusMsg.title = 'Visit the hosted studio, or download a compiled template and open it from disk, or serve this file from localhost.';
+        return;
+    }
     if (!audioBuffer) { statusMsg.textContent = 'LOAD AUDIO FIRST'; return; }
-    if (isPlaying) await togglePlay();                                 // stop live playback before the virtual clock takes over
+    if (isPlaying) await togglePlay();  // stop live playback before the virtual clock takes over
     const choice = await pickExportOptions(exportBtn);
     if (!choice) { _notifyOpener({ cmd: 'mp4-export-cancelled' }); return; }
 
@@ -1817,6 +1874,41 @@ function initSelectors() {                                     // still called w
     circleSel.setItems(Object.keys(CIRCLE_STYLES).map((k) => [k, CIRCLE_STYLES[k].label || k]), circleId);
 }
 
+// Panel controls 
+function setPanelOpen(open) {
+    stageEl.dataset.panel = open ? 'open' : 'closed';
+    panelDot.setAttribute('aria-expanded', String(open));
+    panelDot.setAttribute('aria-label', open ? 'Hide controls' : 'Show controls');
+    if (!open) {
+        const active = document.activeElement;
+        if (active && document.getElementById('panel').contains(active)) active.blur();    // do not leave focus on a hidden control
+        if (typeof _ddActive !== 'undefined' && _ddActive) _ddActive.close();
+    }
+    wakePanel();
+}
+
+// idle auto-fade, next to the AG3 panel block
+const IDLE_MS = 4000;
+let _idleTimer = 0, _lastWake = 0;
+
+function wakePanel() {
+    const now = performance.now();
+    if (stageEl.dataset.idle !== 'true' && now - _lastWake < 250) return;     // pointermove fires very often
+    _lastWake = now;
+    stageEl.dataset.idle = 'false';
+    clearTimeout(_idleTimer);
+    _idleTimer = setTimeout(checkIdle, IDLE_MS);
+}
+
+function checkIdle() {
+    const busy = !isPlaying                                                     // paused: leave the controls visible
+        || stageEl.dataset.panel !== 'open'
+        || (typeof _ddActive !== 'undefined' && _ddActive)                      // a dropdown is open
+        || document.getElementById('xo-menu')                                   // the export picker is open
+        || document.getElementById('panel').querySelector(':focus-visible');    // keyboard focus is inside the panel
+    if (busy) { _idleTimer = setTimeout(checkIdle, IDLE_MS); return; }
+    stageEl.dataset.idle = 'true';
+}
 // ═══════════════════════════════════════════════════════════════════
 // EVENT LISTENERS
 // ═══════════════════════════════════════════════════════════════════
@@ -1845,6 +1937,8 @@ lcBtn.onclick     = cycleLyricsCircle;
 plBtn.onclick     = plPick;
 scanBtn.onclick   = toggleScan;
 exportBtn.onclick = exportMp4;
+nextLBtn.onclick  = toggleNextL;
+panelDot.onclick  = () => setPanelOpen(stageEl.dataset.panel !== 'open');
 beatSens.oninput  = () => LiveBands.setSensitivity(beatSens.value);         
 beatSens.onchange = () => beatSens.blur();                                  
 const presetSel = makeDropdown('presetSel', { onChange: (v) => applyPreset(v) });
@@ -1986,6 +2080,18 @@ _resizeObs.observe(screenEl);
     circleOuter.addEventListener('touchcancel', endPinch);
 })();
 
+// ── Controls Panel ────────────────────────────────────────────────
+// status messages (errors, export results) live inside the panel: when it is closed, make the dot ping instead of hiding them
+new MutationObserver(() => {
+    if (stageEl.dataset.panel !== 'closed') return;
+    panelDot.classList.remove('ping'); void panelDot.offsetWidth; panelDot.classList.add('ping');
+}).observe(statusMsg, { childList: true, characterData: true, subtree: true });
+
+for (const type of ['pointermove', 'pointerdown', 'keydown']) document.addEventListener(type, wakePanel, { passive: true });
+
+// Initialize
+setPanelOpen(true); // applies the open state and starts the idle timer
+
 // ── Boot ──────────────────────────────────────────────────────────
 applyPreset(PRESET_ORDER[0]);
 bpmDisplay.textContent = `${bpm} BPM`;
@@ -1993,7 +2099,15 @@ resizeMasterCanvas();
 updateLyrics(0);
 requestAnimationFrame(displayLoop);
 buildVisualizer(VIZ_ORDER[vizIndex]);
-setLyricsCircleMode(lyricsCircleMode);
+// setLyricsCircleMode(lyricsCircleMode);
+
+// UI hints via next line only so users can hide it
+// independent of main text area (current line)
+if (!liveMode && !playlistMode) {
+    nextLineEl.innerHTML    = !beatTimestamps.length && !LUT_MODE
+        ? `Click ${icon('grid')} for live playback` // Empty template - live 
+        : `${icon('play')} select audio file ${icon('grid')} live playback`; // Processed template
+}
 
 // ── Cleanup on unload ─────────────────────────────────────────────
 window.addEventListener('beforeunload', () => {
@@ -2005,7 +2119,7 @@ window.addEventListener('beforeunload', () => {
     _resizeObs.disconnect();
 });
 
-// ── Cleanup on unload ─────────────────────────────────────────────
+// ── MP4 Export Studio Link ────────────────────────────────────────
 (function initStudioLink() {
     if (!window.opener) return;                                  // opened standalone: nothing to link
     window.addEventListener('message', async (event) => {

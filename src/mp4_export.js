@@ -465,8 +465,17 @@ const FizxExport = (() => {
 
     // ───────────────────────── run control ─────────────────────────
     let run = null;
+    let _pinnedStage = null;
     // Freeze the live template and put it on frame time. Everything touched here is restored by end().
     async function begin({ scale = 1, fps = 30, durationSec }) {
+        // The pin uses the stage's current rectangle, which is the same one exportMp4 already measured. 
+        // A window resize or a mobile URL-bar change mid-export can no longer change the frames.
+        _pinnedStage = { style: stageEl.getAttribute('style'), rect: stageEl.getBoundingClientRect() };
+        stageEl.style.transition = 'none';                                      // the stage animates max-width/aspect-ratio; no animation while pinned
+        stageEl.style.width = _pinnedStage.rect.width + 'px';
+        stageEl.style.height = _pinnedStage.rect.height + 'px';
+        stageEl.style.maxWidth = 'none';
+        stageEl.style.aspectRatio = 'auto';
         _scanEndAt = 0; _scanUntil = 0; screenEl.classList.remove('scan-active');
         if (run) throw new Error('an export is already running');
         if (isPlaying) await togglePlay();                        // pause real playback
@@ -493,6 +502,10 @@ const FizxExport = (() => {
         runFrame(run.baseNow + tSec * 1000);
     }
     function end() {
+        if (_pinnedStage) {
+            if (_pinnedStage.style === null) stageEl.removeAttribute('style'); else stageEl.setAttribute('style', _pinnedStage.style);
+            _pinnedStage = null;
+        }        
         _scanEndAt = 0; _scanUntil = 0; screenEl.classList.remove('scan-active');
         if (!run) return;
         const { saved } = run;

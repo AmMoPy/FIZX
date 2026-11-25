@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FIZX STUDIO</title>
     <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="assets/fizx.svg">
     <!-- Self-hosted subsetted fonts — no network request, works fully offline.
          Base64 strings injected by compile.py from generated .b64 files in assets/fonts/.
          Subsetting via pyftsubset keeps size reasonable (~20KB per variant).
@@ -443,6 +444,13 @@
             padding: 10px;
         }
 
+        #diagnostic-toggle {
+            padding: 10px;
+            z-index: 50;
+            font-family: var(--prim);
+            font-size: 0.75rem; color: var(--text-dim);
+        }
+
         .design-controls-column {
             /* Sticky so the controls stay in view while the user scrolls a
                tall control list, without needing to scroll the whole page. */
@@ -733,7 +741,7 @@
     </div>
 
     <div id="setup-view">
-        <textarea class="input-text lyrics" id="lyrics-input" placeholder="Paste lyrics here (Optional), one line per entry:&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;QUICK START: drop audio > select mode > start session > tap spacebar > preview > export OR go LIVE"></textarea>
+        <textarea class="input-text lyrics" id="lyrics-input" placeholder="Paste lyrics here (Optional), one line per entry:&#10;&#10;Yeah...&#10;They said I couldn't build it&#10;4 gigs of RAM, 2 cores, and a dream...&#10;&#10;QUICK START: paste lyrics > drop audio > select mode > start session > export OR type your name/brand then go LIVE!"></textarea>
         
         <button id="preview-btn" class="live-fab" type="button" title="Open live visualizer, Create Playlist, Enjoy Animations" aria-label="Open live visualizer">LIVE</button>
 
@@ -798,6 +806,9 @@
                 <div id="design-preview-column">
                     <div id="design-stage">
                         <pre id="design-frame-stats" class="readout"></pre>
+                        <label class="switch" id="diagnostic-toggle" data-tip="Master switch for diagnostic strip">
+                            <input type="checkbox"> DS
+                        </label>                        
                         <div id="design-circle-container"></div>
                         <div id="design-text-transition-container">
                             <div id="design-text-layer">
@@ -1624,6 +1635,8 @@ reslyBtn.addEventListener('click', () => {
 // render loop (independent of the circle-drag-lab loop, this one drives
 // the actual AnimCore
 // ═══════════════════════════════════════════════════════════════════
+let diagnosticVisible = false;
+
 const DesignStep = {
     animCore: null,
     config: JSON.parse(JSON.stringify(DEFAULT_ANIM_CONFIG)),
@@ -2147,7 +2160,7 @@ const DesignStep = {
         this.lastFrameTimeMs = nowMs;
 
         this.animCore.renderFrame(playbackTimeSec, deltaTimeMs, nowMs);
-        drawDesignDiagnostics(playbackTimeSec);
+        if (diagnosticVisible) drawDesignDiagnostics(playbackTimeSec);
 
         if (state.player.paused) return;                                  // one-shot redraw finished
         this.recordFrameStats(deltaTimeMs, nowMs);
@@ -2182,6 +2195,7 @@ const DesignStep = {
 // two distinct peaks that the render is still blurring together, that confirms 
 // it's a render-side fix.
 function drawDesignDiagnostics(playbackTimeSec) {
+    if (!diagnosticVisible) return;
     const context = diagnosticCanvas.getContext('2d');
     const canvasWidth = diagnosticCanvas.width;
     const canvasHeight = diagnosticCanvas.height;
@@ -2260,6 +2274,11 @@ document.getElementById('design-export-btn').onclick = () => {
     state.animConfig = DesignStep.config;
     DesignStep.reset(); // TODO: make sense here?
     finishBtn.click();
+};
+
+document.getElementById('diagnostic-toggle').onchange = (event) => {
+    diagnosticVisible = event.target.checked;
+    diagnosticCanvas.style.display = diagnosticVisible ? '' : 'none';
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -3597,6 +3616,8 @@ document.getElementById('zoom-reset-btn')?.addEventListener('click', () => {
 // Live Mode in a new tab
 previewBtn.addEventListener('click', () => {
     if (state.player) state.player.pause();
+    const text = lyricsInput.value.split('\n').find(line => line.trim()) || null; // capture first entry if any
+    state.results = [{ text, start: 0 }];
     const url = URL.createObjectURL(new Blob([buildFizxHtml()], { type: 'text/html' }));
     window.open(url, '_blank');
     // Revoke after a delay — tab has already loaded the document by then.
@@ -4190,10 +4211,11 @@ window.goatcounter = {
 })();
 
 // ═══════════════════════════════════════════════════════════════════
-// service WORKER
+// Service worker registeration
+// Registers only on secure origins (https); skipped silently on file://
+// Remove "https" check to test the SW itself locally
 // ═══════════════════════════════════════════════════════════════════
-// Only where service workers exist (https or localhost); skipped silently on file://
-if ('serviceWorker' in navigator && window.isSecureContext) {
+if ('serviceWorker' in navigator && window.isSecureContext && location.protocol === 'https:') {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('[sw] registration failed:', err));
     });

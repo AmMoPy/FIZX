@@ -1,6 +1,24 @@
-// Offline shell for the FIZX studio (a single self-contained HTML file, deployed as index.html).
-const CACHE_NAME = 'FIZX-v1';                                  // bump by hand on every release
-const CACHE_TTL = 86400 * 30;                                  // seconds; past this, a cached entry is revalidated in the background (safety net if a bump is forgotten)
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Offline shell for the FIZX studio (self-contained HTML file, deployed as index.html).
+// It exists just to ensure offline MP4 export triggered from studio works when browsers 
+// act funny, because:
+//
+//   1. WebCodecs (VideoEncoder) is a secure-context API. On file:// and
+//      plain http://, it is undefined by some browsers, so MP4 export will not work!
+//      This is a browser platform constraint, not a design choice.
+//
+//   2. On HTTPS, export works on every visit (secure origin). But breaks true 
+//      offline experience without a service worker as each export would require 
+//      new visit. The SW caches the studio for offline use after the first visit.
+//
+// This does not contradict the studio being a single self-contained HTML file, 
+// it remains the source of truth — all fonts, WASM, code, and UI are inlined.
+// The SW is a static cache layer, not a backend. Studio is fully functional from file:// 
+// including MP4 export! depending on which browser serve it and how that browser 
+// classify file:// (Chrome, I am looking at you!)
+// ══════════════════════════════════════════════════════════════════════════════════════
+const CACHE_NAME = 'FIZX-v1.7.0';   // bump manually on every release
+const CACHE_TTL = 86400 * 30;     // seconds; past this, a cached entry is revalidated in the background (safety net if a bump is forgotten)
 const ASSETS = ['./', './index.html', './manifest.json', './assets/icons/arrow.png'];
 const STAMP = 'x-sw-cached-at';
 
