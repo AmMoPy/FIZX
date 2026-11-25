@@ -17,9 +17,14 @@
 // including MP4 export! depending on which browser serve it and how that browser 
 // classify file:// (Chrome, I am looking at you!)
 // ══════════════════════════════════════════════════════════════════════════════════════
-const CACHE_NAME = 'FIZX-v1.7.0';   // bump manually on every release
+const CACHE_NAME = 'FIZX-v1.7.1';   // bump manually on every release
 const CACHE_TTL = 86400 * 30;     // seconds; past this, a cached entry is revalidated in the background (safety net if a bump is forgotten)
-const ASSETS = ['./', './index.html', './manifest.json', './assets/icons/arrow.png'];
+const ASSETS = [
+    './',
+    './index.html',
+    './manifest.json',
+    './assets/fizx.svg'
+];
 const STAMP = 'x-sw-cached-at';
 
 // Store a response together with the time it was cached, so the TTL can be checked later.
