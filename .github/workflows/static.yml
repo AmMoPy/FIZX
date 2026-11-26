@@ -9,30 +9,40 @@ permissions:
   pages: write
   id-token: write
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Rename Studio to Index
-        run: cp studio.html index.html # Copies studio to index for the build only
+      - name: Prepare clean site folder
+        run: |
+          mkdir -p _site/assets
+          cp studio.html _site/index.html
+          cp sw.js manifest.json _site/
+          cp assets/fizx.svg _site/assets/
+          cp -r assets/icons _site/assets/
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.' # Uploads the whole root (including the new index.html)
-          name: github-pages-${{ github.run_attempt }}
+          path: '_site'
 
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        with:
-          artifact_name: github-pages-${{ github.run_attempt }}
