@@ -471,7 +471,8 @@ const FizxExport = (() => {
         // The pin uses the stage's current rectangle, which is the same one exportMp4 already measured. 
         // A window resize or a mobile URL-bar change mid-export can no longer change the frames.
         _pinnedStage = { style: stageEl.getAttribute('style'), rect: stageEl.getBoundingClientRect() };
-        stageEl.style.transition = 'none';                                      // the stage animates max-width/aspect-ratio; no animation while pinned
+        _pinnedShown = false;                                     // ensure entry animation play at the start of the video
+        stageEl.style.transition = 'none';                        // the stage animates max-width/aspect-ratio; no animation while pinned
         stageEl.style.width = _pinnedStage.rect.width + 'px';
         stageEl.style.height = _pinnedStage.rect.height + 'px';
         stageEl.style.maxWidth = 'none';

@@ -986,14 +986,20 @@ function toggleNextL() {
 // PRESET APPLICATION
 // Injects CSS vars, sets flash color var, toggles CRT class,
 // ═══════════════════════════════════════════════════════════════════
-// Resolve the active preset's LUT entry once per preset switch, not per frame
-function _resolveLutEffect(presetKey) {
+function resetLutState() {
     [...currentLineEl.classList].forEach(c => { if (c.endsWith('-LUT')) currentLineEl.classList.remove(c); });
+    currentLineEl.style.removeProperty('animation-play-state');
+    currentLineEl.style.removeProperty('animation-delay');
     screenEl.classList.remove('screen-flash-LUT', 'scan-active');
     screenEl.style.removeProperty('animation-duration');
     screenEl.style.removeProperty('animation-delay');
     screenEl.style.removeProperty('animation-play-state');
     _scanUntil = 0;
+}
+
+// Resolve the active preset's LUT entry once per preset switch, not per frame
+function _resolveLutEffect(presetKey) {
+    resetLutState();
 
     const p = PRESETS[presetKey];
     const entry = p && p.effects && p.effects.find(fx => fx.className.endsWith('-LUT'));
@@ -1108,7 +1114,24 @@ function triggerVisual() {
 // LYRICS CURSOR
 // Updates DOM text content only when the lyric index changes.
 // ═══════════════════════════════════════════════════════════════════
+// A single lyric entry at t=0 is user-written text, not a timed song: 
+// it stays up for the whole session. No cursor, no "before the song" state, 
+// no credits, and no entry/exit replay on seek, track change or loop.
+const isPinnedText = () => LYRICS.length === 1 && LYRICS[0].start <= 0;
+let _pinnedShown = false; // pushed into core once; seeks and track changes never touch it again
+
 function updateLyrics(t) {
+
+    if (isPinnedText()) {
+        currentLyricIdx = 0;               // everything that reads the cursor (exit check, export) sees "showing the only entry"
+        if (!_pinnedShown) {
+            _pinnedShown = true;
+            core.setLyricText(LYRICS[0].text);
+            _exited = true;                // never an exit animation: there is no next line
+            // nextLineEl.textContent = ''; 
+        }
+        return;
+    }
 
     const lastLyric = LYRICS[LYRICS.length - 1];
 
@@ -1257,7 +1280,7 @@ function displayLoop() {
     if (isPlaying && !isSeeking) {
         timeDisplay.textContent = t.toFixed(3);
         _updateSeekBarVisual(t);
-        if (!playlistMode) updateLyrics(t);
+        if (!playlistMode || isPinnedText()) updateLyrics(t);
 
         if (LUT_MODE || liveMode) {
             // continuous path: direct index every frame (LUT) or live band values (playlist mode)
@@ -1475,9 +1498,15 @@ async function resetAudio() {
     seekBar.value             = 0;
     seekBar.style.background  = '';
     playBtn.innerHTML         = icon('play');
-    currentLineEl.innerHTML   = '';
+    _pinnedShown              = false; // the next updateLyrics() re-pushes the pinned text into core, which writes both layers
+    nextLBtn.click();
     nextLineEl.innerHTML      = `${icon('play')} select audio file ${icon('grid')} live playback`;
     statusMsg.innerHTML       = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
+
+    // THE REAL NASTY BUG -LUT class's paused animation state being left on #currentLine after the mode transition
+    // Future me: "state that lives in the DOM (class, inline style, animation play state) doesn't get reset by resetting the JavaScript state."
+    core.setLyricText('');   // update both layers are glow mirrors current line, otherwise glow will still be visible
+    resetLutState(); // Removing the class removes the state, any future mode-transition (live/normal/etc..) function should call this
 
     // 7.
     requestAnimationFrame(displayLoop);
@@ -1542,7 +1571,7 @@ async function plAdd(files) {
         _stopBufferSource();                                   // leave song mode
         playlistMode = true; liveMode = true;
         _ensureMedia();
-        // setLyricsCircleMode('circle');                         // compiled lyrics belong to the song, not to the playlist
+        // setLyricsCircleMode(isPinnedText() ? 'both' : 'circle'); // pinned text belongs to session; song lyrics do not belong to playlist
         nextLBtn.click();                                      // Keep current line only if user is animating name/brand
     }
     playlist.push(...fresh);
@@ -1920,7 +1949,7 @@ seekBar.addEventListener('input', () => {
     if (!audioDuration) return;
     const t = (seekBar.value / 100) * audioDuration;
     timeDisplay.textContent = fmt(t);
-    updateLyrics(t);
+    if (!playlistMode || isPinnedText()) updateLyrics(t);
 });
 seekBar.addEventListener('change', () => {
     isSeeking = false;
