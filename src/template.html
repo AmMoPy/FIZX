@@ -1109,7 +1109,6 @@ function triggerVisual() {
 // Updates DOM text content only when the lyric index changes.
 // ═══════════════════════════════════════════════════════════════════
 function updateLyrics(t) {
-    if (!LYRICS.length) return;
 
     const lastLyric = LYRICS[LYRICS.length - 1];
 
@@ -1123,10 +1122,12 @@ function updateLyrics(t) {
         }
     }
 
+    if (!LYRICS.length) return;
+
     if (t < LYRICS[0].start) { // "Before Song Starts"
         if (currentLyricIdx !== -2) {
-            // currentLineEl.innerHTML = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
-            // nextLineEl.textContent  = `\u27a1 ${LYRICS[0].text}`;
+            currentLineEl.innerHTML = '';
+            nextLineEl.textContent  = `\u27a1 ${LYRICS[0].text}`;
             currentLyricIdx = -2;
         }
         return;
@@ -1172,8 +1173,8 @@ function _updateSeekBarVisual(t) {
 }
 
 function seekTo(pct) {
-    if (playlistMode) { if (mediaEl && audioDuration) mediaEl.currentTime = (pct / 100) * audioDuration; return; }
     const target = (pct / 100) * audioDuration;
+    if (playlistMode) { if (mediaEl) mediaEl.currentTime = target; return; }
     // Reset pointers and fast-forward to target without firing triggers
     lastFiredBeatIdx = 0;
     currentLyricIdx  = -1;
@@ -1474,9 +1475,9 @@ async function resetAudio() {
     seekBar.value             = 0;
     seekBar.style.background  = '';
     playBtn.innerHTML         = icon('play');
-    currentLineEl.innerHTML   = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
+    currentLineEl.innerHTML   = '';
     nextLineEl.innerHTML      = `${icon('play')} select audio file ${icon('grid')} live playback`;
-    statusMsg.innerHTML       = `${icon('refresh')} select new file`;
+    statusMsg.innerHTML       = `${icon('bolt')} FIZX READY ${icon('bolt')}`;
 
     // 7.
     requestAnimationFrame(displayLoop);
@@ -1684,7 +1685,7 @@ async function exportMp4() {
     // But VideoEncoder is still undefined depending on how the caller browser classify file://
     if (!window.isSecureContext || typeof VideoEncoder === 'undefined') { 
         statusMsg.textContent = 'EXPORT UNAVAILABLE - NEEDS HTTPS OR LOCALHOST';
-        statusMsg.title = 'Visit the hosted studio, or download a compiled template and open it from disk, or serve this file from localhost.';
+        statusMsg.title = 'Visit the studio online, or download a compiled template and open it from disk, or serve this file from localhost.';
         return;
     }
     if (!audioBuffer) { statusMsg.textContent = 'LOAD AUDIO FIRST'; return; }

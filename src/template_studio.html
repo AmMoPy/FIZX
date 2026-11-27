@@ -1690,7 +1690,8 @@ const DesignStep = {
         // already visible when init() runs — clientWidth is 0 on a display:none
         // element, which would leave the canvas with no drawable area.
         // call showView('design') before DesignStep.init()
-        diagnosticCanvas.width = diagnosticCanvas.clientWidth;
+        // Resizing on parent assumes both has same width, breaks otherwise.
+        diagnosticCanvas.width = diagnosticCanvas.parentElement.clientWidth; // ensure toggle always works on re-entry if was hidden 
         diagnosticCanvas.height = 72;  // width is fitted on every draw instead
         this.requestFrame();           // paint the first still frame
     },
@@ -2641,27 +2642,28 @@ function creatPLayer(file) {
     attachPlayerListeners(state.player);
 }
 
-async function analAudio() {
-    if (state.mode !== 'buffer') {
+async function analAudio(force = false) {
+    if (state.mode !== 'buffer' || force) {
         showOverlay(state.engine);
 
-        // Full-mix beat extraction — drives beat visualizer sync
-        const result = await extractRadix(state.audioFile, onProgress);
+        try {
+            // Full-mix beat extraction — drives beat visualizer sync
+            const result = await extractRadix(state.audioFile, onProgress);
 
-        if (state.engine === 'lut') {
-            applyAnalysisResult(result);
-        } else {
-            state.beats = result.onsets;
-            state.bpm   = result.bpm;
+            if (state.engine === 'lut') {
+                applyAnalysisResult(result);
+            } else {
+                state.beats = result.onsets;
+                state.bpm   = result.bpm;
+            }
+            
+            if (!state.beats.length) {
+                toast('No onsets detected — switching to manual mode');
+                state.mode = 'buffer';
+            }
+        } finally {
+            analysisOverlay.classList.remove('visible');
         }
-        
-        if (!state.beats.length) {
-            toast('No onsets detected — switching to manual mode');
-            state.mode = 'buffer';
-            return;
-        } 
-
-        analysisOverlay.classList.remove('visible');
     }
 }
 
@@ -2703,7 +2705,6 @@ startBtn.addEventListener('click', async () => {
         await state.player.play();
         updateProgress();
     } catch (err) {
-        analysisOverlay.classList.remove('visible');
         console.error('Setup failed:', err);
         toast('Setup failed: ' + (err.message || err));
         showView('setup');
@@ -3617,7 +3618,7 @@ document.getElementById('zoom-reset-btn')?.addEventListener('click', () => {
 previewBtn.addEventListener('click', () => {
     if (state.player) state.player.pause();
     const text = lyricsInput.value.split('\n').find(line => line.trim()) || null; // capture first entry if any
-    state.results = [{ text, start: 0 }];
+    if (text) state.results = [{ text, start: 0 }];
     const url = URL.createObjectURL(new Blob([buildFizxHtml()], { type: 'text/html' }));
     window.open(url, '_blank');
     // Revoke after a delay — tab has already loaded the document by then.
@@ -3760,26 +3761,27 @@ reanalBtn.addEventListener('click', async () => {
         toast('Re-analyze not available in manual mode');
         return;
     }
-    pbStop.click()
-    reanalBtn.disabled    = true;
-    reanalBtn.innerHTML = `${icon('reanalyze')} ANALYZING…`;
-    // Read engine selection fresh — user may have changed it since session start
-    state.engine = document.querySelector('input[name="engine"]:checked')?.value || 'lut';
+    if (!isAnalFresh()) { // only run if new params in 
+        pbStop.click() // ";" ignored for a reason
+        reanalBtn.disabled    = true;
+        reanalBtn.innerHTML = `${icon('reanalyze')} ANALYZING…`;
+        // Read engine selection fresh — user may have changed it since session start
+        state.engine = document.querySelector('input[name="engine"]:checked')?.value || 'lut';
 
-    showOverlay(state.engine);
-
-    try {
-        await analAudio(); // no need for sig guard, this is a "forced re-run" that should update the sig 
-        bpmDisplay.textContent = state.bpm > 0 ? `${state.bpm} BPM` : 'BPM —';
-        toast(`${icon('reanalyze')} ${state.beats.length} ${state.engine === 'lut' ? 'LUT frames' : 'onsets'} · ${state.bpm} BPM`);
-    } catch (err) {
-        console.error('Re-analyze failed:', err);
-        toast('Re-analyze failed: ' + (err.message || err));
-    } finally {
-        analysisOverlay.classList.remove('visible');
-        reanalBtn.disabled    = false;
-        reanalBtn.innerHTML = `${icon('reanalyze')} RE-ANALYZE`;
-        if (previewWrap.classList.contains('visible')) autoassBtn.click(); // display updated timestamps
+        try {
+            await analAudio();
+            bpmDisplay.textContent = state.bpm > 0 ? `${state.bpm} BPM` : 'BPM —';
+            toast(`${icon('reanalyze')} ${state.beats.length} ${state.engine === 'lut' ? 'LUT frames' : 'onsets'} · ${state.bpm} BPM`);
+        } catch (err) {
+            console.error('Re-analyze failed:', err);
+            toast('Re-analyze failed: ' + (err.message || err));
+        } finally {
+            reanalBtn.disabled    = false;
+            reanalBtn.innerHTML = `${icon('reanalyze')} RE-ANALYZE`;
+            if (previewWrap.classList.contains('visible')) autoassBtn.click(); // display updated timestamps
+        }
+    } else {
+        toast('Change Params Then Re-analyze');
     }
 });
 
@@ -3798,7 +3800,16 @@ const ACTIONS = {
         // Re-sync session-params visibility in case engine changed in output view
         updateParamVisibility(); 
     },
-    'nav-design': () => {
+    'nav-design': async () => {
+        if (!isAnalFresh()) {
+            // force analysis if not already (e.g.: lyrics only > design)
+            try { await analAudio(true); }
+            catch {
+                console.error('[nav-design] analysis failed:', err);
+                toast('Analysis failed: ' + (err.message || err));
+                // fall through — free navigation means the design view still opens
+            }
+        }
         showView('design');
         DesignStep.init();
     },
